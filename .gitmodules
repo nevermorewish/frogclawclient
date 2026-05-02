@@ -1,11 +1,11 @@
 [submodule "src-tauri/crates/open-agent-sdk"]
 	path = src-tauri/crates/open-agent-sdk
-	url = git@github.com:AQBot-Desktop/open-agent-sdk-rust.git
+	url = https://github.com/AQBot-Desktop/open-agent-sdk-rust.git
 [submodule "libs/markstream-vue"]
 	path = libs/markstream-vue
-	url = git@github.com:AQBot-Desktop/markstream-vue.git
+	url = https://github.com/AQBot-Desktop/markstream-vue.git
 	branch = aqbot-custom
 [submodule "libs/stream-monaco"]
 	path = libs/stream-monaco
-	url = git@github.com:AQBot-Desktop/stream-monaco.git
+	url = https://github.com/AQBot-Desktop/stream-monaco.git
 	branch = main
