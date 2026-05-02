@@ -31,7 +31,7 @@ jobs:
       - name: Configure and update submodules
         shell: pwsh
         env:
-          SUBMODULE_TOKEN: ${{ secrets.SUBMODULE_TOKEN || secrets.GH_PAT || github.token }}
+          SUBMODULE_TOKEN: ${{ secrets.SUBMODULE_TOKEN || secrets.GH_PAT }}
         run: |
           if ($env:SUBMODULE_TOKEN) {
             Write-Host "::add-mask::$env:SUBMODULE_TOKEN"
