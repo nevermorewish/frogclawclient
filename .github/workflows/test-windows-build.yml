@@ -1,7 +1,10 @@
 ﻿name: Test Windows Build
 
 on:
+  workflow_dispatch:
   push:
+    branches:
+      - main
     tags:
       - 'test-windows-v*.*.*'
 
@@ -86,22 +89,39 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Disable updater artifacts when signing key is unavailable
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if ($env:TAURI_SIGNING_PRIVATE_KEY) {
+            Write-Host "TAURI_SIGNING_PRIVATE_KEY is set; updater artifacts will be signed."
+            exit 0
+          }
+
+          Write-Host "TAURI_SIGNING_PRIVATE_KEY is not set; disabling updater artifacts for this test build."
+          node -e "const fs=require('fs'); const path='src-tauri/tauri.conf.json'; const c=JSON.parse(fs.readFileSync(path,'utf8')); c.bundle.createUpdaterArtifacts=false; fs.writeFileSync(path, JSON.stringify(c,null,2)+String.fromCharCode(10));"
+
       - name: Build with Tauri
-        uses: tauri-apps/tauri-action@v0
+        shell: pwsh
         env:
           NODE_OPTIONS: '--max_old_space_size=4096'
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: pnpm tauri build --target x86_64-pc-windows-msvc
+
+      - name: Upload Windows build artifacts
+        uses: actions/upload-artifact@v4
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'FrogClawClient Test ${{ github.ref_name }}'
-          releaseDraft: true
-          prerelease: true
-          tauriScript: pnpm tauri
-          args: --target x86_64-pc-windows-msvc
+          name: FrogClawClient-windows-x64-${{ github.run_number }}
+          if-no-files-found: error
+          path: |
+            src-tauri/target/x86_64-pc-windows-msvc/release/FrogClawClient.exe
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*setup.exe
 
       - name: Package Windows portable (zip)
+        if: startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         run: |
           $exe = "src-tauri/target/x86_64-pc-windows-msvc/release/FrogClawClient.exe"
@@ -109,9 +129,15 @@ jobs:
           Compress-Archive -Path $exe -DestinationPath $zipName
 
       - name: Upload Windows portable to release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
+          name: 'FrogClawClient Test ${{ github.ref_name }}'
           draft: true
+          prerelease: true
           token: ${{ secrets.GITHUB_TOKEN }}
-          files: FrogClawClient_${{ github.ref_name }}_windows-x64-portable.zip
+          files: |
+            FrogClawClient_${{ github.ref_name }}_windows-x64-portable.zip
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*setup.exe
