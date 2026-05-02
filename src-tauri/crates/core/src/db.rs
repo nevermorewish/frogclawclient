@@ -1,4 +1,4 @@
-use aqbot_migration::MigratorTrait;
+use frogclaw_migration::MigratorTrait;
 use sea_orm::{
     ConnectOptions, ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement,
 };
@@ -39,7 +39,7 @@ pub async fn create_pool(db_path: &str) -> Result<DbHandle> {
     .await?;
 
     // Run SeaORM migrations
-    aqbot_migration::Migrator::up(&conn, None).await?;
+    frogclaw_migration::Migrator::up(&conn, None).await?;
 
     info!("Database initialized at {}", db_path);
     Ok(DbHandle { conn })

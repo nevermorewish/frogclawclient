@@ -32,7 +32,7 @@ describe('buildAssistantDisplayContent', () => {
   });
 
   it('returns content with :::mcp containers unchanged', () => {
-    const content = ':::mcp {"name":"@aqbot/fetch","tool":"fetch_url"}\nresult\n:::\n';
+    const content = ':::mcp {"name":"@frogclaw/fetch","tool":"fetch_url"}\nresult\n:::\n';
     const msg = makeMessage({ content });
     expect(buildAssistantDisplayContent(msg, [])).toBe(content);
   });

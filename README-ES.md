@@ -1,9 +1,9 @@
 [简体中文](./README.md) | [繁體中文](./README-ZH-TW.md) | [English](./README-EN.md) | [日本語](./README-JA.md) | [한국어](./README-KO.md) | [Français](./README-FR.md) | [Deutsch](./README-DE.md) | **Español** | [Русский](./README-RU.md) | [हिन्दी](./README-HI.md) | [العربية](./README-AR.md)
 
-[![AQBot](https://socialify.git.ci/AQBot-Desktop/AQBot/image?description=1&font=JetBrains+Mono&forks=1&issues=1&logo=https%3A%2F%2Fgithub.com%2FAQBot-Desktop%2FAQBot%2Fblob%2Fmain%2Fsrc%2Fassets%2Fimage%2Flogo.png%3Fraw%3Dtrue&name=1&owner=1&pattern=Floating+Cogs&pulls=1&stargazers=1&theme=Auto)](https://github.com/AQBot-Desktop/AQBot)
+[![FrogClawClient](https://socialify.git.ci/FrogClawClient-Desktop/FrogClawClient/image?description=1&font=JetBrains+Mono&forks=1&issues=1&logo=https%3A%2F%2Fgithub.com%2FFrogClawClient-Desktop%2FFrogClawClient%2Fblob%2Fmain%2Fsrc%2Fassets%2Fimage%2Flogo.png%3Fraw%3Dtrue&name=1&owner=1&pattern=Floating+Cogs&pulls=1&stargazers=1&theme=Auto)](https://github.com/FrogClawClient-Desktop/FrogClawClient)
 
 <p align="center">
-    <a href="https://www.producthunt.com/products/aqbot?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-aqbot" target="_blank" rel="noopener noreferrer"><img alt="AQBot - Lightweight, high-perf cross-platform AI desktop client | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1118403&amp;theme=light&amp;t=1775627359538"></a>
+    <a href="https://www.producthunt.com/products/frogclaw?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-frogclaw" target="_blank" rel="noopener noreferrer"><img alt="FrogClawClient - Lightweight, high-perf cross-platform AI desktop client | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1118403&amp;theme=light&amp;t=1775627359538"></a>
 </p>
 
 ## Capturas de pantalla
@@ -68,7 +68,7 @@
 ### Herramientas y extensiones
 
 - **Protocolo MCP** — Implementación completa del Model Context Protocol con soporte para transportes stdio y HTTP
-- **Herramientas integradas** — Herramientas MCP integradas listas para usar como `@aqbot/fetch`
+- **Herramientas integradas** — Herramientas MCP integradas listas para usar como `@frogclaw/fetch`
 - **Panel de ejecución de herramientas** — Visualización de solicitudes de llamadas a herramientas y resultados devueltos
 
 ### Pasarela API
@@ -83,7 +83,7 @@
 ### Datos y seguridad
 
 - **Cifrado AES-256** — Las claves API y los datos sensibles se cifran localmente con AES-256; clave maestra almacenada con permisos 0600
-- **Directorios de datos aislados** — Estado de la aplicación en `~/.aqbot/`; archivos de usuario en `~/Documents/aqbot/`
+- **Directorios de datos aislados** — Estado de la aplicación en `~/.frogclaw/`; archivos de usuario en `~/Documents/frogclaw/`
 - **Copia de seguridad automática** — Copias de seguridad automáticas programadas en directorios locales o almacenamiento WebDAV
 - **Restauración de copia de seguridad** — Restauración con un clic desde copias de seguridad históricas
 - **Exportación de conversación** — Exportar conversaciones como capturas PNG, Markdown, texto plano o JSON
@@ -109,7 +109,7 @@
 
 ## Primeros pasos
 
-Ve a la página de [Releases](https://github.com/AQBot-Desktop/AQBot/releases) y descarga el instalador para tu plataforma.
+Ve a la página de [Releases](https://github.com/FrogClawClient-Desktop/FrogClawClient/releases) y descarga el instalador para tu plataforma.
 
 ## Preguntas frecuentes
 
@@ -117,8 +117,8 @@ Ve a la página de [Releases](https://github.com/AQBot-Desktop/AQBot/releases) y
 
 Dado que la aplicación no está firmada por Apple, macOS puede mostrar uno de los siguientes mensajes:
 
-- «AQBot» está dañado y no se puede abrir
-- «AQBot» no se puede abrir porque Apple no puede comprobar si contiene software malicioso
+- «FrogClawClient» está dañado y no se puede abrir
+- «FrogClawClient» no se puede abrir porque Apple no puede comprobar si contiene software malicioso
 
 **Pasos para resolver el problema:**
 
@@ -133,7 +133,7 @@ Luego ve a **Configuración del sistema → Privacidad y seguridad → Seguridad
 **2. Eliminar el atributo de cuarentena**
 
 ```bash
-sudo xattr -dr com.apple.quarantine /Applications/AQBot.app
+sudo xattr -dr com.apple.quarantine /Applications/FrogClawClient.app
 ```
 
 > Consejo: Puedes arrastrar el ícono de la app al terminal después de escribir `sudo xattr -dr com.apple.quarantine `.

@@ -7,7 +7,7 @@
 use async_trait::async_trait;
 use sea_orm::DatabaseConnection;
 
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 use crate::types::{RagContextResult, RagRetrievedItem, RagSourceResult};
 use crate::vector_store::{EmbeddingRecord, VectorSearchResult, VectorStore};
 use crate::{document_parser, text_chunker};
@@ -59,7 +59,7 @@ impl RAGSource for KnowledgeRAG {
     ) -> Result<String> {
         let kb = crate::repo::knowledge::get_knowledge_base(db, container_id).await?;
         kb.embedding_provider.ok_or_else(|| {
-            AQBotError::Provider("Knowledge base has no embedding provider configured".to_string())
+            FrogClawClientError::Provider("Knowledge base has no embedding provider configured".to_string())
         })
     }
 }
@@ -84,7 +84,7 @@ impl RAGSource for MemoryRAG {
     ) -> Result<String> {
         let ns = crate::repo::memory::get_namespace(db, container_id).await?;
         ns.embedding_provider.ok_or_else(|| {
-            AQBotError::Provider(
+            FrogClawClientError::Provider(
                 "Memory namespace has no embedding provider configured".to_string(),
             )
         })
@@ -133,7 +133,7 @@ pub async fn search<S: RAGSource + ?Sized>(
         .embeddings
         .into_iter()
         .next()
-        .ok_or_else(|| AQBotError::Provider("No query embedding returned".into()))?;
+        .ok_or_else(|| FrogClawClientError::Provider("No query embedding returned".into()))?;
 
     let results = vector_store.search(&cid, query_embedding, top_k).await?;
     Ok(results)
@@ -173,7 +173,7 @@ pub async fn index(
     }
 
     if embeddings.len() != chunks.len() {
-        return Err(AQBotError::Provider(format!(
+        return Err(FrogClawClientError::Provider(format!(
             "Embedding count mismatch: got {} embeddings for {} chunks",
             embeddings.len(),
             chunks.len()

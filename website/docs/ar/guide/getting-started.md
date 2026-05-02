@@ -2,23 +2,23 @@
 
 ## التثبيت
 
-نزّل أحدث مثبّت من [صفحة التنزيل](/ar/download) أو [GitHub Releases](https://github.com/AQBot-Desktop/AQBot/releases).
+نزّل أحدث مثبّت من [صفحة التنزيل](/ar/download) أو [GitHub Releases](https://github.com/FrogClawClient-Desktop/FrogClawClient/releases).
 
 ### macOS
 
 | الشريحة | الملف |
 |---------|-------|
-| Apple Silicon (M1 / M2 / M3 / M4) | `AQBot_x.x.x_aarch64.dmg` |
-| Intel | `AQBot_x.x.x_x64.dmg` |
+| Apple Silicon (M1 / M2 / M3 / M4) | `FrogClawClient_x.x.x_aarch64.dmg` |
+| Intel | `FrogClawClient_x.x.x_x64.dmg` |
 
-1. افتح `.dmg` واسحب **AQBot** إلى مجلد **Applications**.
-2. أطلق AQBot. إذا حظرت macOS التطبيق، اذهب إلى **إعدادات النظام ← الخصوصية والأمان** وانقر **فتح على أي حال**.
+1. افتح `.dmg` واسحب **FrogClawClient** إلى مجلد **Applications**.
+2. أطلق FrogClawClient. إذا حظرت macOS التطبيق، اذهب إلى **إعدادات النظام ← الخصوصية والأمان** وانقر **فتح على أي حال**.
 
 ::: warning macOS: "التطبيق تالف" أو "لا يمكن التحقق من المطوّر"
 إذا رأيت أياً من هذه الرسائل، افتح Terminal ونفّذ:
 
 ```bash
-xattr -c /Applications/AQBot.app
+xattr -c /Applications/FrogClawClient.app
 ```
 
 ثم أعد تشغيل التطبيق.
@@ -28,8 +28,8 @@ xattr -c /Applications/AQBot.app
 
 | البنية | الملف |
 |--------|-------|
-| x64 (معظم الأجهزة) | `AQBot_x.x.x_x64-setup.exe` |
-| ARM64 | `AQBot_x.x.x_arm64-setup.exe` |
+| x64 (معظم الأجهزة) | `FrogClawClient_x.x.x_x64-setup.exe` |
+| ARM64 | `FrogClawClient_x.x.x_arm64-setup.exe` |
 
 شغّل المثبّت واتبع المعالج.
 
@@ -37,14 +37,14 @@ xattr -c /Applications/AQBot.app
 
 ```bash
 # Debian / Ubuntu
-sudo dpkg -i AQBot_x.x.x_amd64.deb
+sudo dpkg -i FrogClawClient_x.x.x_amd64.deb
 
 # Fedora / openSUSE
-sudo rpm -i AQBot_x.x.x_x86_64.rpm
+sudo rpm -i FrogClawClient_x.x.x_x86_64.rpm
 
 # AppImage
-chmod +x AQBot_x.x.x_amd64.AppImage
-./AQBot_x.x.x_amd64.AppImage
+chmod +x FrogClawClient_x.x.x_amd64.AppImage
+./FrogClawClient_x.x.x_amd64.AppImage
 ```
 
 ---
@@ -53,7 +53,7 @@ chmod +x AQBot_x.x.x_amd64.AppImage
 
 ### 1. فتح الإعدادات
 
-أطلق AQBot وانقر على **أيقونة الترس** في أسفل الشريط الجانبي، أو اضغط <kbd>Cmd/Ctrl</kbd>+<kbd>,</kbd>.
+أطلق FrogClawClient وانقر على **أيقونة الترس** في أسفل الشريط الجانبي، أو اضغط <kbd>Cmd/Ctrl</kbd>+<kbd>,</kbd>.
 
 ### 2. إضافة مزوّد
 
@@ -83,7 +83,7 @@ chmod +x AQBot_x.x.x_amd64.AppImage
 1. انقر **محادثة جديدة** في الشريط الجانبي (أو اضغط <kbd>Cmd/Ctrl</kbd>+<kbd>N</kbd>).
 2. اختر نموذجاً من محدد النماذج في أعلى المحادثة.
 3. اكتب رسالة واضغط <kbd>Enter</kbd>.
-4. يبثّ AQBot الاستجابة في الوقت الفعلي. النماذج التي تدعم كتل التفكير (مثل Claude وDeepSeek R1) تعرض عملية الاستدلال في قسم قابل للطي.
+4. يبثّ FrogClawClient الاستجابة في الوقت الفعلي. النماذج التي تدعم كتل التفكير (مثل Claude وDeepSeek R1) تعرض عملية الاستدلال في قسم قابل للطي.
 
 ---
 
@@ -107,8 +107,8 @@ chmod +x AQBot_x.x.x_amd64.AppImage
 
 | المسار | المحتوى |
 |--------|---------|
-| `~/.aqbot/` | حالة التطبيق — قاعدة البيانات ومفاتيح التشفير وقاعدة البيانات المتجهة وشهادات SSL |
-| `~/Documents/aqbot/` | ملفات المستخدم — الصور والمستندات والنسخ الاحتياطية |
+| `~/.frogclaw/` | حالة التطبيق — قاعدة البيانات ومفاتيح التشفير وقاعدة البيانات المتجهة وشهادات SSL |
+| `~/Documents/frogclaw/` | ملفات المستخدم — الصور والمستندات والنسخ الاحتياطية |
 
 ---
 

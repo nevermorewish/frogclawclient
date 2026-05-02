@@ -265,98 +265,6 @@ export interface UpdateConversationInput {
   mode?: 'chat' | 'agent';
 }
 
-// === Gateway System ===
-export interface GatewayStatus {
-  is_running: boolean;
-  listen_address: string;
-  port: number;
-  ssl_enabled: boolean;
-  started_at: number | null;
-  /** HTTPS listener port; `null` when SSL is disabled or not yet started. */
-  https_port: number | null;
-  /** When `true` the gateway redirects all HTTP traffic to HTTPS. */
-  force_ssl: boolean;
-}
-
-export interface GatewayKey {
-  id: string;
-  name: string;
-  key_hash: string;
-  key_prefix: string;
-  enabled: boolean;
-  created_at: number;
-  last_used_at: number | null;
-  has_encrypted_key: boolean;
-}
-
-export interface CreateGatewayKeyResult {
-  gateway_key: GatewayKey;
-  plain_key: string;
-}
-
-export interface GatewayMetrics {
-  total_requests: number;
-  total_tokens: number;
-  total_request_tokens: number;
-  total_response_tokens: number;
-  active_connections: number;
-  today_requests: number;
-  today_tokens: number;
-  today_request_tokens: number;
-  today_response_tokens: number;
-}
-
-export interface UsageByKey {
-  key_id: string;
-  key_name: string;
-  request_count: number;
-  token_count: number;
-  request_tokens: number;
-  response_tokens: number;
-}
-
-export interface UsageByProvider {
-  provider_id: string;
-  provider_name: string;
-  request_count: number;
-  token_count: number;
-  request_tokens: number;
-  response_tokens: number;
-}
-
-export interface UsageByDay {
-  date: string;
-  request_count: number;
-  token_count: number;
-  request_tokens: number;
-  response_tokens: number;
-}
-
-export interface ConnectedProgram {
-  key_id: string;
-  key_name: string;
-  key_prefix: string;
-  today_requests: number;
-  today_tokens: number;
-  today_request_tokens: number;
-  today_response_tokens: number;
-  last_active_at: number | null;
-  is_active: boolean;
-}
-
-export interface GatewayStats {
-  total_requests: number;
-  active_connections: number;
-  uptime_seconds: number;
-  requests_per_minute: number;
-}
-
-export interface GatewaySettings {
-  listen_address: string;
-  port: number;
-  load_balance_strategy: 'round_robin';
-}
-
 // === Settings ===
 export interface AppSettings {
   language: string;
@@ -409,17 +317,7 @@ export interface AppSettings {
   shortcut_fill_last_message: string;
   shortcut_clear_context: string;
   shortcut_clear_conversation_messages: string;
-  shortcut_toggle_gateway: string;
   shortcut_toggle_mode: string;
-  gateway_auto_start: boolean;
-  gateway_listen_address: string;
-  gateway_port: number;
-  gateway_ssl_enabled: boolean;
-  gateway_ssl_mode: string;
-  gateway_ssl_cert_path: string | null;
-  gateway_ssl_key_path: string | null;
-  gateway_ssl_port: number;
-  gateway_force_ssl: boolean;
   // Desktop integration
   always_on_top?: boolean;
   tray_enabled?: boolean;
@@ -443,7 +341,7 @@ export interface AppSettings {
   webdav_max_remote_backups?: number;
   webdav_include_documents?: boolean;
   last_selected_conversation_id?: string | null;
-  /** Custom documents root override (overrides ~/Documents/aqbot/) */
+  /** Custom documents root override (overrides ~/Documents/frogclaw/) */
   documents_root_override?: string | null;
   /** Auto update check interval in minutes (default 60, min 1) */
   update_check_interval?: number;
@@ -508,7 +406,7 @@ export interface RealtimeConfig {
 }
 
 // === UI State ===
-export type PageKey = 'chat' | 'drawing' | 'knowledge' | 'memory' | 'gateway' | 'files' | 'settings' | 'skills';
+export type PageKey = 'home' | 'chat' | 'drawing' | 'knowledge' | 'memory' | 'files' | 'settings' | 'skills';
 
 // === Drawing ===
 export type DrawingModelId = 'gpt-image-2' | 'gpt-image-1.5' | 'gpt-image-1' | 'gpt-image-1-mini';
@@ -622,7 +520,7 @@ export interface Skill {
   description: string;
   author?: string;
   version?: string;
-  source: 'builtin' | 'aqbot' | 'claude' | 'agents' | 'project';
+  source: 'builtin' | 'frogclaw' | 'claude' | 'agents' | 'project';
   sourcePath: string;
   enabled: boolean;
   hasUpdate: boolean;
@@ -673,3 +571,4 @@ export * from './artifact';
 export * from './backup';
 export * from './workspace';
 export * from './agent';
+export * from './frogclawAccount';

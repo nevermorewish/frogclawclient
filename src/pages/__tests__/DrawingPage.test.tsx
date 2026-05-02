@@ -7,7 +7,6 @@ import type { DrawingGeneration, DrawingImage } from '@/types';
 vi.mock('@/pages/ChatPage', () => ({ ChatPage: () => <div>chat</div> }));
 vi.mock('@/pages/KnowledgePage', () => ({ KnowledgePage: () => <div>knowledge</div> }));
 vi.mock('@/pages/MemoryPage', () => ({ MemoryPage: () => <div>memory</div> }));
-vi.mock('@/pages/GatewayPage', () => ({ GatewayPage: () => <div>gateway</div> }));
 vi.mock('@/pages/FilesPage', () => ({ FilesPage: () => <div>files</div> }));
 vi.mock('@/pages/SettingsPage', () => ({ SettingsPage: () => <div>settings</div> }));
 vi.mock('@/pages/SkillsPage', () => ({ SkillsPage: () => <div>skills</div> }));
@@ -115,7 +114,7 @@ describe('DrawingPage routing', () => {
     expect(composer.style.backgroundColor).toBe('rgb(255, 255, 255)');
     expect(composer.style.border).toBe('1px solid var(--border-color)');
     expect(composer.style.borderRadius).toBe('16px');
-    expect(composer.querySelector('textarea')).toHaveClass('aqbot-input-textarea');
+    expect(composer.querySelector('textarea')).toHaveClass('frogclaw-input-textarea');
     expect(screen.getByTestId('drawing-history-scroll')).toHaveStyle({ paddingBottom: '192px' });
   });
 

@@ -19,7 +19,7 @@ const SCROLLABLE_SELECTORS = [
 
 const OS_OPTIONS: Parameters<typeof OverlayScrollbars>[1] = {
   scrollbars: {
-    theme: 'os-theme-aqbot',
+    theme: 'os-theme-frogclaw',
     autoHide: 'scroll',
     autoHideDelay: 600,
     autoHideSuspend: true,

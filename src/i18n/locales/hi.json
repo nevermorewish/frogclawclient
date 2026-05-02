@@ -1,8 +1,9 @@
-{
+﻿{
   "app": {
-    "name": "AQBot"
+    "name": "FrogClawClient"
   },
   "nav": {
+    "home": "होम",
     "chat": "चैट",
     "knowledge": "ज्ञान आधार",
     "memory": "स्मृति",
@@ -931,7 +932,7 @@
     "maxCount": "अधिकतम बैकअप रखें",
     "copies": "प्रतियाँ",
     "backupDir": "बैकअप निर्देशिका",
-    "defaultDir": "AQBot डिफ़ॉल्ट बैकअप निर्देशिका",
+    "defaultDir": "FrogClawClient डिफ़ॉल्ट बैकअप निर्देशिका",
     "effectiveDir": "प्रभावी निर्देशिका",
     "formatSqliteDesc": "तेज़, सीधी पुनर्स्थापना",
     "formatJsonDesc": "पठनीय, बड़ी फ़ाइल",
@@ -1086,7 +1087,7 @@
     "reloadConfirmOk": "रीलोड करें",
     "reloadConfirmCancel": "रद्द करें",
     "closeConfirmTitle": "एप्लिकेशन बंद करें",
-    "closeConfirmContent": "क्या आप AQBot बंद करना चाहते हैं?",
+    "closeConfirmContent": "क्या आप FrogClawClient बंद करना चाहते हैं?",
     "closeConfirmOk": "बंद करें",
     "closeConfirmCancel": "रद्द करें",
     "startMinimized": "छोटे रूप में शुरू करें",
@@ -1196,7 +1197,7 @@
     "uninstallConfirm": "क्या आप वाकई कौशल \"{{name}}\" को अनइंस्टॉल करना चाहते हैं?",
     "detail": "कौशल विवरण",
     "source": {
-      "aqbot": "AQBot",
+      "frogclaw": "FrogClawClient",
       "claude": "Claude",
       "agents": "Agents",
       "builtin": "बिल्ट-इन",

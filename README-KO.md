@@ -1,9 +1,9 @@
 [简体中文](./README.md) | [繁體中文](./README-ZH-TW.md) | [English](./README-EN.md) | [日本語](./README-JA.md) | **한국어** | [Français](./README-FR.md) | [Deutsch](./README-DE.md) | [Español](./README-ES.md) | [Русский](./README-RU.md) | [हिन्दी](./README-HI.md) | [العربية](./README-AR.md)
 
-[![AQBot](https://socialify.git.ci/AQBot-Desktop/AQBot/image?description=1&font=JetBrains+Mono&forks=1&issues=1&logo=https%3A%2F%2Fgithub.com%2FAQBot-Desktop%2FAQBot%2Fblob%2Fmain%2Fsrc%2Fassets%2Fimage%2Flogo.png%3Fraw%3Dtrue&name=1&owner=1&pattern=Floating+Cogs&pulls=1&stargazers=1&theme=Auto)](https://github.com/AQBot-Desktop/AQBot)
+[![FrogClawClient](https://socialify.git.ci/FrogClawClient-Desktop/FrogClawClient/image?description=1&font=JetBrains+Mono&forks=1&issues=1&logo=https%3A%2F%2Fgithub.com%2FFrogClawClient-Desktop%2FFrogClawClient%2Fblob%2Fmain%2Fsrc%2Fassets%2Fimage%2Flogo.png%3Fraw%3Dtrue&name=1&owner=1&pattern=Floating+Cogs&pulls=1&stargazers=1&theme=Auto)](https://github.com/FrogClawClient-Desktop/FrogClawClient)
 
 <p align="center">
-    <a href="https://www.producthunt.com/products/aqbot?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-aqbot" target="_blank" rel="noopener noreferrer"><img alt="AQBot - Lightweight, high-perf cross-platform AI desktop client | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1118403&amp;theme=light&amp;t=1775627359538"></a>
+    <a href="https://www.producthunt.com/products/frogclaw?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-frogclaw" target="_blank" rel="noopener noreferrer"><img alt="FrogClawClient - Lightweight, high-perf cross-platform AI desktop client | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1118403&amp;theme=light&amp;t=1775627359538"></a>
 </p>
 
 ## 스크린샷
@@ -68,7 +68,7 @@
 ### 도구 및 확장
 
 - **MCP 프로토콜** — stdio 및 HTTP 전송을 모두 지원하는 완전한 Model Context Protocol 구현
-- **내장 도구** — `@aqbot/fetch` 등 바로 사용 가능한 내장 MCP 도구 제공
+- **내장 도구** — `@frogclaw/fetch` 등 바로 사용 가능한 내장 MCP 도구 제공
 - **도구 실행 패널** — 도구 호출 요청 및 반환 결과를 시각적으로 표시
 
 ### API 게이트웨이
@@ -83,7 +83,7 @@
 ### 데이터 및 보안
 
 - **AES-256 암호화** — API 키 등 민감한 데이터는 AES-256으로 로컬에 암호화, 마스터 키는 0600 권한으로 저장
-- **데이터 디렉터리 격리** — 앱 상태는 `~/.aqbot/`, 사용자 파일은 `~/Documents/aqbot/`에 저장
+- **데이터 디렉터리 격리** — 앱 상태는 `~/.frogclaw/`, 사용자 파일은 `~/Documents/frogclaw/`에 저장
 - **자동 백업** — 로컬 디렉터리 또는 WebDAV 저장소로의 예약 자동 백업
 - **백업 복원** — 이전 백업에서 원클릭으로 완전 복원
 - **대화 내보내기** — PNG 스크린샷, Markdown, 일반 텍스트, JSON 형식으로 대화 내보내기
@@ -109,7 +109,7 @@
 
 ## 시작하기
 
-[Releases](https://github.com/AQBot-Desktop/AQBot/releases) 페이지로 이동하여 플랫폼에 맞는 설치 프로그램을 다운로드하세요.
+[Releases](https://github.com/FrogClawClient-Desktop/FrogClawClient/releases) 페이지로 이동하여 플랫폼에 맞는 설치 프로그램을 다운로드하세요.
 
 ## 자주 묻는 질문
 
@@ -117,8 +117,8 @@
 
 애플리케이션이 Apple에 의해 서명되지 않았기 때문에 macOS에서 다음 중 하나의 메시지가 표시될 수 있습니다:
 
-- "AQBot"이 손상되어 열 수 없습니다
-- Apple에서 악성 소프트웨어를 확인할 수 없어 "AQBot"을 열 수 없습니다
+- "FrogClawClient"이 손상되어 열 수 없습니다
+- Apple에서 악성 소프트웨어를 확인할 수 없어 "FrogClawClient"을 열 수 없습니다
 
 **해결 단계:**
 
@@ -133,7 +133,7 @@ sudo spctl --master-disable
 **2. 격리 속성 제거**
 
 ```bash
-sudo xattr -dr com.apple.quarantine /Applications/AQBot.app
+sudo xattr -dr com.apple.quarantine /Applications/FrogClawClient.app
 ```
 
 > 팁: 터미널에 `sudo xattr -dr com.apple.quarantine `을 입력한 후 앱 아이콘을 드래그할 수 있습니다.

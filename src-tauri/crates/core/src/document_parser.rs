@@ -1,4 +1,4 @@
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 use std::path::Path;
 
 /// Extract plain text from a document file based on its MIME type.
@@ -7,7 +7,7 @@ pub fn extract_text(file_path: &Path, mime_type: &str) -> Result<String> {
         // Plain text files
         "text/plain" | "text/markdown" | "text/csv" | "text/html" | "text/xml"
         | "application/json" | "application/xml" => std::fs::read_to_string(file_path)
-            .map_err(|e| AQBotError::Provider(format!("Failed to read file: {e}"))),
+            .map_err(|e| FrogClawClientError::Provider(format!("Failed to read file: {e}"))),
 
         // PDF
         "application/pdf" => extract_pdf(file_path),
@@ -20,7 +20,7 @@ pub fn extract_text(file_path: &Path, mime_type: &str) -> Result<String> {
         _ => {
             // Try reading as plain text as fallback
             std::fs::read_to_string(file_path).map_err(|e| {
-                AQBotError::Provider(format!(
+                FrogClawClientError::Provider(format!(
                     "Unsupported MIME type '{}', fallback read failed: {e}",
                     mime_type
                 ))
@@ -32,29 +32,29 @@ pub fn extract_text(file_path: &Path, mime_type: &str) -> Result<String> {
 /// Extract text from PDF using pdf-extract crate.
 fn extract_pdf(file_path: &Path) -> Result<String> {
     let bytes = std::fs::read(file_path)
-        .map_err(|e| AQBotError::Provider(format!("Failed to read PDF file: {e}")))?;
+        .map_err(|e| FrogClawClientError::Provider(format!("Failed to read PDF file: {e}")))?;
 
     pdf_extract::extract_text_from_mem(&bytes)
-        .map_err(|e| AQBotError::Provider(format!("Failed to extract PDF text: {e}")))
+        .map_err(|e| FrogClawClientError::Provider(format!("Failed to extract PDF text: {e}")))
 }
 
 /// Extract text from DOCX by reading the internal XML.
 /// DOCX files are ZIP archives containing word/document.xml.
 fn extract_docx(file_path: &Path) -> Result<String> {
     let file = std::fs::File::open(file_path)
-        .map_err(|e| AQBotError::Provider(format!("Failed to open DOCX file: {e}")))?;
+        .map_err(|e| FrogClawClientError::Provider(format!("Failed to open DOCX file: {e}")))?;
 
     let mut archive = zip::ZipArchive::new(file)
-        .map_err(|e| AQBotError::Provider(format!("Failed to read DOCX as ZIP: {e}")))?;
+        .map_err(|e| FrogClawClientError::Provider(format!("Failed to read DOCX as ZIP: {e}")))?;
 
     let mut xml_content = String::new();
     if let Ok(mut entry) = archive.by_name("word/document.xml") {
         use std::io::Read;
         entry
             .read_to_string(&mut xml_content)
-            .map_err(|e| AQBotError::Provider(format!("Failed to read document.xml: {e}")))?;
+            .map_err(|e| FrogClawClientError::Provider(format!("Failed to read document.xml: {e}")))?;
     } else {
-        return Err(AQBotError::Provider(
+        return Err(FrogClawClientError::Provider(
             "DOCX: word/document.xml not found".into(),
         ));
     }

@@ -3,7 +3,7 @@ use sea_orm::*;
 use std::collections::HashSet;
 
 use crate::entity::messages;
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 use crate::types::{Attachment, ConversationStats, Message, MessagePage, MessageRole};
 use crate::utils::{gen_id, now_ts};
 
@@ -27,12 +27,12 @@ fn role_str(role: &MessageRole) -> &'static str {
 
 fn parse_attachment_list(raw: &str) -> Result<Vec<Attachment>> {
     serde_json::from_str(raw)
-        .map_err(|e| AQBotError::Validation(format!("Invalid message attachments JSON: {e}")))
+        .map_err(|e| FrogClawClientError::Validation(format!("Invalid message attachments JSON: {e}")))
 }
 
 fn stringify_attachment_list(attachments: &[Attachment]) -> Result<String> {
     serde_json::to_string(attachments).map_err(|e| {
-        AQBotError::Validation(format!("Failed to serialize message attachments: {e}"))
+        FrogClawClientError::Validation(format!("Failed to serialize message attachments: {e}"))
     })
 }
 
@@ -92,7 +92,7 @@ pub async fn list_messages_page(
         let cursor = messages::Entity::find_by_id(cursor_id)
             .one(db)
             .await?
-            .ok_or_else(|| AQBotError::NotFound(format!("Message {}", cursor_id)))?;
+            .ok_or_else(|| FrogClawClientError::NotFound(format!("Message {}", cursor_id)))?;
 
         query = query.filter(
             Condition::any()
@@ -164,7 +164,7 @@ pub async fn create_message(
     let row = messages::Entity::find_by_id(&id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("Message {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("Message {}", id)))?;
     message_from_entity(row)
 }
 
@@ -176,7 +176,7 @@ pub async fn update_message_content(
     let row = messages::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("Message {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("Message {}", id)))?;
 
     let mut am: messages::ActiveModel = row.into();
     am.content = Set(content.to_string());
@@ -185,7 +185,7 @@ pub async fn update_message_content(
     let row = messages::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("Message {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("Message {}", id)))?;
     message_from_entity(row)
 }
 
@@ -199,7 +199,7 @@ pub async fn update_message_usage(
     let row = messages::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("Message {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("Message {}", id)))?;
 
     let mut am: messages::ActiveModel = row.into();
     if let Some(pt) = prompt_tokens {
@@ -252,7 +252,7 @@ pub async fn delete_message(db: &DatabaseConnection, id: &str) -> Result<()> {
     let target = messages::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("Message {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("Message {}", id)))?;
 
     let txn = db.begin().await?;
 
@@ -278,7 +278,7 @@ pub async fn delete_message(db: &DatabaseConnection, id: &str) -> Result<()> {
     txn.commit().await?;
 
     if result.rows_affected == 0 {
-        return Err(AQBotError::NotFound(format!("Message {}", id)));
+        return Err(FrogClawClientError::NotFound(format!("Message {}", id)));
     }
     Ok(())
 }
@@ -365,7 +365,7 @@ pub async fn set_active_version(
     let row = messages::Entity::find_by_id(target_message_id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("Message {}", target_message_id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("Message {}", target_message_id)))?;
     let mut am: messages::ActiveModel = row.into();
     am.is_active = Set(1);
     am.update(db).await?;

@@ -1,7 +1,7 @@
-use aqbot_core::db::create_test_pool;
-use aqbot_core::repo::{app, category, conversation, message, provider, settings, stored_file};
-use aqbot_core::types::*;
-use aqbot_core::utils::gen_id;
+use frogclaw_core::db::create_test_pool;
+use frogclaw_core::repo::{app, category, conversation, message, provider, settings, stored_file};
+use frogclaw_core::types::*;
+use frogclaw_core::utils::gen_id;
 
 // ---------------------------------------------------------------------------
 // Settings

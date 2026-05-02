@@ -1,20 +1,20 @@
 ---
 layout: home
-title: AQBot — 開源 AI 桌面客戶端 & AI 閘道
+title: FrogClawClient — 開源 AI 桌面客戶端 & AI 閘道
 titleTemplate: false
 
 head:
   - - meta
     - name: description
-      content: AQBot 是一款免費開源的 AI 桌面客戶端，內建 AI 閘道。支援 OpenAI、Claude、Gemini、DeepSeek 等多模型對話，MCP 伺服器、知識庫、隱私優先。
+      content: FrogClawClient 是一款免費開源的 AI 桌面客戶端，內建 AI 閘道。支援 OpenAI、Claude、Gemini、DeepSeek 等多模型對話，MCP 伺服器、知識庫、隱私優先。
 
 hero:
-  name: AQBot
+  name: FrogClawClient
   text: 您的 AI 桌面助手
   tagline: 多模型對話、MCP 工具、API 閘道、知識庫，一個開源客戶端全部搞定
   image:
     src: /logo.png
-    alt: AQBot
+    alt: FrogClawClient
   actions:
     - theme: brand
       text: 快速開始
@@ -24,7 +24,7 @@ hero:
       link: /zh-tw/download
     - theme: alt
       text: GitHub
-      link: https://github.com/AQBot-Desktop/AQBot
+      link: https://github.com/FrogClawClient-Desktop/FrogClawClient
 
 features:
   - icon: robot
@@ -35,7 +35,7 @@ features:
     details: 切換至 Agent 模式，AI 自主執行任務。讀寫檔案、執行命令、分析程式碼——三級權限控制 + 工作目錄沙箱，安全可控。
   - icon: api
     title: MCP 工具呼叫
-    details: 完整實現 Model Context Protocol，支援 stdio、SSE、StreamableHTTP。一鍵連接外部工具，內建 @aqbot/fetch 等 MCP 工具。
+    details: 完整實現 Model Context Protocol，支援 stdio、SSE、StreamableHTTP。一鍵連接外部工具，內建 @frogclaw/fetch 等 MCP 工具。
   - icon: cloud-server
     title: 內建 API 閘道
     details: 本機 OpenAI 相容 API 伺服器，可作為 Claude Code、Codex、Gemini CLI 等工具的後端。金鑰管理、速率限制、SSL/TLS。

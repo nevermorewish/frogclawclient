@@ -2,7 +2,7 @@ use sea_orm::sea_query::Expr;
 use sea_orm::*;
 
 use crate::entity::{memory_items, memory_namespaces};
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 use crate::types::{
     CreateMemoryItemInput, CreateMemoryNamespaceInput, MemoryItem, MemoryNamespace,
     UpdateMemoryItemInput, UpdateMemoryNamespaceInput,
@@ -50,7 +50,7 @@ pub async fn get_namespace(db: &DatabaseConnection, id: &str) -> Result<MemoryNa
     let model = memory_namespaces::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("MemoryNamespace {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("MemoryNamespace {}", id)))?;
 
     Ok(model_to_namespace(model))
 }
@@ -83,7 +83,7 @@ pub async fn delete_namespace(db: &DatabaseConnection, id: &str) -> Result<()> {
     let result = memory_namespaces::Entity::delete_by_id(id).exec(db).await?;
 
     if result.rows_affected == 0 {
-        return Err(AQBotError::NotFound(format!("MemoryNamespace {}", id)));
+        return Err(FrogClawClientError::NotFound(format!("MemoryNamespace {}", id)));
     }
     Ok(())
 }
@@ -96,7 +96,7 @@ pub async fn update_namespace(
     let model = memory_namespaces::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("MemoryNamespace {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("MemoryNamespace {}", id)))?;
 
     let mut am: memory_namespaces::ActiveModel = model.clone().into();
     if let Some(name) = input.name {
@@ -165,7 +165,7 @@ pub async fn add_item(db: &DatabaseConnection, input: CreateMemoryItemInput) -> 
     let model = memory_items::Entity::find_by_id(&id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("MemoryItem {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("MemoryItem {}", id)))?;
 
     Ok(model_to_item(model))
 }
@@ -174,7 +174,7 @@ pub async fn delete_item(db: &DatabaseConnection, id: &str) -> Result<()> {
     let result = memory_items::Entity::delete_by_id(id).exec(db).await?;
 
     if result.rows_affected == 0 {
-        return Err(AQBotError::NotFound(format!("MemoryItem {}", id)));
+        return Err(FrogClawClientError::NotFound(format!("MemoryItem {}", id)));
     }
     Ok(())
 }
@@ -187,7 +187,7 @@ pub async fn update_item(
     let model = memory_items::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("MemoryItem {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("MemoryItem {}", id)))?;
 
     let mut am: memory_items::ActiveModel = model.into();
     if let Some(title) = input.title {
@@ -204,7 +204,7 @@ pub async fn update_item(
     let updated = memory_items::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("MemoryItem {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("MemoryItem {}", id)))?;
 
     Ok(model_to_item(updated))
 }
@@ -218,7 +218,7 @@ pub async fn update_item_index_status(
     let model = memory_items::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("MemoryItem {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("MemoryItem {}", id)))?;
 
     let mut am: memory_items::ActiveModel = model.into();
     am.index_status = Set(status.to_string());

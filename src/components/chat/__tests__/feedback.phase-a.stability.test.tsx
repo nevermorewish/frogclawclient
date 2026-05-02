@@ -26,9 +26,9 @@ describe('Phase A feedback regressions', () => {
     const inputAreaSource = readSource('src/components/chat/InputArea.tsx');
     const cssSource = readSource('src/index.css');
 
-    expect(inputAreaSource).toContain('className="aqbot-input-textarea"');
-    expect(cssSource).toContain('.aqbot-input-textarea');
-    expect(cssSource).toMatch(/\.aqbot-input-textarea[\s\S]*scrollbar-width:\s*thin/i);
+    expect(inputAreaSource).toContain('className="frogclaw-input-textarea"');
+    expect(cssSource).toContain('.frogclaw-input-textarea');
+    expect(cssSource).toMatch(/\.frogclaw-input-textarea[\s\S]*scrollbar-width:\s*thin/i);
   });
 
   it('keeps a null conversation max tokens override visually off instead of hydrating it from the global default', () => {

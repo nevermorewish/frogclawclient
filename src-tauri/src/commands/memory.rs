@@ -1,12 +1,12 @@
 use crate::AppState;
-use aqbot_core::types::*;
+use frogclaw_core::types::*;
 use tauri::{AppHandle, Emitter, State};
 
 #[tauri::command]
 pub async fn list_memory_namespaces(
     state: State<'_, AppState>,
 ) -> Result<Vec<MemoryNamespace>, String> {
-    aqbot_core::repo::memory::list_namespaces(&state.sea_db)
+    frogclaw_core::repo::memory::list_namespaces(&state.sea_db)
         .await
         .map_err(|e| e.to_string())
 }
@@ -16,14 +16,14 @@ pub async fn create_memory_namespace(
     state: State<'_, AppState>,
     input: CreateMemoryNamespaceInput,
 ) -> Result<MemoryNamespace, String> {
-    aqbot_core::repo::memory::create_namespace(&state.sea_db, input)
+    frogclaw_core::repo::memory::create_namespace(&state.sea_db, input)
         .await
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn delete_memory_namespace(state: State<'_, AppState>, id: String) -> Result<(), String> {
-    aqbot_core::repo::memory::delete_namespace(&state.sea_db, &id)
+    frogclaw_core::repo::memory::delete_namespace(&state.sea_db, &id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -34,7 +34,7 @@ pub async fn update_memory_namespace(
     id: String,
     input: UpdateMemoryNamespaceInput,
 ) -> Result<MemoryNamespace, String> {
-    aqbot_core::repo::memory::update_namespace(&state.sea_db, &id, input)
+    frogclaw_core::repo::memory::update_namespace(&state.sea_db, &id, input)
         .await
         .map_err(|e| e.to_string())
 }
@@ -44,7 +44,7 @@ pub async fn list_memory_items(
     state: State<'_, AppState>,
     namespace_id: String,
 ) -> Result<Vec<MemoryItem>, String> {
-    aqbot_core::repo::memory::list_items(&state.sea_db, &namespace_id)
+    frogclaw_core::repo::memory::list_items(&state.sea_db, &namespace_id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -55,18 +55,18 @@ pub async fn add_memory_item(
     state: State<'_, AppState>,
     input: CreateMemoryItemInput,
 ) -> Result<MemoryItem, String> {
-    let item = aqbot_core::repo::memory::add_item(&state.sea_db, input)
+    let item = frogclaw_core::repo::memory::add_item(&state.sea_db, input)
         .await
         .map_err(|e| e.to_string())?;
 
     // Spawn async embedding task if namespace has an embedding provider
-    let ns = aqbot_core::repo::memory::get_namespace(&state.sea_db, &item.namespace_id)
+    let ns = frogclaw_core::repo::memory::get_namespace(&state.sea_db, &item.namespace_id)
         .await
         .map_err(|e| e.to_string())?;
 
     if let Some(ref embedding_provider) = ns.embedding_provider {
         // Set status to indexing
-        let _ = aqbot_core::repo::memory::update_item_index_status(&state.sea_db, &item.id, "indexing", None).await;
+        let _ = frogclaw_core::repo::memory::update_item_index_status(&state.sea_db, &item.id, "indexing", None).await;
 
         let db = state.sea_db.clone();
         let master_key = state.master_key;
@@ -97,7 +97,7 @@ pub async fn add_memory_item(
                     ("failed", Some(e.to_string()))
                 }
             };
-            let _ = aqbot_core::repo::memory::update_item_index_status(&db, &item_id, status, err_msg.as_deref()).await;
+            let _ = frogclaw_core::repo::memory::update_item_index_status(&db, &item_id, status, err_msg.as_deref()).await;
 
             let _ = app.emit(
                 "memory-item-indexed",
@@ -114,7 +114,7 @@ pub async fn add_memory_item(
         return Ok(MemoryItem { index_status: "indexing".to_string(), ..item });
     } else {
         // No embedding provider — mark as skipped
-        let _ = aqbot_core::repo::memory::update_item_index_status(&state.sea_db, &item.id, "skipped", None).await;
+        let _ = frogclaw_core::repo::memory::update_item_index_status(&state.sea_db, &item.id, "skipped", None).await;
         return Ok(MemoryItem { index_status: "skipped".to_string(), ..item });
     }
 }
@@ -132,7 +132,7 @@ pub async fn delete_memory_item(
         .delete_document_embeddings(&collection_id, &id)
         .await;
 
-    aqbot_core::repo::memory::delete_item(&state.sea_db, &id)
+    frogclaw_core::repo::memory::delete_item(&state.sea_db, &id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -146,19 +146,19 @@ pub async fn update_memory_item(
     input: UpdateMemoryItemInput,
 ) -> Result<MemoryItem, String> {
     let content_changed = input.content.is_some();
-    let item = aqbot_core::repo::memory::update_item(&state.sea_db, &id, input)
+    let item = frogclaw_core::repo::memory::update_item(&state.sea_db, &id, input)
         .await
         .map_err(|e| e.to_string())?;
 
     // Re-index if content changed and namespace has embedding provider
     if content_changed {
-        let ns = aqbot_core::repo::memory::get_namespace(&state.sea_db, &namespace_id)
+        let ns = frogclaw_core::repo::memory::get_namespace(&state.sea_db, &namespace_id)
             .await
             .map_err(|e| e.to_string())?;
 
         if let Some(ref embedding_provider) = ns.embedding_provider {
             // Set status to indexing
-            let _ = aqbot_core::repo::memory::update_item_index_status(&state.sea_db, &id, "indexing", None).await;
+            let _ = frogclaw_core::repo::memory::update_item_index_status(&state.sea_db, &id, "indexing", None).await;
 
             let db = state.sea_db.clone();
             let master_key = state.master_key;
@@ -195,7 +195,7 @@ pub async fn update_memory_item(
                         ("failed", Some(e.to_string()))
                     }
                 };
-                let _ = aqbot_core::repo::memory::update_item_index_status(&db, &item_id, status, err_msg.as_deref()).await;
+                let _ = frogclaw_core::repo::memory::update_item_index_status(&db, &item_id, status, err_msg.as_deref()).await;
 
                 let _ = app.emit(
                     "memory-item-indexed",
@@ -221,7 +221,7 @@ pub async fn search_memory(
     namespace_id: String,
     query: String,
     top_k: Option<usize>,
-) -> Result<Vec<aqbot_core::vector_store::VectorSearchResult>, String> {
+) -> Result<Vec<frogclaw_core::vector_store::VectorSearchResult>, String> {
     crate::indexing::search_memory(
         &state.sea_db,
         &state.master_key,
@@ -240,7 +240,7 @@ pub async fn rebuild_memory_index(
     state: State<'_, AppState>,
     namespace_id: String,
 ) -> Result<(), String> {
-    let ns = aqbot_core::repo::memory::get_namespace(&state.sea_db, &namespace_id)
+    let ns = frogclaw_core::repo::memory::get_namespace(&state.sea_db, &namespace_id)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -253,13 +253,13 @@ pub async fn rebuild_memory_index(
     let _ = state.vector_store.delete_collection(&collection_id).await;
 
     // Get all items and re-index
-    let items = aqbot_core::repo::memory::list_items(&state.sea_db, &namespace_id)
+    let items = frogclaw_core::repo::memory::list_items(&state.sea_db, &namespace_id)
         .await
         .map_err(|e| e.to_string())?;
 
     // Set all items to indexing status
     for item in &items {
-        let _ = aqbot_core::repo::memory::update_item_index_status(&state.sea_db, &item.id, "indexing", None).await;
+        let _ = frogclaw_core::repo::memory::update_item_index_status(&state.sea_db, &item.id, "indexing", None).await;
     }
 
     let db = state.sea_db.clone();
@@ -289,7 +289,7 @@ pub async fn rebuild_memory_index(
                     ("failed", Some(e.to_string()))
                 }
             };
-            let _ = aqbot_core::repo::memory::update_item_index_status(&db, &item.id, status, err_msg.as_deref()).await;
+            let _ = frogclaw_core::repo::memory::update_item_index_status(&db, &item.id, status, err_msg.as_deref()).await;
 
             // Emit per-item event for real-time progress
             let _ = app.emit(
@@ -326,12 +326,12 @@ pub async fn clear_memory_index(
         .map_err(|e| e.to_string())?;
 
     // Reset all items to "pending"
-    let items = aqbot_core::repo::memory::list_items(&state.sea_db, &namespace_id)
+    let items = frogclaw_core::repo::memory::list_items(&state.sea_db, &namespace_id)
         .await
         .map_err(|e| e.to_string())?;
 
     for item in items {
-        let _ = aqbot_core::repo::memory::update_item_index_status(
+        let _ = frogclaw_core::repo::memory::update_item_index_status(
             &state.sea_db,
             &item.id,
             "pending",
@@ -350,7 +350,7 @@ pub async fn reindex_memory_item(
     namespace_id: String,
     item_id: String,
 ) -> Result<(), String> {
-    let ns = aqbot_core::repo::memory::get_namespace(&state.sea_db, &namespace_id)
+    let ns = frogclaw_core::repo::memory::get_namespace(&state.sea_db, &namespace_id)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -358,7 +358,7 @@ pub async fn reindex_memory_item(
         .embedding_provider
         .ok_or("No embedding provider configured")?;
 
-    let items = aqbot_core::repo::memory::list_items(&state.sea_db, &namespace_id)
+    let items = frogclaw_core::repo::memory::list_items(&state.sea_db, &namespace_id)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -367,7 +367,7 @@ pub async fn reindex_memory_item(
         .find(|i| i.id == item_id)
         .ok_or("Item not found")?;
 
-    let _ = aqbot_core::repo::memory::update_item_index_status(&state.sea_db, &item_id, "indexing", None).await;
+    let _ = frogclaw_core::repo::memory::update_item_index_status(&state.sea_db, &item_id, "indexing", None).await;
 
     let db = state.sea_db.clone();
     let master_key = state.master_key;
@@ -403,7 +403,7 @@ pub async fn reindex_memory_item(
                 ("failed", Some(e.to_string()))
             }
         };
-        let _ = aqbot_core::repo::memory::update_item_index_status(&db, &iid, status, err_msg.as_deref()).await;
+        let _ = frogclaw_core::repo::memory::update_item_index_status(&db, &iid, status, err_msg.as_deref()).await;
 
         let _ = app.emit(
             "memory-item-indexed",
@@ -424,7 +424,7 @@ pub async fn reorder_memory_namespaces(
     state: State<'_, AppState>,
     namespace_ids: Vec<String>,
 ) -> Result<(), String> {
-    aqbot_core::repo::memory::reorder_namespaces(&state.sea_db, &namespace_ids)
+    frogclaw_core::repo::memory::reorder_namespaces(&state.sea_db, &namespace_ids)
         .await
         .map_err(|e| e.to_string())
 }

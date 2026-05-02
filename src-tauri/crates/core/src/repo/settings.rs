@@ -2,7 +2,7 @@ use sea_orm::*;
 use sea_query::OnConflict;
 
 use crate::entity::settings;
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 use crate::types::AppSettings;
 
 pub async fn get_settings(db: &DatabaseConnection) -> Result<AppSettings> {
@@ -48,8 +48,8 @@ pub async fn save_settings(db: &DatabaseConnection, settings: &AppSettings) -> R
         })
         .await
         .map_err(|e| match e {
-            sea_orm::TransactionError::Connection(db_err) => AQBotError::from(db_err),
-            sea_orm::TransactionError::Transaction(db_err) => AQBotError::from(db_err),
+            sea_orm::TransactionError::Connection(db_err) => FrogClawClientError::from(db_err),
+            sea_orm::TransactionError::Transaction(db_err) => FrogClawClientError::from(db_err),
         })?;
     }
     Ok(())

@@ -1,5 +1,5 @@
 use crate::AppState;
-use aqbot_core::types::*;
+use frogclaw_core::types::*;
 use tauri::State;
 
 #[tauri::command]
@@ -7,7 +7,7 @@ pub async fn list_branches(
     state: State<'_, AppState>,
     conversation_id: String,
 ) -> Result<Vec<ConversationBranch>, String> {
-    aqbot_core::repo::conversation_branch::list_branches(&state.sea_db, &conversation_id)
+    frogclaw_core::repo::conversation_branch::list_branches(&state.sea_db, &conversation_id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -18,7 +18,7 @@ pub async fn fork_conversation(
     conversation_id: String,
     message_id: String,
 ) -> Result<ConversationBranch, String> {
-    aqbot_core::repo::conversation_branch::create_branch(
+    frogclaw_core::repo::conversation_branch::create_branch(
         &state.sea_db,
         &conversation_id,
         &message_id,

@@ -1,8 +1,9 @@
 {
   "app": {
-    "name": "AQBot"
+    "name": "FrogClawClient"
   },
   "nav": {
+    "home": "Home",
     "chat": "Chat",
     "knowledge": "Knowledge",
     "memory": "Memory",
@@ -936,7 +937,7 @@
     "maxCount": "Max Backups to Keep",
     "copies": "copies",
     "backupDir": "Backup Directory",
-    "defaultDir": "AQBot default backups directory",
+    "defaultDir": "FrogClawClient default backups directory",
     "effectiveDir": "Effective directory",
     "formatSqliteDesc": "Fast, direct restore",
     "formatJsonDesc": "Readable, larger file",
@@ -1091,7 +1092,7 @@
     "reloadConfirmOk": "Reload",
     "reloadConfirmCancel": "Cancel",
     "closeConfirmTitle": "Quit Application",
-    "closeConfirmContent": "Are you sure you want to quit AQBot?",
+    "closeConfirmContent": "Are you sure you want to quit FrogClawClient?",
     "closeConfirmOk": "Quit",
     "closeConfirmCancel": "Cancel",
     "startMinimized": "Start Minimized",
@@ -1201,7 +1202,7 @@
     "uninstallConfirm": "Are you sure you want to uninstall skill \"{{name}}\"?",
     "detail": "Skill Details",
     "source": {
-      "aqbot": "AQBot",
+      "frogclaw": "FrogClawClient",
       "claude": "Claude",
       "agents": "Agents",
       "builtin": "Built-in",

@@ -3,7 +3,7 @@ use sea_orm::*;
 
 use crate::crypto::{decrypt_key, encrypt_key};
 use crate::entity::{models, provider_keys, providers};
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 use crate::types::*;
 use crate::utils::{gen_id, now_ts};
 
@@ -110,7 +110,7 @@ pub async fn get_provider(db: &DatabaseConnection, id: &str) -> Result<ProviderC
     let row = providers::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("Provider {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("Provider {}", id)))?;
 
     let keys = list_keys_for_provider(db, &row.id).await?;
     let models = list_models_for_provider(db, &row.id).await?;
@@ -167,7 +167,7 @@ pub async fn update_provider(
     let row = providers::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("Provider {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("Provider {}", id)))?;
 
     let mut am: providers::ActiveModel = row.into();
     am.name = Set(name);
@@ -203,7 +203,7 @@ fn parse_deep_link_provider_type(value: &str) -> Result<ProviderType> {
         "cohere" => Ok(ProviderType::Cohere),
         "voyage" => Ok(ProviderType::Voyage),
         "custom" => Ok(ProviderType::Custom),
-        other => Err(AQBotError::Validation(format!(
+        other => Err(FrogClawClientError::Validation(format!(
             "Unsupported provider type: {other}"
         ))),
     }
@@ -212,7 +212,7 @@ fn parse_deep_link_provider_type(value: &str) -> Result<ProviderType> {
 fn normalize_deep_link_baseurl(value: &str) -> Result<String> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
-        return Err(AQBotError::Validation("Base URL is required".into()));
+        return Err(FrogClawClientError::Validation("Base URL is required".into()));
     }
 
     let forced = trimmed.ends_with('!');
@@ -223,20 +223,20 @@ fn normalize_deep_link_baseurl(value: &str) -> Result<String> {
     };
 
     let parsed = reqwest::Url::parse(without_force)
-        .map_err(|_| AQBotError::Validation("Base URL must be a valid URL".into()))?;
+        .map_err(|_| FrogClawClientError::Validation("Base URL must be a valid URL".into()))?;
     match parsed.scheme() {
         "http" | "https" => {}
         _ => {
-            return Err(AQBotError::Validation(
+            return Err(FrogClawClientError::Validation(
                 "Base URL must use http or https".into(),
             ));
         }
     }
     if parsed.host_str().is_none() {
-        return Err(AQBotError::Validation("Base URL host is required".into()));
+        return Err(FrogClawClientError::Validation("Base URL host is required".into()));
     }
     if parsed.query().is_some() || parsed.fragment().is_some() {
-        return Err(AQBotError::Validation(
+        return Err(FrogClawClientError::Validation(
             "Base URL must not contain query or fragment".into(),
         ));
     }
@@ -280,12 +280,12 @@ pub async fn import_provider_from_deep_link(
 ) -> Result<DeepLinkProviderImportResult> {
     let name = input.name.trim();
     if name.is_empty() {
-        return Err(AQBotError::Validation("Provider name is required".into()));
+        return Err(FrogClawClientError::Validation("Provider name is required".into()));
     }
 
     let raw_key = input.apikey.trim();
     if raw_key.is_empty() {
-        return Err(AQBotError::Validation("API key is required".into()));
+        return Err(FrogClawClientError::Validation("API key is required".into()));
     }
 
     let provider_type = parse_deep_link_provider_type(&input.provider_type)?;
@@ -344,7 +344,7 @@ pub async fn delete_provider(db: &DatabaseConnection, id: &str) -> Result<()> {
     let result = providers::Entity::delete_by_id(id).exec(db).await?;
 
     if result.rows_affected == 0 {
-        return Err(AQBotError::NotFound(format!("Provider {}", id)));
+        return Err(FrogClawClientError::NotFound(format!("Provider {}", id)));
     }
     Ok(())
 }
@@ -353,7 +353,7 @@ pub async fn toggle_provider(db: &DatabaseConnection, id: &str, enabled: bool) -
     let row = providers::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("Provider {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("Provider {}", id)))?;
 
     let mut am: providers::ActiveModel = row.into();
     am.enabled = Set(if enabled { 1 } else { 0 });
@@ -431,7 +431,7 @@ pub async fn add_provider_key(
     let row = provider_keys::Entity::find_by_id(&id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("ProviderKey {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("ProviderKey {}", id)))?;
     Ok(key_from_entity(row))
 }
 
@@ -444,7 +444,7 @@ pub async fn update_provider_key(
     let row = provider_keys::Entity::find_by_id(key_id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("ProviderKey {}", key_id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("ProviderKey {}", key_id)))?;
 
     let mut am: provider_keys::ActiveModel = row.into();
     am.key_encrypted = Set(key_encrypted.to_string());
@@ -460,7 +460,7 @@ pub async fn delete_provider_key(db: &DatabaseConnection, key_id: &str) -> Resul
     let result = provider_keys::Entity::delete_by_id(key_id).exec(db).await?;
 
     if result.rows_affected == 0 {
-        return Err(AQBotError::NotFound(format!("ProviderKey {}", key_id)));
+        return Err(FrogClawClientError::NotFound(format!("ProviderKey {}", key_id)));
     }
     Ok(())
 }
@@ -473,7 +473,7 @@ pub async fn toggle_provider_key(
     let row = provider_keys::Entity::find_by_id(key_id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("ProviderKey {}", key_id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("ProviderKey {}", key_id)))?;
 
     let mut am: provider_keys::ActiveModel = row.into();
     am.enabled = Set(if enabled { 1 } else { 0 });
@@ -486,7 +486,7 @@ pub async fn get_provider_key(db: &DatabaseConnection, key_id: &str) -> Result<P
     let row = provider_keys::Entity::find_by_id(key_id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("ProviderKey {}", key_id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("ProviderKey {}", key_id)))?;
     Ok(key_from_entity(row))
 }
 
@@ -498,7 +498,7 @@ pub async fn get_active_key(db: &DatabaseConnection, provider_id: &str) -> Resul
         .one(db)
         .await?
         .ok_or_else(|| {
-            AQBotError::NotFound(format!("No active key for provider {}", provider_id))
+            FrogClawClientError::NotFound(format!("No active key for provider {}", provider_id))
         })?;
     Ok(key_from_entity(row))
 }
@@ -572,7 +572,7 @@ pub async fn get_model(
     let row = models::Entity::find_by_id((provider_id.to_string(), model_id.to_string()))
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("Model {}/{}", provider_id, model_id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("Model {}/{}", provider_id, model_id)))?;
 
     Ok(model_from_entity(row))
 }
@@ -632,7 +632,7 @@ pub async fn toggle_model(
     let row = models::Entity::find_by_id((provider_id.to_string(), model_id.to_string()))
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("Model {}/{}", provider_id, model_id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("Model {}/{}", provider_id, model_id)))?;
 
     let mut am: models::ActiveModel = row.into();
     am.enabled = Set(if enabled { 1 } else { 0 });
@@ -652,7 +652,7 @@ pub async fn update_model_params(
     let row = models::Entity::find_by_id((provider_id.to_string(), model_id.to_string()))
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("Model {}/{}", provider_id, model_id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("Model {}/{}", provider_id, model_id)))?;
 
     let mut am: models::ActiveModel = row.into();
     am.param_overrides = Set(Some(param_json));
@@ -751,7 +751,7 @@ pub async fn ensure_builtin_provider(db: &DatabaseConnection, builtin_id: &str) 
     let bp = builtins
         .iter()
         .find(|b| b.builtin_id == builtin_id)
-        .ok_or_else(|| AQBotError::NotFound(format!("Built-in provider {}", builtin_id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("Built-in provider {}", builtin_id)))?;
 
     let prov = create_provider(
         db,
@@ -1002,7 +1002,7 @@ mod tests {
             .await
             .expect_err("invalid input should fail");
 
-            assert!(matches!(error, AQBotError::Validation(_)));
+            assert!(matches!(error, FrogClawClientError::Validation(_)));
         }
     }
 }

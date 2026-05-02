@@ -2,11 +2,11 @@
 
 ## What is the API Gateway?
 
-AQBot includes a built-in local API server that exposes your configured providers as **OpenAI-compatible**, **Claude-native**, and **Gemini-native** endpoints. Any tool or client that speaks one of these protocols can use AQBot as its backend — no separate API keys or relay services required.
+FrogClawClient includes a built-in local API server that exposes your configured providers as **OpenAI-compatible**, **Claude-native**, and **Gemini-native** endpoints. Any tool or client that speaks one of these protocols can use FrogClawClient as its backend — no separate API keys or relay services required.
 
 Use cases:
 
-- Run **Claude Code CLI**, **OpenAI Codex CLI**, **Gemini CLI**, or **OpenCode** through AQBot.
+- Run **Claude Code CLI**, **OpenAI Codex CLI**, **Gemini CLI**, or **OpenCode** through FrogClawClient.
 - Feed your IDE extensions through a single, locally managed endpoint.
 - Share one set of provider keys across many tools with per-key rate limiting.
 
@@ -19,7 +19,7 @@ Use cases:
 3. By default the server listens on `127.0.0.1:8080` (HTTP). You can change the listen address and port in the **Settings** tab.
 
 ::: tip
-Enable **Auto-start** in the gateway settings to launch the server automatically when AQBot starts.
+Enable **Auto-start** in the gateway settings to launch the server automatically when FrogClawClient starts.
 :::
 
 ---
@@ -49,11 +49,11 @@ The gateway can serve HTTPS alongside or instead of HTTP.
 
 1. Open the **Settings** tab.
 2. Enable **SSL/TLS** and select **Generate** mode.
-3. AQBot creates a self-signed certificate and private key at:
+3. FrogClawClient creates a self-signed certificate and private key at:
 
    ```
-   ~/.aqbot/ssl/cert.pem
-   ~/.aqbot/ssl/key.pem
+   ~/.frogclaw/ssl/cert.pem
+   ~/.frogclaw/ssl/key.pem
    ```
 
 4. Set the **HTTPS port** (default `8443`).
@@ -98,20 +98,20 @@ Click any log entry to inspect the full request and response. Use the **Clear Lo
 
 ## Configuration Templates
 
-AQBot ships with ready-made configuration snippets for popular CLI tools. Go to the **Templates** tab, pick a tool, and click **Copy** to get the configuration you need.
+FrogClawClient ships with ready-made configuration snippets for popular CLI tools. Go to the **Templates** tab, pick a tool, and click **Copy** to get the configuration you need.
 
 ### Claude Code CLI
 
 ```bash
 claude config set --global apiUrl http://127.0.0.1:8080
-claude config set --global apiKey aqbot-xxxx
+claude config set --global apiKey frogclaw-xxxx
 ```
 
 ### OpenAI Codex CLI
 
 ```bash
 export OPENAI_BASE_URL=http://127.0.0.1:8080/v1
-export OPENAI_API_KEY=aqbot-xxxx
+export OPENAI_API_KEY=frogclaw-xxxx
 codex
 ```
 
@@ -123,7 +123,7 @@ Add to your OpenCode configuration:
 {
   "provider": "openai",
   "baseURL": "http://127.0.0.1:8080/v1",
-  "apiKey": "aqbot-xxxx"
+  "apiKey": "frogclaw-xxxx"
 }
 ```
 
@@ -131,7 +131,7 @@ Add to your OpenCode configuration:
 
 ```bash
 export GEMINI_API_BASE=http://127.0.0.1:8080
-export GEMINI_API_KEY=aqbot-xxxx
+export GEMINI_API_KEY=frogclaw-xxxx
 gemini
 ```
 
@@ -141,10 +141,10 @@ Any tool that accepts an OpenAI-compatible base URL can connect to the gateway:
 
 ```
 Base URL:  http://127.0.0.1:8080/v1
-API Key:   aqbot-xxxx
+API Key:   frogclaw-xxxx
 ```
 
-Replace `aqbot-xxxx` with a key generated in the **API Keys** tab. If SSL is enabled, use `https://` and port `8443` (or your configured HTTPS port).
+Replace `frogclaw-xxxx` with a key generated in the **API Keys** tab. If SSL is enabled, use `https://` and port `8443` (or your configured HTTPS port).
 
 ---
 
@@ -152,14 +152,14 @@ Replace `aqbot-xxxx` with a key generated in the **API Keys** tab. If SSL is ena
 
 Below is a general pattern for connecting any OpenAI-compatible client:
 
-1. **Generate a gateway API key** in AQBot.
+1. **Generate a gateway API key** in FrogClawClient.
 2. **Set the base URL** in your tool's configuration to `http://127.0.0.1:8080/v1` (or the HTTPS equivalent).
 3. **Set the API key** to the gateway key you generated.
-4. **Select a model** that you have configured in one of your AQBot providers.
-5. Start using the tool — all requests route through AQBot to the upstream provider.
+4. **Select a model** that you have configured in one of your FrogClawClient providers.
+5. Start using the tool — all requests route through FrogClawClient to the upstream provider.
 
 ::: tip
-If a tool requires a specific API format (e.g. Claude or Gemini native), AQBot automatically detects the request format and routes it to the correct provider. You do not need to configure separate endpoints per format.
+If a tool requires a specific API format (e.g. Claude or Gemini native), FrogClawClient automatically detects the request format and routes it to the correct provider. You do not need to configure separate endpoints per format.
 :::
 
 ---

@@ -2,7 +2,7 @@ use sea_orm::*;
 use sea_query::OnConflict;
 
 use crate::entity::program_policies;
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 use crate::types::{ProgramPolicy, SaveProgramPolicyInput};
 use crate::utils::gen_id;
 
@@ -75,7 +75,7 @@ pub async fn delete_program_policy(db: &DatabaseConnection, id: &str) -> Result<
     let result = program_policies::Entity::delete_by_id(id).exec(db).await?;
 
     if result.rows_affected == 0 {
-        return Err(AQBotError::NotFound(format!("ProgramPolicy {}", id)));
+        return Err(FrogClawClientError::NotFound(format!("ProgramPolicy {}", id)));
     }
 
     Ok(())

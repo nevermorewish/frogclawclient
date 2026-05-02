@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 
-use aqbot_core::repo::cli_config::{connect, get_config_path, CliTool};
+use frogclaw_core::repo::cli_config::{connect, get_config_path, CliTool};
 use serde_json::{json, Value};
 
 static ENV_MUTEX: Mutex<()> = Mutex::new(());
@@ -22,7 +22,7 @@ impl TempHome {
     fn new() -> Self {
         let nonce = TEMP_HOME_COUNTER.fetch_add(1, Ordering::Relaxed);
         let root = std::env::temp_dir().join(format!(
-            "aqbot-cli-config-test-{}-{nonce}",
+            "frogclaw-cli-config-test-{}-{nonce}",
             std::process::id()
         ));
         let home = root.join("home");
@@ -199,11 +199,11 @@ fn harness_restores_environment_after_run() {
         let opencode_path = opencode_config_path(temp_home.home());
         write_json(
             &opencode_path,
-            &json!({ "provider": { "aqbot": { "enabled": true } } }),
+            &json!({ "provider": { "frogclaw": { "enabled": true } } }),
         );
         assert_eq!(
             read_json(&opencode_path),
-            json!({ "provider": { "aqbot": { "enabled": true } } })
+            json!({ "provider": { "frogclaw": { "enabled": true } } })
         );
 
         panic!("intentional panic to verify Drop cleanup");
@@ -352,7 +352,7 @@ fn codex_connect_writes_openai_api_key_auth_and_proxy_provider_contract() {
         assert_eq!(
             auth.get("OPENAI_API_KEY").and_then(|value| value.as_str()),
             Some("test-api-key"),
-            "Codex auth.json should store AQBot's key as OPENAI_API_KEY"
+            "Codex auth.json should store FrogClawClient's key as OPENAI_API_KEY"
         );
         assert!(
             auth.get("token").is_none(),
@@ -367,7 +367,7 @@ fn codex_connect_writes_openai_api_key_auth_and_proxy_provider_contract() {
         assert_eq!(
             doc.get("model_provider").and_then(|value| value.as_str()),
             Some("any"),
-            "Codex should keep using the existing AQBot provider slot"
+            "Codex should keep using the existing FrogClawClient provider slot"
         );
 
         let provider = doc
@@ -380,7 +380,7 @@ fn codex_connect_writes_openai_api_key_auth_and_proxy_provider_contract() {
         assert_eq!(
             provider.get("base_url").and_then(|value| value.as_str()),
             Some("http://localhost:1234/v1"),
-            "Codex provider should point at the AQBot gateway URL"
+            "Codex provider should point at the FrogClawClient gateway URL"
         );
         assert_eq!(
             provider.get("wire_api").and_then(|value| value.as_str()),
@@ -399,7 +399,7 @@ fn codex_connect_writes_openai_api_key_auth_and_proxy_provider_contract() {
 
 #[test]
 fn gemini_validation_requires_both_env_and_settings() {
-    use aqbot_core::repo::cli_config::validate_connection;
+    use frogclaw_core::repo::cli_config::validate_connection;
 
     with_temp_home(|temp_home| {
         let env_path = gemini_env_path(temp_home.home());
@@ -441,7 +441,7 @@ fn gemini_validation_requires_both_env_and_settings() {
 
 #[test]
 fn codex_validation_requires_openai_api_key_auth_and_proxy_provider_contract() {
-    use aqbot_core::repo::cli_config::validate_connection;
+    use frogclaw_core::repo::cli_config::validate_connection;
 
     with_temp_home(|temp_home| {
         let auth_path = codex_auth_path(temp_home.home());
@@ -498,7 +498,7 @@ requires_openai_auth = true
 
 #[test]
 fn gemini_validation_drift_rejects_wrong_selected_type() {
-    use aqbot_core::repo::cli_config::validate_connection;
+    use frogclaw_core::repo::cli_config::validate_connection;
 
     with_temp_home(|temp_home| {
         connect(CliTool::Gemini, "http://localhost:1234/v1", "test-api-key")
@@ -534,7 +534,7 @@ fn gemini_validation_drift_rejects_wrong_selected_type() {
 
 #[test]
 fn claude_validation_requires_anthropic_env_and_primary_api_key() {
-    use aqbot_core::repo::cli_config::validate_connection;
+    use frogclaw_core::repo::cli_config::validate_connection;
 
     with_temp_home(|temp_home| {
         let settings_path = claude_settings_path(temp_home.home());
@@ -570,7 +570,7 @@ fn claude_validation_requires_anthropic_env_and_primary_api_key() {
 
 #[test]
 fn claude_validation_rejects_stale_anthropic_env_override() {
-    use aqbot_core::repo::cli_config::validate_connection;
+    use frogclaw_core::repo::cli_config::validate_connection;
 
     with_temp_home(|temp_home| {
         let settings_path = claude_settings_path(temp_home.home());
@@ -600,7 +600,7 @@ fn claude_validation_rejects_stale_anthropic_env_override() {
 
 #[test]
 fn claude_validation_drift_rejects_wrong_primary_api_key() {
-    use aqbot_core::repo::cli_config::validate_connection;
+    use frogclaw_core::repo::cli_config::validate_connection;
 
     with_temp_home(|temp_home| {
         connect(
@@ -634,7 +634,7 @@ fn claude_validation_drift_rejects_wrong_primary_api_key() {
 
 #[test]
 fn gemini_disconnect_restore_backup_restores_both_files() {
-    use aqbot_core::repo::cli_config::disconnect;
+    use frogclaw_core::repo::cli_config::disconnect;
 
     with_temp_home(|temp_home| {
         let env_path = gemini_env_path(temp_home.home());
@@ -689,7 +689,7 @@ fn gemini_disconnect_restore_backup_restores_both_files() {
 
 #[test]
 fn claude_disconnect_restore_backup_restores_both_files() {
-    use aqbot_core::repo::cli_config::disconnect;
+    use frogclaw_core::repo::cli_config::disconnect;
 
     with_temp_home(|temp_home| {
         let settings_path = claude_settings_path(temp_home.home());
@@ -734,18 +734,18 @@ fn claude_disconnect_restore_backup_restores_both_files() {
 }
 
 #[test]
-fn gemini_disconnect_minimal_cleanup_removes_only_aqbot_keys() {
-    use aqbot_core::repo::cli_config::disconnect;
+fn gemini_disconnect_minimal_cleanup_removes_only_frogclaw_keys() {
+    use frogclaw_core::repo::cli_config::disconnect;
 
     with_temp_home(|temp_home| {
         let env_path = gemini_env_path(temp_home.home());
         let settings_path = gemini_settings_path(temp_home.home());
 
-        // Create files with mix of AQBot and user data
+        // Create files with mix of FrogClawClient and user data
         std::fs::create_dir_all(env_path.parent().unwrap()).unwrap();
         std::fs::write(
             &env_path,
-            "USER_VAR=keep-this\nGEMINI_API_KEY=aqbot-key\nANOTHER_VAR=also-keep\nGEMINI_API_BASE_URL=http://localhost:1234/v1\n",
+            "USER_VAR=keep-this\nGEMINI_API_KEY=frogclaw-key\nANOTHER_VAR=also-keep\nGEMINI_API_BASE_URL=http://localhost:1234/v1\n",
         )
         .unwrap();
 
@@ -766,7 +766,7 @@ fn gemini_disconnect_minimal_cleanup_removes_only_aqbot_keys() {
         disconnect(CliTool::Gemini, false, "http://localhost:1234/v1")
             .expect("disconnect should succeed");
 
-        // Verify only AQBot keys removed from .env
+        // Verify only FrogClawClient keys removed from .env
         let env_content = std::fs::read_to_string(&env_path).unwrap();
         assert!(env_content.contains("USER_VAR=keep-this"));
         assert!(env_content.contains("ANOTHER_VAR=also-keep"));
@@ -788,14 +788,14 @@ fn gemini_disconnect_minimal_cleanup_removes_only_aqbot_keys() {
 }
 
 #[test]
-fn claude_disconnect_minimal_cleanup_removes_only_aqbot_fields() {
-    use aqbot_core::repo::cli_config::disconnect;
+fn claude_disconnect_minimal_cleanup_removes_only_frogclaw_fields() {
+    use frogclaw_core::repo::cli_config::disconnect;
 
     with_temp_home(|temp_home| {
         let settings_path = claude_settings_path(temp_home.home());
         let config_path = claude_config_path(temp_home.home());
 
-        // Create files with mix of AQBot and user data
+        // Create files with mix of FrogClawClient and user data
         write_json(
             &settings_path,
             &json!({
@@ -817,7 +817,7 @@ fn claude_disconnect_minimal_cleanup_removes_only_aqbot_fields() {
         disconnect(CliTool::ClaudeCode, false, "http://localhost:1234/v1")
             .expect("disconnect should succeed");
 
-        // Verify AQBot fields removed from settings.json
+        // Verify FrogClawClient fields removed from settings.json
         let settings = read_json(&settings_path);
         assert!(!settings.as_object().unwrap().contains_key("apiBaseUrl"));
         assert!(!settings.as_object().unwrap().contains_key("apiKey"));
@@ -831,8 +831,8 @@ fn claude_disconnect_minimal_cleanup_removes_only_aqbot_fields() {
 }
 
 #[test]
-fn claude_disconnect_minimal_cleanup_removes_only_aqbot_anthropic_env_fields() {
-    use aqbot_core::repo::cli_config::disconnect;
+fn claude_disconnect_minimal_cleanup_removes_only_frogclaw_anthropic_env_fields() {
+    use frogclaw_core::repo::cli_config::disconnect;
 
     with_temp_home(|temp_home| {
         let settings_path = claude_settings_path(temp_home.home());
@@ -879,8 +879,8 @@ fn claude_disconnect_minimal_cleanup_removes_only_aqbot_anthropic_env_fields() {
 }
 
 #[test]
-fn gemini_disconnect_minimal_cleanup_preserves_non_aqbot_selected_type() {
-    use aqbot_core::repo::cli_config::disconnect;
+fn gemini_disconnect_minimal_cleanup_preserves_non_frogclaw_selected_type() {
+    use frogclaw_core::repo::cli_config::disconnect;
 
     with_temp_home(|temp_home| {
         let env_path = gemini_env_path(temp_home.home());
@@ -919,7 +919,7 @@ fn gemini_disconnect_minimal_cleanup_preserves_non_aqbot_selected_type() {
 
 #[test]
 fn claude_disconnect_minimal_cleanup_preserves_non_any_primary_api_key() {
-    use aqbot_core::repo::cli_config::disconnect;
+    use frogclaw_core::repo::cli_config::disconnect;
 
     with_temp_home(|temp_home| {
         let settings_path = claude_settings_path(temp_home.home());
@@ -1022,7 +1022,7 @@ fn claude_connect_rollback_on_post_write_validation_failure() {
 // ─── OpenCode Tests ─────────────────────────────────────────
 
 #[test]
-fn opencode_connect_preserves_existing_non_aqbot_providers() {
+fn opencode_connect_preserves_existing_non_frogclaw_providers() {
     with_temp_home(|temp_home| {
         let config_path = opencode_config_path(temp_home.home());
 
@@ -1061,13 +1061,13 @@ fn opencode_connect_preserves_existing_non_aqbot_providers() {
 
         let config = read_json(&config_path);
 
-        // Verify aqbot was added
+        // Verify frogclaw was added
         assert!(
             config
                 .get("provider")
-                .and_then(|p| p.get("aqbot"))
+                .and_then(|p| p.get("frogclaw"))
                 .is_some(),
-            "aqbot provider should be added"
+            "frogclaw provider should be added"
         );
 
         // Verify existing providers are preserved
@@ -1092,19 +1092,19 @@ fn opencode_connect_preserves_existing_non_aqbot_providers() {
 }
 
 #[test]
-fn opencode_disconnect_without_restore_removes_only_aqbot_provider() {
-    use aqbot_core::repo::cli_config::disconnect;
+fn opencode_disconnect_without_restore_removes_only_frogclaw_provider() {
+    use frogclaw_core::repo::cli_config::disconnect;
 
     with_temp_home(|temp_home| {
         let config_path = opencode_config_path(temp_home.home());
 
-        // Create config with multiple providers including aqbot
+        // Create config with multiple providers including frogclaw
         write_json(
             &config_path,
             &json!({
                 "$schema": "https://opencode.ai/config.json",
                 "provider": {
-                    "aqbot": {
+                    "frogclaw": {
                         "apiKey": "test-key",
                         "baseURL": "http://localhost:1234/v1",
                         "models": {
@@ -1131,13 +1131,13 @@ fn opencode_disconnect_without_restore_removes_only_aqbot_provider() {
 
         let config = read_json(&config_path);
 
-        // Verify aqbot was removed
+        // Verify frogclaw was removed
         assert!(
             config
                 .get("provider")
-                .and_then(|p| p.get("aqbot"))
+                .and_then(|p| p.get("frogclaw"))
                 .is_none(),
-            "aqbot provider should be removed"
+            "frogclaw provider should be removed"
         );
 
         // Verify other providers and settings are preserved
@@ -1160,7 +1160,7 @@ fn opencode_disconnect_without_restore_removes_only_aqbot_provider() {
 
 #[test]
 fn opencode_disconnect_with_restore_restores_original_config() {
-    use aqbot_core::repo::cli_config::disconnect;
+    use frogclaw_core::repo::cli_config::disconnect;
 
     with_temp_home(|temp_home| {
         let config_path = opencode_config_path(temp_home.home());
@@ -1190,14 +1190,14 @@ fn opencode_disconnect_with_restore_restores_original_config() {
         )
         .expect("connect should succeed");
 
-        // Verify connected state has aqbot
+        // Verify connected state has frogclaw
         let connected_config = read_json(&config_path);
         assert!(
             connected_config
                 .get("provider")
-                .and_then(|p| p.get("aqbot"))
+                .and_then(|p| p.get("frogclaw"))
                 .is_some(),
-            "aqbot should be present after connect"
+            "frogclaw should be present after connect"
         );
 
         // Disconnect with restore
@@ -1214,8 +1214,8 @@ fn opencode_disconnect_with_restore_restores_original_config() {
 }
 
 #[test]
-fn opencode_validation_requires_aqbot_provider_with_correct_fields() {
-    use aqbot_core::repo::cli_config::validate_connection;
+fn opencode_validation_requires_frogclaw_provider_with_correct_fields() {
+    use frogclaw_core::repo::cli_config::validate_connection;
 
     with_temp_home(|temp_home| {
         let config_path = opencode_config_path(temp_home.home());
@@ -1240,7 +1240,7 @@ fn opencode_validation_requires_aqbot_provider_with_correct_fields() {
             "should reject when provider section is missing"
         );
 
-        // Test 3: Provider without aqbot
+        // Test 3: Provider without frogclaw
         write_json(
             &config_path,
             &json!({
@@ -1255,15 +1255,15 @@ fn opencode_validation_requires_aqbot_provider_with_correct_fields() {
         assert_eq!(
             validate_connection(CliTool::OpenCode, "http://localhost:1234/v1").unwrap(),
             false,
-            "should reject when aqbot provider is missing"
+            "should reject when frogclaw provider is missing"
         );
 
-        // Test 4: aqbot with wrong baseURL
+        // Test 4: frogclaw with wrong baseURL
         write_json(
             &config_path,
             &json!({
                 "provider": {
-                    "aqbot": {
+                    "frogclaw": {
                         "apiKey": "test-key",
                         "baseURL": "http://wrong-url/v1"
                     }
@@ -1276,12 +1276,12 @@ fn opencode_validation_requires_aqbot_provider_with_correct_fields() {
             "should reject when baseURL doesn't match"
         );
 
-        // Test 5: aqbot with empty apiKey
+        // Test 5: frogclaw with empty apiKey
         write_json(
             &config_path,
             &json!({
                 "provider": {
-                    "aqbot": {
+                    "frogclaw": {
                         "apiKey": "",
                         "baseURL": "http://localhost:1234/v1"
                     }
@@ -1362,7 +1362,7 @@ fn cursor_connect_sets_gateway_fields_without_removing_other_settings() {
 
 #[test]
 fn cursor_disconnect_with_restore_restores_original_settings() {
-    use aqbot_core::repo::cli_config::disconnect;
+    use frogclaw_core::repo::cli_config::disconnect;
 
     with_temp_home(|temp_home| {
         let settings_path = cursor_settings_path(temp_home.home(), temp_home.appdata());
@@ -1400,7 +1400,7 @@ fn cursor_disconnect_with_restore_restores_original_settings() {
 
 #[test]
 fn cursor_disconnect_without_restore_removes_only_gateway_fields() {
-    use aqbot_core::repo::cli_config::disconnect;
+    use frogclaw_core::repo::cli_config::disconnect;
 
     with_temp_home(|temp_home| {
         let settings_path = cursor_settings_path(temp_home.home(), temp_home.appdata());
@@ -1450,7 +1450,7 @@ fn cursor_disconnect_without_restore_removes_only_gateway_fields() {
 
 #[test]
 fn cursor_validation_requires_gateway_fields_with_correct_values() {
-    use aqbot_core::repo::cli_config::validate_connection;
+    use frogclaw_core::repo::cli_config::validate_connection;
 
     with_temp_home(|temp_home| {
         let settings_path = cursor_settings_path(temp_home.home(), temp_home.appdata());

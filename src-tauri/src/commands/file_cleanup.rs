@@ -9,20 +9,20 @@ fn file_cleanup_lock() -> &'static tokio::sync::Mutex<()> {
 
 pub async fn delete_attachment_reference(
     db: &DatabaseConnection,
-    file_store: &aqbot_core::file_store::FileStore,
+    file_store: &frogclaw_core::file_store::FileStore,
     record_id: &str,
 ) -> Result<(), String> {
     let _guard = file_cleanup_lock().lock().await;
 
-    let file = aqbot_core::repo::stored_file::get_stored_file(db, record_id)
+    let file = frogclaw_core::repo::stored_file::get_stored_file(db, record_id)
         .await
         .map_err(|e| e.to_string())?;
-    aqbot_core::repo::stored_file::delete_stored_file(db, record_id)
+    frogclaw_core::repo::stored_file::delete_stored_file(db, record_id)
         .await
         .map_err(|e| e.to_string())?;
 
     let remaining_refs =
-        aqbot_core::repo::stored_file::count_stored_files_with_storage_path(db, &file.storage_path)
+        frogclaw_core::repo::stored_file::count_stored_files_with_storage_path(db, &file.storage_path)
             .await
             .map_err(|e| e.to_string())?;
     if remaining_refs == 0 {

@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Modal, Input, List, Tag, Typography, theme } from 'antd';
-import { Search, MessageSquare, Settings, Network, Plus, PanelLeftClose, Sparkles, ImagePlus } from 'lucide-react';
+import { Search, MessageSquare, Settings, Plus, PanelLeftClose, Sparkles, ImagePlus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '@/stores';
 import { formatShortcutForDisplay } from '@/lib/shortcuts';
@@ -29,6 +29,15 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const setActivePage = useUIStore((s) => s.setActivePage);
   const setSettingsSection = useUIStore((s) => s.setSettingsSection);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+
+  const dispatchChatAction = useCallback((eventName: string) => {
+    setActivePage('chat');
+    onClose();
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent(eventName));
+    }, 80);
+  }, [onClose, setActivePage]);
+
   const commands = useMemo<Command[]>(() => {
     const nav = t('commandPalette.navigation');
     const actions = t('commandPalette.actions');
@@ -61,13 +70,6 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
         action: () => { setActivePage('drawing'); onClose(); },
       },
       {
-        id: 'go-gateway',
-        label: t('commandPalette.goToGateway'),
-        icon: <Network size={16} />,
-        category: nav,
-        action: () => { setActivePage('gateway'); onClose(); },
-      },
-      {
         id: 'go-skills',
         label: t('commandPalette.goToSkills'),
         icon: <Sparkles size={16} />,
@@ -80,7 +82,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
         icon: <Plus size={16} />,
         shortcut: newConversationShortcut,
         category: actions,
-        action: () => { setActivePage('chat'); onClose(); },
+        action: () => dispatchChatAction('frogclaw:new-conversation'),
       },
       {
         id: 'toggle-sidebar',
@@ -95,7 +97,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
         icon: <Search size={16} />,
         shortcut: searchConversationsShortcut,
         category: actions,
-        action: () => { setActivePage('chat'); onClose(); },
+        action: () => dispatchChatAction('frogclaw:focus-conversation-search'),
       },
       {
         id: 'settings-search',
@@ -112,7 +114,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
         action: () => { setActivePage('settings'); setSettingsSection('mcpServers'); onClose(); },
       },
     ];
-  }, [t, setActivePage, setSettingsSection, toggleSidebar, onClose]);
+  }, [t, setActivePage, setSettingsSection, toggleSidebar, onClose, dispatchChatAction]);
 
   const filtered = useMemo(() => {
     if (!query.trim()) return commands;

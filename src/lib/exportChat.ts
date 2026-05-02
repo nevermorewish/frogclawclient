@@ -1,5 +1,5 @@
 import { isTauri } from '@/lib/invoke'
-import { stripAqbotTags } from '@/lib/chatMarkdown'
+import { stripFrogclawTags } from '@/lib/chatMarkdown'
 import type { Message } from '@/types'
 
 function browserDownload(filename: string, content: string, mimeType: string) {
@@ -65,7 +65,7 @@ export interface TranscriptExportOptions {
 
 function getExportMessageContent(message: Message, options?: TranscriptExportOptions) {
   if (options?.includeThinking === false) {
-    return stripAqbotTags(message.content)
+    return stripFrogclawTags(message.content)
   }
   return message.content
 }

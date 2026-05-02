@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum AQBotError {
+pub enum FrogClawClientError {
     #[error("Database error: {0}")]
     Database(#[from] sea_orm::DbErr),
     #[error("Provider error: {0}")]
@@ -18,7 +18,7 @@ pub enum AQBotError {
     Io(#[from] std::io::Error),
 }
 
-impl serde::Serialize for AQBotError {
+impl serde::Serialize for FrogClawClientError {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -27,13 +27,13 @@ impl serde::Serialize for AQBotError {
     }
 }
 
-impl From<sea_orm::TransactionError<sea_orm::DbErr>> for AQBotError {
+impl From<sea_orm::TransactionError<sea_orm::DbErr>> for FrogClawClientError {
     fn from(err: sea_orm::TransactionError<sea_orm::DbErr>) -> Self {
         match err {
-            sea_orm::TransactionError::Connection(e) => AQBotError::Database(e),
-            sea_orm::TransactionError::Transaction(e) => AQBotError::Database(e),
+            sea_orm::TransactionError::Connection(e) => FrogClawClientError::Database(e),
+            sea_orm::TransactionError::Transaction(e) => FrogClawClientError::Database(e),
         }
     }
 }
 
-pub type Result<T> = std::result::Result<T, AQBotError>;
+pub type Result<T> = std::result::Result<T, FrogClawClientError>;

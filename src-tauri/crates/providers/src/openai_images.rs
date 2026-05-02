@@ -1,4 +1,4 @@
-use aqbot_core::error::{AQBotError, Result};
+use frogclaw_core::error::{FrogClawClientError, Result};
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 
@@ -119,7 +119,7 @@ impl OpenAIImagesClient {
         let response = apply_request_headers(builder, ctx)
             .send()
             .await
-            .map_err(|e| AQBotError::Provider(format!("Image generation failed: {}", e)))?;
+            .map_err(|e| FrogClawClientError::Provider(format!("Image generation failed: {}", e)))?;
         parse_response(response).await
     }
 
@@ -147,14 +147,14 @@ impl OpenAIImagesClient {
             let part = reqwest::multipart::Part::bytes(image.bytes)
                 .file_name(image.file_name)
                 .mime_str(&image.mime_type)
-                .map_err(|e| AQBotError::Provider(format!("Invalid image MIME type: {}", e)))?;
+                .map_err(|e| FrogClawClientError::Provider(format!("Invalid image MIME type: {}", e)))?;
             form = form.part("image[]", part);
         }
         if let Some(mask) = request.mask {
             let part = reqwest::multipart::Part::bytes(mask.bytes)
                 .file_name(mask.file_name)
                 .mime_str(&mask.mime_type)
-                .map_err(|e| AQBotError::Provider(format!("Invalid mask MIME type: {}", e)))?;
+                .map_err(|e| FrogClawClientError::Provider(format!("Invalid mask MIME type: {}", e)))?;
             form = form.part("mask", part);
         }
 
@@ -165,7 +165,7 @@ impl OpenAIImagesClient {
         let response = apply_request_headers(builder, ctx)
             .send()
             .await
-            .map_err(|e| AQBotError::Provider(format!("Image edit failed: {}", e)))?;
+            .map_err(|e| FrogClawClientError::Provider(format!("Image edit failed: {}", e)))?;
         parse_response(response).await
     }
 }
@@ -174,7 +174,7 @@ async fn parse_response(response: reqwest::Response) -> Result<ImageApiOutput> {
     let status = response.status();
     if !status.is_success() {
         let text = response.text().await.unwrap_or_default();
-        return Err(AQBotError::Provider(format!(
+        return Err(FrogClawClientError::Provider(format!(
             "OpenAI image API error {}: {}",
             status, text
         )));
@@ -182,16 +182,16 @@ async fn parse_response(response: reqwest::Response) -> Result<ImageApiOutput> {
     let body: ImageApiResponse = response
         .json()
         .await
-        .map_err(|e| AQBotError::Provider(format!("Invalid image API response: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Provider(format!("Invalid image API response: {}", e)))?;
 
     let mut images = Vec::with_capacity(body.data.len());
     for item in body.data {
         let encoded = item
             .b64_json
-            .ok_or_else(|| AQBotError::Provider("Image API response missing b64_json".into()))?;
+            .ok_or_else(|| FrogClawClientError::Provider("Image API response missing b64_json".into()))?;
         let bytes = base64::engine::general_purpose::STANDARD
             .decode(encoded)
-            .map_err(|e| AQBotError::Provider(format!("Invalid image b64_json: {}", e)))?;
+            .map_err(|e| FrogClawClientError::Provider(format!("Invalid image b64_json: {}", e)))?;
         images.push(ImageApiImage {
             bytes,
             revised_prompt: item.revised_prompt,

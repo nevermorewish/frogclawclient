@@ -59,7 +59,7 @@ export default function WebDavSync() {
     host: '',
     username: '',
     password: '',
-    path: '/aqbot/',
+    path: '/frogclaw/',
     acceptInvalidCerts: false,
   });
   const [configModalOpen, setConfigModalOpen] = useState(false);
@@ -136,7 +136,7 @@ export default function WebDavSync() {
         host: values.host,
         username: values.username,
         password: values.password,
-        path: values.path || '/aqbot/',
+        path: values.path || '/frogclaw/',
         acceptInvalidCerts: values.acceptInvalidCerts || false,
       };
       await invoke('save_webdav_config', { config: newConfig });
@@ -174,7 +174,7 @@ export default function WebDavSync() {
         host: values.host,
         username: values.username,
         password: values.password,
-        path: values.path || '/aqbot/',
+        path: values.path || '/frogclaw/',
         acceptInvalidCerts: values.acceptInvalidCerts || false,
       };
       await invoke<boolean>('webdav_check_connection', {
@@ -442,7 +442,7 @@ export default function WebDavSync() {
             </Form.Item>
           </div>
           <Form.Item name="path" label={t('backup.webdav.path')}>
-            <Input placeholder="/aqbot/" />
+            <Input placeholder="/frogclaw/" />
           </Form.Item>
           <div className="flex items-center gap-4 mb-4">
             <Form.Item

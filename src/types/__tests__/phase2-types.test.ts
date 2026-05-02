@@ -10,8 +10,6 @@ import type {
   ConversationBranch,
   ConversationWorkspaceSnapshot,
   ProgramPolicy,
-  GatewayDiagnostic,
-  GatewayTemplate,
   DesktopCapability,
 } from '@/types';
 
@@ -118,28 +116,6 @@ describe('Phase-2 type contracts', () => {
       allowedModelIds: [],
     };
     expect(pp.programName).toBe('cursor');
-  });
-
-  it('GatewayDiagnostic has required fields', () => {
-    const gd: GatewayDiagnostic = {
-      id: 'gd1',
-      category: 'provider_latency',
-      status: 'ok',
-      message: 'All good',
-      createdAt: '2025-01-01',
-    };
-    expect(gd.status).toBe('ok');
-  });
-
-  it('GatewayTemplate has required fields', () => {
-    const gt: GatewayTemplate = {
-      id: 'gt1',
-      name: 'Cursor',
-      target: 'cursor',
-      format: 'json',
-      content: '{}',
-    };
-    expect(gt.target).toBe('cursor');
   });
 
   it('DesktopCapability has required fields', () => {

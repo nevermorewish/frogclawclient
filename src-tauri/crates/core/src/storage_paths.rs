@@ -30,7 +30,7 @@ pub fn clear_documents_root_override() {
 }
 
 /// Returns the active documents root — custom override if set, otherwise the
-/// platform default (`~/Documents/aqbot/`).
+/// platform default (`~/Documents/frogclaw/`).
 pub fn documents_root() -> PathBuf {
     if let Ok(guard) = DOCUMENTS_ROOT_OVERRIDE.read() {
         if let Some(ref custom) = *guard {
@@ -40,11 +40,11 @@ pub fn documents_root() -> PathBuf {
     default_documents_root()
 }
 
-/// The platform default documents root: `~/Documents/aqbot/`.
+/// The platform default documents root: `~/Documents/frogclaw/`.
 pub fn default_documents_root() -> PathBuf {
     dirs::document_dir()
         .expect("Could not determine Documents directory")
-        .join("aqbot")
+        .join("frogclaw")
 }
 
 /// Returns the typed subdirectory for a given MIME type.
@@ -134,11 +134,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn documents_root_ends_with_aqbot() {
+    fn documents_root_ends_with_frogclaw() {
         let root = default_documents_root();
         assert!(
-            root.ends_with("aqbot"),
-            "Expected path ending with 'aqbot', got {:?}",
+            root.ends_with("frogclaw"),
+            "Expected path ending with 'frogclaw', got {:?}",
             root
         );
         // Should be under the platform Documents directory
@@ -301,7 +301,7 @@ mod tests {
     #[test]
     fn ensure_dirs_creates_structure() {
         // Use a temp dir to avoid side effects
-        let tmp = std::env::temp_dir().join("aqbot_test_ensure_dirs");
+        let tmp = std::env::temp_dir().join("frogclaw_test_ensure_dirs");
         let _ = std::fs::remove_dir_all(&tmp);
 
         // We test the logic by verifying the dirs exist after calling ensure_documents_dirs.

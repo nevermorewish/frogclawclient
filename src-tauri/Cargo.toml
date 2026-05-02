@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/core", "crates/providers", "crates/gateway", "crates/migration", "crates/agent"]
+members = [".", "crates/core", "crates/providers", "crates/migration", "crates/agent"]
 resolver = "2"
 
 [workspace.dependencies]
@@ -17,20 +17,20 @@ sqlite-vec = "0.1.8-alpha.1"
 libsqlite3-sys = "0.30"
 
 [package]
-name = "aqbot"
+name = "frogclawclient"
 version = "0.0.1"
-description = "AQBot - AI Chat Desktop App"
+description = "FrogClawClient - AI Chat Desktop App"
 authors = ["you"]
 license = "AGPL-3.0-only"
 edition = "2021"
-default-run = "AQBot"
+default-run = "FrogClawClient"
 
 [lib]
-name = "aqbot_lib"
+name = "frogclawclient_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [[bin]]
-name = "AQBot"
+name = "FrogClawClient"
 path = "src/main.rs"
 
 [build-dependencies]
@@ -47,11 +47,10 @@ tauri-plugin-process = "2"
 tauri-plugin-updater = "2"
 serde = { workspace = true }
 serde_json = { workspace = true }
-aqbot-core = { path = "crates/core" }
-aqbot-providers = { path = "crates/providers" }
-aqbot-agent = { path = "crates/agent" }
+frogclaw-core = { path = "crates/core" }
+frogclaw-providers = { path = "crates/providers" }
+frogclaw-agent = { path = "crates/agent" }
 open-agent-sdk = { path = "crates/open-agent-sdk" }
-aqbot-gateway = { path = "crates/gateway" }
 tokio = { workspace = true }
 sea-orm = { workspace = true }
 chrono = { workspace = true }
@@ -65,7 +64,7 @@ rustls = { version = "0.23", default-features = false, features = ["aws-lc-rs"] 
 tauri-plugin-mcp-bridge = "0.2"
 font-kit = "0.14"
 tauri-plugin-clipboard-manager = "2"
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", features = ["json", "cookies"] }
 zip = "2"
 tempfile = "3"
 open = "5"

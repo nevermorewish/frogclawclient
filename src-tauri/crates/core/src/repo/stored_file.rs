@@ -2,7 +2,7 @@ use sea_orm::*;
 use serde::{Deserialize, Serialize};
 
 use crate::entity::stored_files;
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoredFile {
@@ -59,7 +59,7 @@ pub async fn get_stored_file(db: &DatabaseConnection, id: &str) -> Result<Stored
     let model = stored_files::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("StoredFile {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("StoredFile {}", id)))?;
 
     Ok(model_to_stored_file(model))
 }
@@ -81,7 +81,7 @@ pub async fn delete_stored_file(db: &DatabaseConnection, id: &str) -> Result<()>
     let result = stored_files::Entity::delete_by_id(id).exec(db).await?;
 
     if result.rows_affected == 0 {
-        return Err(AQBotError::NotFound(format!("StoredFile {}", id)));
+        return Err(FrogClawClientError::NotFound(format!("StoredFile {}", id)));
     }
     Ok(())
 }

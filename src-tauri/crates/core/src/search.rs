@@ -3,7 +3,7 @@ use std::time::Instant;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 
 // ── Response types ────────────────────────────────────────
 
@@ -66,7 +66,7 @@ pub async fn execute_search(
         "zhipu" => search_zhipu(endpoint, api_key, query, max_results, timeout_ms).await,
         "bocha" => search_bocha(endpoint, api_key, query, max_results, timeout_ms).await,
         _ => {
-            return Err(AQBotError::Validation(format!(
+            return Err(FrogClawClientError::Validation(format!(
                 "Unsupported provider type: {}",
                 provider_type
             )));
@@ -158,7 +158,7 @@ async fn search_tavily(
     let client = Client::builder()
         .timeout(std::time::Duration::from_millis(timeout_ms as u64))
         .build()
-        .map_err(|e| AQBotError::Provider(format!("HTTP client error: {e}")))?;
+        .map_err(|e| FrogClawClientError::Provider(format!("HTTP client error: {e}")))?;
 
     let body = TavilyRequest {
         api_key,
@@ -172,12 +172,12 @@ async fn search_tavily(
         .json(&body)
         .send()
         .await
-        .map_err(|e| AQBotError::Provider(format!("Tavily request failed: {e}")))?;
+        .map_err(|e| FrogClawClientError::Provider(format!("Tavily request failed: {e}")))?;
 
     if !resp.status().is_success() {
         let status = resp.status();
         let text = resp.text().await.unwrap_or_default();
-        return Err(AQBotError::Provider(format!(
+        return Err(FrogClawClientError::Provider(format!(
             "Tavily API error {status}: {text}"
         )));
     }
@@ -185,7 +185,7 @@ async fn search_tavily(
     let data: TavilyResponse = resp
         .json()
         .await
-        .map_err(|e| AQBotError::Provider(format!("Tavily response parse error: {e}")))?;
+        .map_err(|e| FrogClawClientError::Provider(format!("Tavily response parse error: {e}")))?;
 
     Ok(data
         .results
@@ -235,7 +235,7 @@ async fn search_zhipu(
     let client = Client::builder()
         .timeout(std::time::Duration::from_millis(timeout_ms as u64))
         .build()
-        .map_err(|e| AQBotError::Provider(format!("HTTP client error: {e}")))?;
+        .map_err(|e| FrogClawClientError::Provider(format!("HTTP client error: {e}")))?;
 
     let body = ZhipuRequest {
         search_query: query,
@@ -249,12 +249,12 @@ async fn search_zhipu(
         .json(&body)
         .send()
         .await
-        .map_err(|e| AQBotError::Provider(format!("Zhipu request failed: {e}")))?;
+        .map_err(|e| FrogClawClientError::Provider(format!("Zhipu request failed: {e}")))?;
 
     if !resp.status().is_success() {
         let status = resp.status();
         let text = resp.text().await.unwrap_or_default();
-        return Err(AQBotError::Provider(format!(
+        return Err(FrogClawClientError::Provider(format!(
             "Zhipu API error {status}: {text}"
         )));
     }
@@ -262,7 +262,7 @@ async fn search_zhipu(
     let data: ZhipuResponse = resp
         .json()
         .await
-        .map_err(|e| AQBotError::Provider(format!("Zhipu response parse error: {e}")))?;
+        .map_err(|e| FrogClawClientError::Provider(format!("Zhipu response parse error: {e}")))?;
 
     let results = data.search_result.unwrap_or_default();
     Ok(results
@@ -328,7 +328,7 @@ async fn search_bocha(
     let client = Client::builder()
         .timeout(std::time::Duration::from_millis(timeout_ms as u64))
         .build()
-        .map_err(|e| AQBotError::Provider(format!("HTTP client error: {e}")))?;
+        .map_err(|e| FrogClawClientError::Provider(format!("HTTP client error: {e}")))?;
 
     let body = BochaRequest {
         query,
@@ -344,12 +344,12 @@ async fn search_bocha(
         .json(&body)
         .send()
         .await
-        .map_err(|e| AQBotError::Provider(format!("Bocha request failed: {e}")))?;
+        .map_err(|e| FrogClawClientError::Provider(format!("Bocha request failed: {e}")))?;
 
     if !resp.status().is_success() {
         let status = resp.status();
         let text = resp.text().await.unwrap_or_default();
-        return Err(AQBotError::Provider(format!(
+        return Err(FrogClawClientError::Provider(format!(
             "Bocha API error {status}: {text}"
         )));
     }
@@ -357,10 +357,10 @@ async fn search_bocha(
     let data: BochaResponse = resp
         .json()
         .await
-        .map_err(|e| AQBotError::Provider(format!("Bocha response parse error: {e}")))?;
+        .map_err(|e| FrogClawClientError::Provider(format!("Bocha response parse error: {e}")))?;
 
     if data.code.unwrap_or(0) != 200 {
-        return Err(AQBotError::Provider(format!(
+        return Err(FrogClawClientError::Provider(format!(
             "Bocha search failed: {}",
             data.msg.unwrap_or_else(|| "Unknown error".to_string())
         )));

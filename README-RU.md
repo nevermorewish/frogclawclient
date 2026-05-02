@@ -1,9 +1,9 @@
 [简体中文](./README.md) | [繁體中文](./README-ZH-TW.md) | [English](./README-EN.md) | [日本語](./README-JA.md) | [한국어](./README-KO.md) | [Français](./README-FR.md) | [Deutsch](./README-DE.md) | [Español](./README-ES.md) | **Русский** | [हिन्दी](./README-HI.md) | [العربية](./README-AR.md)
 
-[![AQBot](https://socialify.git.ci/AQBot-Desktop/AQBot/image?description=1&font=JetBrains+Mono&forks=1&issues=1&logo=https%3A%2F%2Fgithub.com%2FAQBot-Desktop%2FAQBot%2Fblob%2Fmain%2Fsrc%2Fassets%2Fimage%2Flogo.png%3Fraw%3Dtrue&name=1&owner=1&pattern=Floating+Cogs&pulls=1&stargazers=1&theme=Auto)](https://github.com/AQBot-Desktop/AQBot)
+[![FrogClawClient](https://socialify.git.ci/FrogClawClient-Desktop/FrogClawClient/image?description=1&font=JetBrains+Mono&forks=1&issues=1&logo=https%3A%2F%2Fgithub.com%2FFrogClawClient-Desktop%2FFrogClawClient%2Fblob%2Fmain%2Fsrc%2Fassets%2Fimage%2Flogo.png%3Fraw%3Dtrue&name=1&owner=1&pattern=Floating+Cogs&pulls=1&stargazers=1&theme=Auto)](https://github.com/FrogClawClient-Desktop/FrogClawClient)
 
 <p align="center">
-    <a href="https://www.producthunt.com/products/aqbot?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-aqbot" target="_blank" rel="noopener noreferrer"><img alt="AQBot - Lightweight, high-perf cross-platform AI desktop client | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1118403&amp;theme=light&amp;t=1775627359538"></a>
+    <a href="https://www.producthunt.com/products/frogclaw?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-frogclaw" target="_blank" rel="noopener noreferrer"><img alt="FrogClawClient - Lightweight, high-perf cross-platform AI desktop client | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1118403&amp;theme=light&amp;t=1775627359538"></a>
 </p>
 
 ## Скриншоты
@@ -68,7 +68,7 @@
 ### Инструменты и расширения
 
 - **Протокол MCP** — Полная реализация Model Context Protocol с поддержкой транспортов stdio и HTTP
-- **Встроенные инструменты** — Готовые к использованию встроенные MCP-инструменты, такие как `@aqbot/fetch`
+- **Встроенные инструменты** — Готовые к использованию встроенные MCP-инструменты, такие как `@frogclaw/fetch`
 - **Панель выполнения инструментов** — Визуальное отображение запросов вызовов инструментов и возвращённых результатов
 
 ### API-шлюз
@@ -83,7 +83,7 @@
 ### Данные и безопасность
 
 - **Шифрование AES-256** — API-ключи и конфиденциальные данные шифруются локально с помощью AES-256; мастер-ключ хранится с правами 0600
-- **Изолированные каталоги данных** — Состояние приложения в `~/.aqbot/`; пользовательские файлы в `~/Documents/aqbot/`
+- **Изолированные каталоги данных** — Состояние приложения в `~/.frogclaw/`; пользовательские файлы в `~/Documents/frogclaw/`
 - **Автоматическое резервное копирование** — Плановое автоматическое резервное копирование в локальные каталоги или хранилище WebDAV
 - **Восстановление из резервной копии** — Восстановление в один клик из исторических резервных копий
 - **Экспорт разговоров** — Экспорт разговоров в виде PNG-скриншотов, Markdown, обычного текста или JSON
@@ -109,7 +109,7 @@
 
 ## Начало работы
 
-Перейдите на страницу [Releases](https://github.com/AQBot-Desktop/AQBot/releases) и загрузите установщик для вашей платформы.
+Перейдите на страницу [Releases](https://github.com/FrogClawClient-Desktop/FrogClawClient/releases) и загрузите установщик для вашей платформы.
 
 ## Часто задаваемые вопросы
 
@@ -117,8 +117,8 @@
 
 Поскольку приложение не подписано Apple, macOS может показать одно из следующих сообщений:
 
-- «AQBot» повреждён и не может быть открыт
-- «AQBot» не может быть открыт, поскольку Apple не может проверить его на наличие вредоносного программного обеспечения
+- «FrogClawClient» повреждён и не может быть открыт
+- «FrogClawClient» не может быть открыт, поскольку Apple не может проверить его на наличие вредоносного программного обеспечения
 
 **Шаги для решения:**
 
@@ -133,7 +133,7 @@ sudo spctl --master-disable
 **2. Удалить атрибут карантина**
 
 ```bash
-sudo xattr -dr com.apple.quarantine /Applications/AQBot.app
+sudo xattr -dr com.apple.quarantine /Applications/FrogClawClient.app
 ```
 
 > Совет: Вы можете перетащить значок приложения в терминал после ввода `sudo xattr -dr com.apple.quarantine `.

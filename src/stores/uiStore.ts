@@ -16,8 +16,8 @@ interface UIState {
 }
 
 export const useUIStore = create<UIState>((set, get) => ({
-  activePage: 'chat',
-  previousPage: 'chat',
+  activePage: 'home',
+  previousPage: 'home',
   sidebarCollapsed: false,
   settingsSection: 'general',
   selectedProviderId: null,

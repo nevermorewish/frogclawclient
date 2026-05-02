@@ -1,5 +1,5 @@
-use aqbot_core::error::{AQBotError, Result};
-use aqbot_core::types::*;
+use frogclaw_core::error::{FrogClawClientError, Result};
+use frogclaw_core::types::*;
 use async_trait::async_trait;
 use futures::Stream;
 use futures::StreamExt;
@@ -501,18 +501,18 @@ impl ProviderAdapter for GeminiAdapter {
         let resp = crate::apply_request_headers(self.get_client(ctx)?.post(&url).json(&body), ctx)
             .send()
             .await
-            .map_err(|e| AQBotError::Provider(format!("Request failed: {e}")))?;
+            .map_err(|e| FrogClawClientError::Provider(format!("Request failed: {e}")))?;
 
         if !resp.status().is_success() {
             let s = resp.status();
             let t = resp.text().await.unwrap_or_default();
-            return Err(AQBotError::Provider(format!("Gemini API error {s}: {t}")));
+            return Err(FrogClawClientError::Provider(format!("Gemini API error {s}: {t}")));
         }
 
         let gr: GeminiResponse = resp
             .json()
             .await
-            .map_err(|e| AQBotError::Provider(format!("Parse error: {e}")))?;
+            .map_err(|e| FrogClawClientError::Provider(format!("Parse error: {e}")))?;
 
         let parts = gr
             .candidates
@@ -522,7 +522,7 @@ impl ProviderAdapter for GeminiAdapter {
             .map(|c| &c.parts);
 
         let mut content = String::new();
-        let mut tool_calls: Vec<aqbot_core::types::ToolCall> = Vec::new();
+        let mut tool_calls: Vec<frogclaw_core::types::ToolCall> = Vec::new();
 
         if let Some(parts) = parts {
             for part in parts {
@@ -530,7 +530,7 @@ impl ProviderAdapter for GeminiAdapter {
                     content.push_str(text);
                 }
                 if let Some(ref fc) = part.function_call {
-                    tool_calls.push(aqbot_core::types::ToolCall {
+                    tool_calls.push(frogclaw_core::types::ToolCall {
                         id: format!(
                             "gemini_{}",
                             std::time::SystemTime::now()
@@ -539,7 +539,7 @@ impl ProviderAdapter for GeminiAdapter {
                                 .unwrap_or(0)
                         ),
                         call_type: "function".to_string(),
-                        function: aqbot_core::types::ToolCallFunction {
+                        function: frogclaw_core::types::ToolCallFunction {
                             name: fc.name.clone(),
                             arguments: serde_json::to_string(&fc.args).unwrap_or_default(),
                         },
@@ -598,14 +598,14 @@ impl ProviderAdapter for GeminiAdapter {
                 Ok(r) => {
                     let s = r.status();
                     let t = r.text().await.unwrap_or_default();
-                    let _ = tx.unbounded_send(Err(AQBotError::Provider(format!(
+                    let _ = tx.unbounded_send(Err(FrogClawClientError::Provider(format!(
                         "Gemini API error {s}: {t}"
                     ))));
                     return;
                 }
                 Err(e) => {
                     let _ = tx
-                        .unbounded_send(Err(AQBotError::Provider(format!("Request failed: {e}"))));
+                        .unbounded_send(Err(FrogClawClientError::Provider(format!("Request failed: {e}"))));
                     return;
                 }
             };
@@ -642,7 +642,7 @@ impl ProviderAdapter for GeminiAdapter {
                                     .map(|c| &c.parts);
 
                                 let mut content: Option<String> = None;
-                                let mut tool_calls_vec: Vec<aqbot_core::types::ToolCall> =
+                                let mut tool_calls_vec: Vec<frogclaw_core::types::ToolCall> =
                                     Vec::new();
 
                                 if let Some(parts) = parts {
@@ -651,7 +651,7 @@ impl ProviderAdapter for GeminiAdapter {
                                             content = Some(text.clone());
                                         }
                                         if let Some(ref fc) = part.function_call {
-                                            tool_calls_vec.push(aqbot_core::types::ToolCall {
+                                            tool_calls_vec.push(frogclaw_core::types::ToolCall {
                                                 id: format!(
                                                     "gemini_{}",
                                                     std::time::SystemTime::now()
@@ -660,7 +660,7 @@ impl ProviderAdapter for GeminiAdapter {
                                                         .unwrap_or(0)
                                                 ),
                                                 call_type: "function".to_string(),
-                                                function: aqbot_core::types::ToolCallFunction {
+                                                function: frogclaw_core::types::ToolCallFunction {
                                                     name: fc.name.clone(),
                                                     arguments: serde_json::to_string(&fc.args)
                                                         .unwrap_or_default(),
@@ -694,7 +694,7 @@ impl ProviderAdapter for GeminiAdapter {
                         }
                     }
                     Err(e) => {
-                        let _ = tx.unbounded_send(Err(AQBotError::Provider(format!(
+                        let _ = tx.unbounded_send(Err(FrogClawClientError::Provider(format!(
                             "Stream error: {e}"
                         ))));
                         return;
@@ -721,18 +721,18 @@ impl ProviderAdapter for GeminiAdapter {
         let resp = crate::apply_request_headers(self.get_client(ctx)?.get(&url), ctx)
             .send()
             .await
-            .map_err(|e| AQBotError::Provider(format!("Request failed: {e}")))?;
+            .map_err(|e| FrogClawClientError::Provider(format!("Request failed: {e}")))?;
 
         if !resp.status().is_success() {
             let s = resp.status();
             let t = resp.text().await.unwrap_or_default();
-            return Err(AQBotError::Provider(format!("Gemini API error {s}: {t}")));
+            return Err(FrogClawClientError::Provider(format!("Gemini API error {s}: {t}")));
         }
 
         let models: GeminiModelsResponse = resp
             .json()
             .await
-            .map_err(|e| AQBotError::Provider(format!("Parse error: {e}")))?;
+            .map_err(|e| FrogClawClientError::Provider(format!("Parse error: {e}")))?;
 
         Ok(models
             .models
@@ -802,12 +802,12 @@ impl ProviderAdapter for GeminiAdapter {
         let resp = crate::apply_request_headers(self.get_client(ctx)?.post(&url).json(&body), ctx)
             .send()
             .await
-            .map_err(|e| AQBotError::Provider(format!("Gemini embed request failed: {e}")))?;
+            .map_err(|e| FrogClawClientError::Provider(format!("Gemini embed request failed: {e}")))?;
 
         if !resp.status().is_success() {
             let s = resp.status();
             let t = resp.text().await.unwrap_or_default();
-            return Err(AQBotError::Provider(format!(
+            return Err(FrogClawClientError::Provider(format!(
                 "Gemini embed API error {s}: {t}"
             )));
         }
@@ -824,7 +824,7 @@ impl ProviderAdapter for GeminiAdapter {
         let result: GeminiBatchEmbedResponse = resp
             .json()
             .await
-            .map_err(|e| AQBotError::Provider(format!("Gemini embed parse error: {e}")))?;
+            .map_err(|e| FrogClawClientError::Provider(format!("Gemini embed parse error: {e}")))?;
 
         let dimensions = result
             .embeddings

@@ -1,5 +1,5 @@
 [package]
-name = "aqbot-core"
+name = "frogclaw-core"
 version = "0.0.1"
 edition = "2021"
 
@@ -28,7 +28,7 @@ libsqlite3-sys = { workspace = true }
 pdf-extract = "0.7"
 zip = "2"
 dirs = "5"
-aqbot-migration = { path = "../migration" }
+frogclaw-migration = { path = "../migration" }
 
 [dev-dependencies]
 tempfile = "3"

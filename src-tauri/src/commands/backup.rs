@@ -1,7 +1,7 @@
 use crate::AppState;
-use aqbot_core::repo::backup;
-use aqbot_core::repo::settings::get_settings;
-use aqbot_core::types::*;
+use frogclaw_core::repo::backup;
+use frogclaw_core::repo::settings::get_settings;
+use frogclaw_core::types::*;
 use sea_orm::DatabaseConnection;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -23,7 +23,7 @@ pub async fn create_backup(
     let settings = get_settings(&state.sea_db)
         .await
         .map_err(|e| e.to_string())?;
-    let decoded_backup_dir = aqbot_core::path_vars::decode_path_opt(&settings.backup_dir);
+    let decoded_backup_dir = frogclaw_core::path_vars::decode_path_opt(&settings.backup_dir);
     let backup_dir =
         backup::resolve_backup_dir(decoded_backup_dir.as_deref(), &state.app_data_dir);
     backup::create_backup(&state.sea_db, &format, &backup_dir)
@@ -86,7 +86,7 @@ pub async fn get_backup_settings(state: State<'_, AppState>) -> Result<AutoBacku
     let settings = get_settings(&state.sea_db)
         .await
         .map_err(|e| e.to_string())?;
-    let decoded_backup_dir = aqbot_core::path_vars::decode_path_opt(&settings.backup_dir);
+    let decoded_backup_dir = frogclaw_core::path_vars::decode_path_opt(&settings.backup_dir);
     let default_dir = backup::resolve_backup_dir(None, &state.app_data_dir);
     Ok(AutoBackupSettings {
         enabled: settings.auto_backup_enabled,
@@ -110,9 +110,9 @@ pub async fn update_backup_settings(
     settings.auto_backup_enabled = backup_settings.enabled;
     settings.auto_backup_interval_hours = backup_settings.interval_hours;
     settings.auto_backup_max_count = backup_settings.max_count;
-    settings.backup_dir = aqbot_core::path_vars::encode_path_opt(&backup_settings.backup_dir);
+    settings.backup_dir = frogclaw_core::path_vars::encode_path_opt(&backup_settings.backup_dir);
 
-    aqbot_core::repo::settings::save_settings(&state.sea_db, &settings)
+    frogclaw_core::repo::settings::save_settings(&state.sea_db, &settings)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -178,7 +178,7 @@ async fn restart_auto_backup(
             // Read current settings to get backup_dir
             let backup_dir = match get_settings(&db).await {
                 Ok(s) => {
-                    let decoded = aqbot_core::path_vars::decode_path_opt(&s.backup_dir);
+                    let decoded = frogclaw_core::path_vars::decode_path_opt(&s.backup_dir);
                     backup::resolve_backup_dir(decoded.as_deref(), &app_dir)
                 }
                 Err(_) => backup::resolve_backup_dir(None, &app_dir),

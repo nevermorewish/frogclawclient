@@ -41,15 +41,15 @@ export function buildSearchTag(
   results?: SearchResultItem[],
 ): string {
   if (status === 'searching') {
-    return '<web-search status="searching" data-aqbot="1"></web-search>';
+    return '<web-search status="searching" data-frogclaw="1"></web-search>';
   }
   if (status === 'error') {
-    return '<web-search status="error" data-aqbot="1"></web-search>';
+    return '<web-search status="error" data-frogclaw="1"></web-search>';
   }
   const json = JSON.stringify(
     (results ?? []).map((r) => ({ title: r.title, url: r.url, content: r.content })),
   );
-  return `<web-search status="done" data-aqbot="1">\n${json}\n</web-search>\n\n`;
+  return `<web-search status="done" data-frogclaw="1">\n${json}\n</web-search>\n\n`;
 }
 
 export function parseSearchContent(content: string): {

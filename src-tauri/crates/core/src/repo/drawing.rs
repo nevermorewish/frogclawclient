@@ -2,7 +2,7 @@ use sea_orm::*;
 use serde::{Deserialize, Serialize};
 
 use crate::entity::{drawing_generations, drawing_images};
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 use crate::repo::stored_file::StoredFile;
 use crate::utils::{gen_id, now_ts};
 
@@ -242,7 +242,7 @@ pub async fn mark_generation_succeeded(
     let row = drawing_generations::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("DrawingGeneration {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("DrawingGeneration {}", id)))?;
     let mut am: drawing_generations::ActiveModel = row.into();
     am.status = Set("succeeded".to_string());
     am.error_message = Set(None);
@@ -261,7 +261,7 @@ pub async fn mark_generation_failed(
     let row = drawing_generations::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("DrawingGeneration {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("DrawingGeneration {}", id)))?;
     let mut am: drawing_generations::ActiveModel = row.into();
     am.status = Set("failed".to_string());
     am.error_message = Set(Some(error_message));
@@ -274,7 +274,7 @@ pub async fn get_image(db: &DatabaseConnection, id: &str) -> Result<DrawingImage
     let row = drawing_images::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("DrawingImage {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("DrawingImage {}", id)))?;
     Ok(image_from_entity(row))
 }
 
@@ -282,7 +282,7 @@ pub async fn get_generation(db: &DatabaseConnection, id: &str) -> Result<Drawing
     let row = drawing_generations::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("DrawingGeneration {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("DrawingGeneration {}", id)))?;
     hydrate_generation(db, row).await
 }
 
@@ -326,7 +326,7 @@ pub async fn delete_generation(db: &DatabaseConnection, id: &str) -> Result<()> 
         .exec(db)
         .await?;
     if result.rows_affected == 0 {
-        return Err(AQBotError::NotFound(format!("DrawingGeneration {}", id)));
+        return Err(FrogClawClientError::NotFound(format!("DrawingGeneration {}", id)));
     }
     Ok(())
 }

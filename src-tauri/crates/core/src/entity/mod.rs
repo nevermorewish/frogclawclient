@@ -1,4 +1,4 @@
-//! SeaORM entity definitions for AQBot database tables.
+//! SeaORM entity definitions for FrogClawClient database tables.
 
 pub mod conversation_categories;
 pub mod conversation_summaries;

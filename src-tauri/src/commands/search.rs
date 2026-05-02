@@ -1,7 +1,7 @@
 use crate::AppState;
-use aqbot_core::entity::search_providers;
-use aqbot_core::search::{self, SearchResponse, TestResult};
-use aqbot_core::types::*;
+use frogclaw_core::entity::search_providers;
+use frogclaw_core::search::{self, SearchResponse, TestResult};
+use frogclaw_core::types::*;
 use sea_orm::EntityTrait;
 use tauri::State;
 
@@ -9,7 +9,7 @@ use tauri::State;
 pub async fn list_search_providers(
     state: State<'_, AppState>,
 ) -> Result<Vec<SearchProvider>, String> {
-    aqbot_core::repo::search_provider::list_search_providers(&state.sea_db)
+    frogclaw_core::repo::search_provider::list_search_providers(&state.sea_db)
         .await
         .map_err(|e| e.to_string())
 }
@@ -21,12 +21,12 @@ pub async fn create_search_provider(
 ) -> Result<SearchProvider, String> {
     if let Some(ref raw_key) = input.api_key {
         if !raw_key.is_empty() {
-            let encrypted = aqbot_core::crypto::encrypt_key(raw_key, &state.master_key)
+            let encrypted = frogclaw_core::crypto::encrypt_key(raw_key, &state.master_key)
                 .map_err(|e| e.to_string())?;
             input.api_key = Some(encrypted);
         }
     }
-    aqbot_core::repo::search_provider::create_search_provider(&state.sea_db, input)
+    frogclaw_core::repo::search_provider::create_search_provider(&state.sea_db, input)
         .await
         .map_err(|e| e.to_string())
 }
@@ -39,19 +39,19 @@ pub async fn update_search_provider(
 ) -> Result<SearchProvider, String> {
     if let Some(ref raw_key) = input.api_key {
         if !raw_key.is_empty() {
-            let encrypted = aqbot_core::crypto::encrypt_key(raw_key, &state.master_key)
+            let encrypted = frogclaw_core::crypto::encrypt_key(raw_key, &state.master_key)
                 .map_err(|e| e.to_string())?;
             input.api_key = Some(encrypted);
         }
     }
-    aqbot_core::repo::search_provider::update_search_provider(&state.sea_db, &id, input)
+    frogclaw_core::repo::search_provider::update_search_provider(&state.sea_db, &id, input)
         .await
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn delete_search_provider(state: State<'_, AppState>, id: String) -> Result<(), String> {
-    aqbot_core::repo::search_provider::delete_search_provider(&state.sea_db, &id)
+    frogclaw_core::repo::search_provider::delete_search_provider(&state.sea_db, &id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -69,7 +69,7 @@ async fn get_provider_with_key(
 
     let api_key = match &model.api_key_ref {
         Some(encrypted) if !encrypted.is_empty() => {
-            aqbot_core::crypto::decrypt_key(encrypted, &state.master_key)
+            frogclaw_core::crypto::decrypt_key(encrypted, &state.master_key)
                 .map_err(|e| e.to_string())?
         }
         _ => String::new(),

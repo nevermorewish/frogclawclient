@@ -1,4 +1,4 @@
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 use crate::mcp_client::McpToolResult;
 use regex::Regex;
 use serde_json::Value;
@@ -6,7 +6,7 @@ use serde_json::Value;
 /// Dispatch a tool call to the appropriate built-in implementation.
 pub async fn dispatch(server_name: &str, tool_name: &str, args: Value) -> Result<McpToolResult> {
     match server_name {
-        "@aqbot/fetch" => match tool_name {
+        "@frogclaw/fetch" => match tool_name {
             "fetch_url" => {
                 let url = args.get("url").and_then(|v| v.as_str()).unwrap_or_default();
                 let max_length = args
@@ -23,12 +23,12 @@ pub async fn dispatch(server_name: &str, tool_name: &str, args: Value) -> Result
                     .map(|v| v as usize);
                 fetch_markdown(url, max_length).await
             }
-            _ => Err(AQBotError::Gateway(format!(
+            _ => Err(FrogClawClientError::Gateway(format!(
                 "Unknown fetch tool: {}",
                 tool_name
             ))),
         },
-        "@aqbot/search-file" => match tool_name {
+        "@frogclaw/search-file" => match tool_name {
             "read_file" => {
                 let path = args
                     .get("path")
@@ -49,12 +49,12 @@ pub async fn dispatch(server_name: &str, tool_name: &str, args: Value) -> Result
                     .map(|v| v as usize);
                 search_files(path, pattern, max_results).await
             }
-            _ => Err(AQBotError::Gateway(format!(
+            _ => Err(FrogClawClientError::Gateway(format!(
                 "Unknown search-file tool: {}",
                 tool_name
             ))),
         },
-        _ => Err(AQBotError::Gateway(format!(
+        _ => Err(FrogClawClientError::Gateway(format!(
             "Unknown builtin server: {}",
             server_name
         ))),
@@ -74,17 +74,17 @@ async fn fetch_url(url: &str, max_length: Option<usize>) -> Result<McpToolResult
     }
 
     let client = reqwest::Client::builder()
-        .user_agent("AQBot/1.0 (Web Fetch Tool)")
+        .user_agent("FrogClawClient/1.0 (Web Fetch Tool)")
         .timeout(std::time::Duration::from_secs(30))
         .redirect(reqwest::redirect::Policy::limited(5))
         .build()
-        .map_err(|e| AQBotError::Gateway(format!("HTTP client error: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("HTTP client error: {}", e)))?;
 
     let resp = client
         .get(url)
         .send()
         .await
-        .map_err(|e| AQBotError::Gateway(format!("Failed to fetch {}: {}", url, e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to fetch {}: {}", url, e)))?;
 
     let status = resp.status();
     if !status.is_success() {
@@ -101,7 +101,7 @@ async fn fetch_url(url: &str, max_length: Option<usize>) -> Result<McpToolResult
     let body = resp
         .text()
         .await
-        .map_err(|e| AQBotError::Gateway(format!("Failed to read response body: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read response body: {}", e)))?;
 
     let text = html_to_text(&body);
     let max = max_length.unwrap_or(5000);
@@ -122,17 +122,17 @@ async fn fetch_markdown(url: &str, max_length: Option<usize>) -> Result<McpToolR
     }
 
     let client = reqwest::Client::builder()
-        .user_agent("AQBot/1.0 (Web Fetch Tool)")
+        .user_agent("FrogClawClient/1.0 (Web Fetch Tool)")
         .timeout(std::time::Duration::from_secs(30))
         .redirect(reqwest::redirect::Policy::limited(5))
         .build()
-        .map_err(|e| AQBotError::Gateway(format!("HTTP client error: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("HTTP client error: {}", e)))?;
 
     let resp = client
         .get(url)
         .send()
         .await
-        .map_err(|e| AQBotError::Gateway(format!("Failed to fetch {}: {}", url, e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to fetch {}: {}", url, e)))?;
 
     let status = resp.status();
     if !status.is_success() {
@@ -149,7 +149,7 @@ async fn fetch_markdown(url: &str, max_length: Option<usize>) -> Result<McpToolR
     let body = resp
         .text()
         .await
-        .map_err(|e| AQBotError::Gateway(format!("Failed to read response body: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read response body: {}", e)))?;
 
     let markdown = html_to_markdown(&body);
     let max = max_length.unwrap_or(10000);

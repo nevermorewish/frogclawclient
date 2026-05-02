@@ -10,7 +10,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { getVisibleModelCapabilities } from '@/lib/modelCapabilities';
 import type { ModelCapability, Model } from '@/types';
 
-const PINNED_MODELS_KEY = 'aqbot_pinned_models';
+const PINNED_MODELS_KEY = 'frogclaw_pinned_models';
 
 const CAPABILITY_COLORS: Record<ModelCapability, string> = {
   TextChat: 'blue', Vision: 'green', FunctionCalling: 'purple', Reasoning: 'orange', RealtimeVoice: 'red',
@@ -235,9 +235,9 @@ export function ModelSelector({ style, onSelect, overrideCurrentModel, children,
     // Bubble-action instances (onSelect) and multi-select (multiSelect) should not.
     if (multiSelect || onSelect) return;
     const onToggle = () => setOpen(!open);
-    window.addEventListener('aqbot:toggle-model-selector', onToggle);
+    window.addEventListener('frogclaw:toggle-model-selector', onToggle);
     return () => {
-      window.removeEventListener('aqbot:toggle-model-selector', onToggle);
+      window.removeEventListener('frogclaw:toggle-model-selector', onToggle);
     };
   }, [open, setOpen, multiSelect, onSelect]);
 

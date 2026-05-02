@@ -241,7 +241,7 @@ describe('ModelSelector', () => {
   });
 
   it('does not show pinned non-chat models', () => {
-    localStorage.setItem('aqbot_pinned_models', JSON.stringify(['provider-1::gpt-image-2']));
+    localStorage.setItem('frogclaw_pinned_models', JSON.stringify(['provider-1::gpt-image-2']));
 
     render(
       <ModelSelector

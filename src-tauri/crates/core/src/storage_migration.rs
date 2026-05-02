@@ -1,4 +1,4 @@
-//! One-time migration: move files from legacy ~/.aqbot/files/ to ~/Documents/aqbot/
+//! One-time migration: move files from legacy ~/.frogclaw/files/ to ~/Documents/frogclaw/
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -18,7 +18,7 @@ pub struct MigrationReport {
     pub messages_updated: usize,
 }
 
-/// Migrates files from legacy ~/.aqbot/files/ to ~/Documents/aqbot/{images,files}/
+/// Migrates files from legacy ~/.frogclaw/files/ to ~/Documents/frogclaw/{images,files}/
 /// Updates stored_files.storage_path and messages.attachments JSON in the database.
 /// Idempotent: safe to run multiple times.
 pub async fn migrate_to_documents_root(

@@ -5,7 +5,7 @@ use aes_gcm::{
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use sha2::{Digest, Sha256};
 
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 
 const NONCE_SIZE: usize = 12;
 
@@ -17,7 +17,7 @@ pub fn generate_master_key() -> [u8; 32] {
 
 pub fn encrypt_key(plaintext: &str, master_key: &[u8; 32]) -> Result<String> {
     let cipher = Aes256Gcm::new_from_slice(master_key)
-        .map_err(|e| AQBotError::Crypto(format!("Failed to create cipher: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Crypto(format!("Failed to create cipher: {}", e)))?;
 
     let mut nonce_bytes = [0u8; NONCE_SIZE];
     OsRng.fill_bytes(&mut nonce_bytes);
@@ -25,7 +25,7 @@ pub fn encrypt_key(plaintext: &str, master_key: &[u8; 32]) -> Result<String> {
 
     let ciphertext = cipher
         .encrypt(nonce, plaintext.as_bytes())
-        .map_err(|e| AQBotError::Crypto(format!("Encryption failed: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Crypto(format!("Encryption failed: {}", e)))?;
 
     let mut combined = Vec::with_capacity(NONCE_SIZE + ciphertext.len());
     combined.extend_from_slice(&nonce_bytes);
@@ -37,24 +37,24 @@ pub fn encrypt_key(plaintext: &str, master_key: &[u8; 32]) -> Result<String> {
 pub fn decrypt_key(encrypted: &str, master_key: &[u8; 32]) -> Result<String> {
     let combined = BASE64
         .decode(encrypted)
-        .map_err(|e| AQBotError::Crypto(format!("Base64 decode failed: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Crypto(format!("Base64 decode failed: {}", e)))?;
 
     if combined.len() < NONCE_SIZE {
-        return Err(AQBotError::Crypto("Invalid encrypted data".to_string()));
+        return Err(FrogClawClientError::Crypto("Invalid encrypted data".to_string()));
     }
 
     let (nonce_bytes, ciphertext) = combined.split_at(NONCE_SIZE);
     let nonce = Nonce::from_slice(nonce_bytes);
 
     let cipher = Aes256Gcm::new_from_slice(master_key)
-        .map_err(|e| AQBotError::Crypto(format!("Failed to create cipher: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Crypto(format!("Failed to create cipher: {}", e)))?;
 
     let plaintext = cipher
         .decrypt(nonce, ciphertext)
-        .map_err(|e| AQBotError::Crypto(format!("Decryption failed: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Crypto(format!("Decryption failed: {}", e)))?;
 
     String::from_utf8(plaintext)
-        .map_err(|e| AQBotError::Crypto(format!("UTF-8 decode failed: {}", e)))
+        .map_err(|e| FrogClawClientError::Crypto(format!("UTF-8 decode failed: {}", e)))
 }
 
 pub fn sha256_hash(input: &str) -> String {

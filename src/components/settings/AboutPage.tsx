@@ -12,6 +12,7 @@ const { Text } = Typography;
 
 export function AboutPage() {
   const { t } = useTranslation();
+  const appName = t('app.name');
   const [checking, setChecking] = useState(false);
   const [appVersion, setAppVersion] = useState('...');
   const { checkForUpdate } = useUpdateChecker();
@@ -56,11 +57,11 @@ export function AboutPage() {
       }}>
         <img
           src={logoUrl}
-          alt="AQBot"
+          alt={appName}
           style={{ width: 96, height: 96, borderRadius: 20, marginBottom: 16 }}
           draggable={false}
         />
-        <div style={{ fontSize: 22, fontWeight: 600 }}>AQBot</div>
+        <div style={{ fontSize: 22, fontWeight: 600 }}>{appName}</div>
         <Text type="secondary" style={{ marginTop: 4 }}>
           {t('settings.version')} {appVersion}
         </Text>
@@ -82,7 +83,7 @@ export function AboutPage() {
           <span>{t('settings.website')}</span>
           <Button
             icon={<Globe size={16} />}
-            href="https://app.aqbot.top"
+            href="https://frogclaw.com"
             target="_blank"
             type="link"
           >
@@ -94,7 +95,7 @@ export function AboutPage() {
           <span>GitHub</span>
           <Button
             icon={<Github size={16} />}
-            href="https://github.com/AQBot-Desktop/AQBot"
+            href="https://github.com/frogclaw/FrogClawClient"
             target="_blank"
             type="link"
           >

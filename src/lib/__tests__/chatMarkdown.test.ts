@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseChatMarkdown, stripAqbotTags } from '../chatMarkdown';
+import { parseChatMarkdown, stripFrogclawTags } from '../chatMarkdown';
 
 describe('parseChatMarkdown', () => {
   it('parses fenced code blocks into markdown nodes', () => {
@@ -44,10 +44,10 @@ UI -> App: 携带token访问
     });
   });
 
-  it('strips think and aqbot-only tags when preparing export-safe transcript text', () => {
-    const cleaned = stripAqbotTags(`Final answer
+  it('strips think and frogclaw-only tags when preparing export-safe transcript text', () => {
+    const cleaned = stripFrogclawTags(`Final answer
 <think>Hidden reasoning</think>
-<knowledge-retrieval data-aqbot="1">retrieved</knowledge-retrieval>
+<knowledge-retrieval data-frogclaw="1">retrieved</knowledge-retrieval>
 :::mcp tool
 payload
 :::

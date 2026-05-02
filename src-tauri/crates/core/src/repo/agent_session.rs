@@ -1,5 +1,5 @@
 use crate::entity::agent_sessions;
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 use crate::types::AgentSession;
 use crate::utils::gen_id;
 use sea_orm::*;
@@ -89,7 +89,7 @@ pub async fn update_agent_session_status(
     let model = agent_sessions::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("AgentSession {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("AgentSession {}", id)))?;
 
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let mut am: agent_sessions::ActiveModel = model.into();
@@ -108,7 +108,7 @@ pub async fn update_agent_session_cwd(
     let model = agent_sessions::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("AgentSession {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("AgentSession {}", id)))?;
 
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let mut am: agent_sessions::ActiveModel = model.into();
@@ -127,7 +127,7 @@ pub async fn update_agent_session_permission_mode(
     let model = agent_sessions::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("AgentSession {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("AgentSession {}", id)))?;
 
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let mut am: agent_sessions::ActiveModel = model.into();
@@ -172,7 +172,7 @@ pub async fn update_agent_session_after_query(
     let model = agent_sessions::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("AgentSession {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("AgentSession {}", id)))?;
 
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let mut am: agent_sessions::ActiveModel = model.clone().into();

@@ -1,9 +1,9 @@
 [简体中文](./README.md) | **繁體中文** | [English](./README-EN.md) | [日本語](./README-JA.md) | [한국어](./README-KO.md) | [Français](./README-FR.md) | [Deutsch](./README-DE.md) | [Español](./README-ES.md) | [Русский](./README-RU.md) | [हिन्दी](./README-HI.md) | [العربية](./README-AR.md)
 
-[![AQBot](https://socialify.git.ci/AQBot-Desktop/AQBot/image?description=1&font=JetBrains+Mono&forks=1&issues=1&logo=https%3A%2F%2Fgithub.com%2FAQBot-Desktop%2FAQBot%2Fblob%2Fmain%2Fsrc%2Fassets%2Fimage%2Flogo.png%3Fraw%3Dtrue&name=1&owner=1&pattern=Floating+Cogs&pulls=1&stargazers=1&theme=Auto)](https://github.com/AQBot-Desktop/AQBot)
+[![FrogClawClient](https://socialify.git.ci/FrogClawClient-Desktop/FrogClawClient/image?description=1&font=JetBrains+Mono&forks=1&issues=1&logo=https%3A%2F%2Fgithub.com%2FFrogClawClient-Desktop%2FFrogClawClient%2Fblob%2Fmain%2Fsrc%2Fassets%2Fimage%2Flogo.png%3Fraw%3Dtrue&name=1&owner=1&pattern=Floating+Cogs&pulls=1&stargazers=1&theme=Auto)](https://github.com/FrogClawClient-Desktop/FrogClawClient)
 
 <p align="center">
-    <a href="https://www.producthunt.com/products/aqbot?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-aqbot" target="_blank" rel="noopener noreferrer"><img alt="AQBot - Lightweight, high-perf cross-platform AI desktop client | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1118403&amp;theme=light&amp;t=1775627359538"></a>
+    <a href="https://www.producthunt.com/products/frogclaw?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-frogclaw" target="_blank" rel="noopener noreferrer"><img alt="FrogClawClient - Lightweight, high-perf cross-platform AI desktop client | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1118403&amp;theme=light&amp;t=1775627359538"></a>
 </p>
 
 ## 執行截圖
@@ -68,7 +68,7 @@
 ### 工具與擴充
 
 - **MCP 協議** — 完整實作 Model Context Protocol，支援 stdio 和 HTTP 兩種傳輸方式
-- **內建工具** — 提供 `@aqbot/fetch` 等開箱即用的內建 MCP 工具
+- **內建工具** — 提供 `@frogclaw/fetch` 等開箱即用的內建 MCP 工具
 - **工具執行面板** — 可視化展示工具呼叫請求與回傳結果
 
 ### API 閘道
@@ -83,7 +83,7 @@
 ### 資料與安全
 
 - **AES-256 加密** — API Key 等敏感資料使用 AES-256 加密存儲於本地，主金鑰權限 0600
-- **資料目錄隔離** — 應用程式狀態存儲於 `~/.aqbot/`，使用者檔案存儲於 `~/Documents/aqbot/`
+- **資料目錄隔離** — 應用程式狀態存儲於 `~/.frogclaw/`，使用者檔案存儲於 `~/Documents/frogclaw/`
 - **自動備份** — 支援定時自動備份到本地目錄、WebDAV 存儲
 - **備份還原** — 一鍵從歷史備份還原完整資料
 - **對話匯出** — 支援將對話匯出為 PNG 截圖、Markdown、純文字或 JSON 格式
@@ -109,7 +109,7 @@
 
 ## 快速開始
 
-前往 [Releases](https://github.com/AQBot-Desktop/AQBot/releases) 頁面下載適合您平台的安裝包。
+前往 [Releases](https://github.com/FrogClawClient-Desktop/FrogClawClient/releases) 頁面下載適合您平台的安裝包。
 
 ## 常見問題
 
@@ -117,8 +117,8 @@
 
 由於應用程式未經 Apple 簽名，macOS 可能會彈出以下提示之一：
 
-- 「AQBot」已損毀，無法開啟
-- 無法開啟「AQBot」，因為無法驗證開發者
+- 「FrogClawClient」已損毀，無法開啟
+- 無法開啟「FrogClawClient」，因為無法驗證開發者
 
 **解決步驟：**
 
@@ -133,7 +133,7 @@ sudo spctl --master-disable
 **2. 移除應用程式的安全隔離屬性**
 
 ```bash
-sudo xattr -dr com.apple.quarantine /Applications/AQBot.app
+sudo xattr -dr com.apple.quarantine /Applications/FrogClawClient.app
 ```
 
 > 如果不確定路徑，可將應用程式圖示拖曳到 `sudo xattr -dr com.apple.quarantine ` 後面。

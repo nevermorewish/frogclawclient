@@ -223,7 +223,7 @@ export function DrawingComposer({ settings, prompt, onPromptChange, onHeightChan
           </div>
         )}
         <textarea
-          className="aqbot-input-textarea"
+          className="frogclaw-input-textarea"
           value={prompt}
           onChange={(event) => onPromptChange(event.target.value)}
           onKeyDown={(event) => {

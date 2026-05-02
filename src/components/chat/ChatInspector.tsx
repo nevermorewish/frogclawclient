@@ -149,13 +149,13 @@ export function ChatInspector({
                 {conversation.id.slice(0, 8)}…
               </Typography.Text>
             </Descriptions.Item>
-            <Descriptions.Item label={t('gateway.defaultProvider')}>
+            <Descriptions.Item label={t('settings.defaultProvider')}>
               {conversation.provider_id || '-'}
             </Descriptions.Item>
-            <Descriptions.Item label={t('gateway.defaultModel')}>
+            <Descriptions.Item label={t('settings.defaultModel')}>
               {conversation.model_id || '-'}
             </Descriptions.Item>
-            <Descriptions.Item label={t('gateway.created')}>
+            <Descriptions.Item label={t('chat.inspector.created', 'Created')}>
               {new Date(conversation.created_at).toLocaleString()}
             </Descriptions.Item>
             <Descriptions.Item label={t('chat.inspector.tools')}>

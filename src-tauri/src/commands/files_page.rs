@@ -1,5 +1,5 @@
-use aqbot_core::repo::stored_file::StoredFile;
-use aqbot_core::types::BackupManifest;
+use frogclaw_core::repo::stored_file::StoredFile;
+use frogclaw_core::types::BackupManifest;
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -45,7 +45,7 @@ fn resolve_storage_path(storage_path: &str) -> String {
         return storage_path.to_string_lossy().to_string();
     }
 
-    aqbot_core::storage_paths::resolve_documents_path(&storage_path.to_string_lossy())
+    frogclaw_core::storage_paths::resolve_documents_path(&storage_path.to_string_lossy())
         .to_string_lossy()
         .to_string()
 }
@@ -236,7 +236,7 @@ pub async fn read_attachment_preview(file_path: String) -> Result<String, String
 
 #[tauri::command]
 pub async fn save_avatar_file(data: String, mime_type: String) -> Result<String, String> {
-    use aqbot_core::file_store::FileStore;
+    use frogclaw_core::file_store::FileStore;
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(&data)
         .map_err(|e| format!("Invalid base64: {e}"))?;
@@ -307,7 +307,7 @@ pub async fn list_files_page_entries(
 ) -> Result<Vec<FilesPageEntry>, String> {
     let entries = match category.as_str() {
         "images" | "files" => {
-            let all_files = aqbot_core::repo::stored_file::list_all_stored_files(&state.sea_db)
+            let all_files = frogclaw_core::repo::stored_file::list_all_stored_files(&state.sea_db)
                 .await
                 .map_err(|e| e.to_string())?;
             if category == "images" {
@@ -317,7 +317,7 @@ pub async fn list_files_page_entries(
             }
         }
         "backups" => {
-            let manifests = aqbot_core::repo::backup::list_backups(&state.sea_db)
+            let manifests = frogclaw_core::repo::backup::list_backups(&state.sea_db)
                 .await
                 .map_err(|e| e.to_string())?;
             build_backup_entries(&manifests)
@@ -356,11 +356,11 @@ pub async fn cleanup_missing_files_page_entry(
     let (source_kind, record_id) = parse_entry_id(&entry_id)?;
     match source_kind {
         "attachment" => {
-            let file_store = aqbot_core::file_store::FileStore::new();
+            let file_store = frogclaw_core::file_store::FileStore::new();
             super::file_cleanup::delete_attachment_reference(&state.sea_db, &file_store, record_id)
                 .await
         }
-        "backup_manifest" => aqbot_core::repo::backup::delete_backup(&state.sea_db, record_id)
+        "backup_manifest" => frogclaw_core::repo::backup::delete_backup(&state.sea_db, record_id)
             .await
             .map_err(|e| e.to_string()),
         _ => Err(format!("Unknown source_kind: {}", source_kind)),
@@ -407,7 +407,7 @@ mod tests {
             .unwrap()
             .as_nanos();
         std::env::temp_dir().join(format!(
-            "aqbot-files-page-tests-{}-{}",
+            "frogclaw-files-page-tests-{}-{}",
             std::process::id(),
             unique
         ))
@@ -521,7 +521,7 @@ mod tests {
         )];
         let entries = build_image_entries(&files);
 
-        let expected = aqbot_core::storage_paths::documents_root()
+        let expected = frogclaw_core::storage_paths::documents_root()
             .join("images/abc123_photo.jpg")
             .to_string_lossy()
             .to_string();
@@ -622,11 +622,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_attachment_cleanup_removes_disk_file_and_db_record() {
-        let db = aqbot_core::db::create_test_pool().await.unwrap().conn;
+        let db = frogclaw_core::db::create_test_pool().await.unwrap().conn;
         let app_data_dir = make_temp_app_data_dir();
         std::fs::create_dir_all(&app_data_dir).unwrap();
 
-        let file_store = aqbot_core::file_store::FileStore::with_root(app_data_dir.clone());
+        let file_store = frogclaw_core::file_store::FileStore::with_root(app_data_dir.clone());
         let saved = file_store
             .save_file(b"hello world", "photo.png", "image/png")
             .unwrap();
@@ -636,7 +636,7 @@ mod tests {
             "test fixture file must exist before cleanup"
         );
 
-        aqbot_core::repo::stored_file::create_stored_file(
+        frogclaw_core::repo::stored_file::create_stored_file(
             &db,
             "file-1",
             &saved.hash,
@@ -660,7 +660,7 @@ mod tests {
             "attachment cleanup must remove the backing file from disk"
         );
         assert!(
-            aqbot_core::repo::stored_file::get_stored_file(&db, "file-1")
+            frogclaw_core::repo::stored_file::get_stored_file(&db, "file-1")
                 .await
                 .is_err(),
             "attachment cleanup must also remove the stored-file record"
@@ -671,11 +671,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_attachment_cleanup_preserves_shared_file_until_last_reference() {
-        let db = aqbot_core::db::create_test_pool().await.unwrap().conn;
+        let db = frogclaw_core::db::create_test_pool().await.unwrap().conn;
         let app_data_dir = make_temp_app_data_dir();
         std::fs::create_dir_all(&app_data_dir).unwrap();
 
-        let file_store = aqbot_core::file_store::FileStore::with_root(app_data_dir.clone());
+        let file_store = frogclaw_core::file_store::FileStore::with_root(app_data_dir.clone());
         let saved = file_store
             .save_file(b"same-bytes", "shared.png", "image/png")
             .unwrap();
@@ -686,7 +686,7 @@ mod tests {
         );
 
         for file_id in ["file-1", "file-2"] {
-            aqbot_core::repo::stored_file::create_stored_file(
+            frogclaw_core::repo::stored_file::create_stored_file(
                 &db,
                 file_id,
                 &saved.hash,
@@ -711,13 +711,13 @@ mod tests {
             "cleanup must keep the shared backing file while another record still references it"
         );
         assert!(
-            aqbot_core::repo::stored_file::get_stored_file(&db, "file-1")
+            frogclaw_core::repo::stored_file::get_stored_file(&db, "file-1")
                 .await
                 .is_err(),
             "cleanup must remove the targeted record"
         );
         assert!(
-            aqbot_core::repo::stored_file::get_stored_file(&db, "file-2")
+            frogclaw_core::repo::stored_file::get_stored_file(&db, "file-2")
                 .await
                 .is_ok(),
             "cleanup must preserve other records that still share the same storage path"
@@ -894,12 +894,12 @@ mod tests {
         ];
         let b64 = base64::engine::general_purpose::STANDARD.encode(png_bytes);
 
-        // Use a temp dir so we don't pollute the real ~/Documents/aqbot
+        // Use a temp dir so we don't pollute the real ~/Documents/frogclaw
         let tmp = make_temp_app_data_dir();
         std::fs::create_dir_all(&tmp).unwrap();
 
         // Save via FileStore directly (mirrors command logic without the Tauri runtime)
-        let store = aqbot_core::file_store::FileStore::with_root(tmp.clone());
+        let store = frogclaw_core::file_store::FileStore::with_root(tmp.clone());
         let decoded = base64::engine::general_purpose::STANDARD
             .decode(&b64)
             .unwrap();

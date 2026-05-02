@@ -10,8 +10,8 @@ pub mod reasoning;
 pub mod registry;
 pub mod voyage;
 
-use aqbot_core::error::{AQBotError, Result};
-use aqbot_core::types::*;
+use frogclaw_core::error::{FrogClawClientError, Result};
+use frogclaw_core::types::*;
 use async_trait::async_trait;
 use futures::Stream;
 use std::pin::Pin;
@@ -43,7 +43,7 @@ pub trait ProviderAdapter: Send + Sync {
         _ctx: &ProviderRequestContext,
         _request: RerankRequest,
     ) -> Result<RerankResponse> {
-        Err(AQBotError::Provider(
+        Err(FrogClawClientError::Provider(
             "Rerank is not supported by this provider".into(),
         ))
     }
@@ -207,7 +207,7 @@ pub fn build_http_client(proxy_config: Option<&ProviderProxyConfig>) -> Result<r
                         };
                         let proxy_url = format!("{}://{}:{}", scheme, addr, port);
                         let proxy = reqwest::Proxy::all(&proxy_url).map_err(|e| {
-                            AQBotError::Provider(format!("Invalid proxy URL: {}", e))
+                            FrogClawClientError::Provider(format!("Invalid proxy URL: {}", e))
                         })?;
                         builder = builder.proxy(proxy);
                     } else {
@@ -228,17 +228,17 @@ pub fn build_http_client(proxy_config: Option<&ProviderProxyConfig>) -> Result<r
     builder
         .tcp_nodelay(true)
         .build()
-        .map_err(|e| AQBotError::Provider(format!("Failed to build HTTP client: {}", e)))
+        .map_err(|e| FrogClawClientError::Provider(format!("Failed to build HTTP client: {}", e)))
 }
 
 pub fn build_default_http_client() -> Result<reqwest::Client> {
     build_http_client(None)
 }
 
-/// Default User-Agent: `AQBot-{os}_{arch}/{version}`
+/// Default User-Agent: `FrogClawClient-{os}_{arch}/{version}`
 pub fn default_user_agent() -> String {
     format!(
-        "AQBot-{}_{}/{}",
+        "FrogClawClient-{}_{}/{}",
         std::env::consts::OS,
         std::env::consts::ARCH,
         env!("CARGO_PKG_VERSION")

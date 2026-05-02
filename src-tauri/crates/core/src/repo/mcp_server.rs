@@ -1,7 +1,7 @@
 use sea_orm::*;
 
 use crate::entity::{mcp_servers, tool_descriptors};
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 use crate::repo::settings;
 use crate::types::{CreateMcpServerInput, McpServer, ToolDescriptor};
 use crate::utils::gen_id;
@@ -20,12 +20,12 @@ struct BuiltinDef {
 const BUILTIN_DEFS: &[BuiltinDef] = &[
     BuiltinDef {
         id: BUILTIN_FETCH_ID,
-        name: "@aqbot/fetch",
+        name: "@frogclaw/fetch",
         default_enabled: true,
     },
     BuiltinDef {
         id: BUILTIN_SEARCH_FILE_ID,
-        name: "@aqbot/search-file",
+        name: "@frogclaw/search-file",
         default_enabled: false,
     },
 ];
@@ -85,7 +85,7 @@ pub async fn set_builtin_enabled(
     let def = BUILTIN_DEFS
         .iter()
         .find(|d| d.id == id)
-        .ok_or_else(|| AQBotError::NotFound(format!("Builtin server {id}")))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("Builtin server {id}")))?;
     settings::set_setting(
         db,
         &builtin_setting_key(def.name),
@@ -100,7 +100,7 @@ pub async fn get_builtin_server(db: &DatabaseConnection, id: &str) -> Result<Mcp
     let def = BUILTIN_DEFS
         .iter()
         .find(|d| d.id == id)
-        .ok_or_else(|| AQBotError::NotFound(format!("Builtin server {id}")))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("Builtin server {id}")))?;
     let enabled = get_builtin_enabled(db, def.name, def.default_enabled).await;
     Ok(make_builtin_server(def, enabled))
 }
@@ -148,7 +148,7 @@ pub async fn get_mcp_server(db: &DatabaseConnection, id: &str) -> Result<McpServ
     let model = mcp_servers::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("McpServer {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("McpServer {}", id)))?;
 
     Ok(model_to_mcp_server(model))
 }
@@ -248,7 +248,7 @@ pub async fn update_mcp_server(
     let model = mcp_servers::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("McpServer {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("McpServer {}", id)))?;
 
     let mut am: mcp_servers::ActiveModel = model.into();
     am.name = Set(name);
@@ -273,7 +273,7 @@ pub async fn delete_mcp_server(db: &DatabaseConnection, id: &str) -> Result<()> 
     // Prevent deletion of built-in MCP servers
     let server = get_mcp_server(db, id).await?;
     if server.source == "builtin" {
-        return Err(AQBotError::Gateway(
+        return Err(FrogClawClientError::Gateway(
             "Cannot delete built-in MCP server".to_string(),
         ));
     }
@@ -281,7 +281,7 @@ pub async fn delete_mcp_server(db: &DatabaseConnection, id: &str) -> Result<()> 
     let result = mcp_servers::Entity::delete_by_id(id).exec(db).await?;
 
     if result.rows_affected == 0 {
-        return Err(AQBotError::NotFound(format!("McpServer {}", id)));
+        return Err(FrogClawClientError::NotFound(format!("McpServer {}", id)));
     }
     Ok(())
 }
@@ -357,7 +357,7 @@ pub async fn save_tool_descriptors(
 
 fn builtin_tools(server_id: &str, server_name: &str) -> Vec<ToolDescriptor> {
     match server_name {
-        "@aqbot/fetch" => vec![
+        "@frogclaw/fetch" => vec![
             ToolDescriptor {
                 id: format!("{server_id}-fetch-url"),
                 server_id: server_id.to_string(),
@@ -373,7 +373,7 @@ fn builtin_tools(server_id: &str, server_name: &str) -> Vec<ToolDescriptor> {
                 input_schema_json: Some(r#"{"type":"object","properties":{"url":{"type":"string","description":"URL to fetch"}},"required":["url"]}"#.into()),
             },
         ],
-        "@aqbot/search-file" => vec![
+        "@frogclaw/search-file" => vec![
             ToolDescriptor {
                 id: format!("{server_id}-read-file"),
                 server_id: server_id.to_string(),

@@ -28,7 +28,7 @@ const { frontmatter } = useData();
     </template>
     <template #layout-bottom>
       <footer class="site-footer">
-        <p>© 2026 AQBot</p>
+        <p>© 2026 FrogClawClient</p>
       </footer>
     </template>
   </Layout>

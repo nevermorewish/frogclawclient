@@ -1,6 +1,6 @@
 use crate::AppState;
-use aqbot_core::types::*;
-use aqbot_providers::{
+use frogclaw_core::types::*;
+use frogclaw_providers::{
     registry::ProviderRegistry, resolve_base_url_for_type, ProviderAdapter, ProviderRequestContext,
 };
 use base64::Engine;
@@ -37,7 +37,7 @@ async fn resolve_system_prompt(
     // 2. Category-level system prompt (middle priority)
     if let Some(ref cat_id) = conversation.category_id {
         if let Ok(categories) =
-            aqbot_core::repo::conversation_category::list_conversation_categories(db).await
+            frogclaw_core::repo::conversation_category::list_conversation_categories(db).await
         {
             if let Some(cat) = categories.iter().find(|c| &c.id == cat_id) {
                 if let Some(ref s) = cat.system_prompt {
@@ -50,7 +50,7 @@ async fn resolve_system_prompt(
     }
 
     // 3. Global default system prompt (lowest priority)
-    let settings = aqbot_core::repo::settings::get_settings(db)
+    let settings = frogclaw_core::repo::settings::get_settings(db)
         .await
         .unwrap_or_default();
     settings.default_system_prompt.filter(|s| !s.is_empty())
@@ -96,23 +96,23 @@ async fn persist_attachments(
     state: &AppState,
     conversation_id: &str,
     attachments: &[AttachmentInput],
-) -> aqbot_core::error::Result<Vec<Attachment>> {
-    aqbot_core::storage_paths::ensure_documents_dirs()?;
-    let file_store = aqbot_core::file_store::FileStore::new();
+) -> frogclaw_core::error::Result<Vec<Attachment>> {
+    frogclaw_core::storage_paths::ensure_documents_dirs()?;
+    let file_store = frogclaw_core::file_store::FileStore::new();
 
     let mut persisted = Vec::with_capacity(attachments.len());
     for attachment in attachments {
         let data = base64::engine::general_purpose::STANDARD
             .decode(&attachment.data)
             .map_err(|e| {
-                aqbot_core::error::AQBotError::Validation(format!(
+                frogclaw_core::error::FrogClawClientError::Validation(format!(
                     "Invalid attachment base64 for {}: {}",
                     attachment.file_name, e
                 ))
             })?;
         let saved = file_store.save_file(&data, &attachment.file_name, &attachment.file_type)?;
-        let stored_file_id = aqbot_core::utils::gen_id();
-        aqbot_core::repo::stored_file::create_stored_file(
+        let stored_file_id = frogclaw_core::utils::gen_id();
+        frogclaw_core::repo::stored_file::create_stored_file(
             &state.sea_db,
             &stored_file_id,
             &saved.hash,
@@ -251,12 +251,12 @@ fn strip_disabled_thinking_delta(delta: &str, state: &mut DisabledThinkingStripS
 }
 
 /// Strip display-only tags from assistant message content so they aren't sent to the AI.
-/// Strips: `<knowledge-retrieval data-aqbot="1">` and `<memory-retrieval data-aqbot="1">` tags,
+/// Strips: `<knowledge-retrieval data-frogclaw="1">` and `<memory-retrieval data-frogclaw="1">` tags,
 /// `:::mcp ... :::` fenced blocks, and `<think>...</think>` blocks.
 fn strip_display_tags(content: &str) -> String {
     // Strip <think> blocks first
     let content = strip_think_tags(content);
-    // Strip knowledge-retrieval and memory-retrieval tags with data-aqbot attribute
+    // Strip knowledge-retrieval and memory-retrieval tags with data-frogclaw attribute
     let content = {
         let mut s = content.to_string();
         for tag_name in &["knowledge-retrieval", "memory-retrieval"] {
@@ -264,7 +264,7 @@ fn strip_display_tags(content: &str) -> String {
             let tag_end = format!("</{}>", tag_name);
             while let Some(start_pos) = s.find(&tag_start) {
                 let rest = &s[start_pos + tag_start.len()..];
-                if rest.contains("data-aqbot=") {
+                if rest.contains("data-frogclaw=") {
                     if let Some(end_offset) = s[start_pos..].find(&tag_end) {
                         let after = &s[start_pos + end_offset + tag_end.len()..];
                         let before = &s[..start_pos];
@@ -316,9 +316,9 @@ fn strip_display_tags(content: &str) -> String {
 }
 
 fn build_message_content(
-    file_store: &aqbot_core::file_store::FileStore,
+    file_store: &frogclaw_core::file_store::FileStore,
     message: &Message,
-) -> aqbot_core::error::Result<ChatContent> {
+) -> frogclaw_core::error::Result<ChatContent> {
     // Strip display-only tags from assistant messages
     let content = if message.role == MessageRole::Assistant {
         strip_display_tags(&message.content)
@@ -348,7 +348,7 @@ fn build_message_content(
     for attachment in image_attachments {
         let data_url = if attachment.file_path.is_empty() {
             let base64_data = attachment.data.as_ref().ok_or_else(|| {
-                aqbot_core::error::AQBotError::Validation(format!(
+                frogclaw_core::error::FrogClawClientError::Validation(format!(
                     "Attachment {} is missing both file_path and inline data",
                     attachment.file_name
                 ))
@@ -380,9 +380,9 @@ fn build_message_content(
 }
 
 fn chat_message_from_message(
-    file_store: &aqbot_core::file_store::FileStore,
+    file_store: &frogclaw_core::file_store::FileStore,
     message: &Message,
-) -> aqbot_core::error::Result<ChatMessage> {
+) -> frogclaw_core::error::Result<ChatMessage> {
     let tool_calls: Option<Vec<ToolCall>> = message
         .tool_calls_json
         .as_ref()
@@ -404,7 +404,7 @@ fn chat_message_from_message(
 
 #[tauri::command]
 pub async fn list_conversations(state: State<'_, AppState>) -> Result<Vec<Conversation>, String> {
-    aqbot_core::repo::conversation::list_conversations(&state.sea_db)
+    frogclaw_core::repo::conversation::list_conversations(&state.sea_db)
         .await
         .map_err(|e| e.to_string())
 }
@@ -417,7 +417,7 @@ pub async fn create_conversation(
     provider_id: String,
     system_prompt: Option<String>,
 ) -> Result<Conversation, String> {
-    aqbot_core::repo::conversation::create_conversation(
+    frogclaw_core::repo::conversation::create_conversation(
         &state.sea_db,
         &title,
         &model_id,
@@ -434,7 +434,7 @@ pub async fn update_conversation(
     id: String,
     input: UpdateConversationInput,
 ) -> Result<Conversation, String> {
-    aqbot_core::repo::conversation::update_conversation(&state.sea_db, &id, input)
+    frogclaw_core::repo::conversation::update_conversation(&state.sea_db, &id, input)
         .await
         .map_err(|e| e.to_string())
 }
@@ -452,7 +452,7 @@ pub async fn branch_conversation(
     as_child: bool,
     title: Option<String>,
 ) -> Result<Conversation, String> {
-    aqbot_core::repo::conversation::branch_conversation(
+    frogclaw_core::repo::conversation::branch_conversation(
         &state.sea_db,
         &conversation_id,
         &until_message_id,
@@ -467,24 +467,24 @@ async fn delete_conversation_with_attachments(
     db: &sea_orm::DatabaseConnection,
     conversation_id: &str,
 ) -> Result<(), String> {
-    let file_store = aqbot_core::file_store::FileStore::new();
+    let file_store = frogclaw_core::file_store::FileStore::new();
     delete_conversation_with_attachments_using(db, &file_store, conversation_id).await
 }
 
 async fn delete_conversation_with_attachments_using(
     db: &sea_orm::DatabaseConnection,
-    file_store: &aqbot_core::file_store::FileStore,
+    file_store: &frogclaw_core::file_store::FileStore,
     conversation_id: &str,
 ) -> Result<(), String> {
     let files =
-        aqbot_core::repo::stored_file::list_stored_files_by_conversation(db, conversation_id)
+        frogclaw_core::repo::stored_file::list_stored_files_by_conversation(db, conversation_id)
             .await
             .map_err(|e| e.to_string())?;
     for file in files {
         super::file_cleanup::delete_attachment_reference(db, file_store, &file.id).await?;
     }
 
-    aqbot_core::repo::conversation::delete_conversation(db, conversation_id)
+    frogclaw_core::repo::conversation::delete_conversation(db, conversation_id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -494,7 +494,7 @@ pub async fn search_conversations(
     state: State<'_, AppState>,
     query: String,
 ) -> Result<Vec<ConversationSearchResult>, String> {
-    aqbot_core::repo::conversation::search_conversations(&state.sea_db, &query)
+    frogclaw_core::repo::conversation::search_conversations(&state.sea_db, &query)
         .await
         .map_err(|e| e.to_string())
 }
@@ -504,7 +504,7 @@ pub async fn toggle_pin_conversation(
     state: State<'_, AppState>,
     id: String,
 ) -> Result<Conversation, String> {
-    aqbot_core::repo::conversation::toggle_pin(&state.sea_db, &id)
+    frogclaw_core::repo::conversation::toggle_pin(&state.sea_db, &id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -514,7 +514,7 @@ pub async fn toggle_archive_conversation(
     state: State<'_, AppState>,
     id: String,
 ) -> Result<Conversation, String> {
-    aqbot_core::repo::conversation::toggle_archive(&state.sea_db, &id)
+    frogclaw_core::repo::conversation::toggle_archive(&state.sea_db, &id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -523,7 +523,7 @@ pub async fn toggle_archive_conversation(
 pub async fn list_archived_conversations(
     state: State<'_, AppState>,
 ) -> Result<Vec<Conversation>, String> {
-    aqbot_core::repo::conversation::list_archived_conversations(&state.sea_db)
+    frogclaw_core::repo::conversation::list_archived_conversations(&state.sea_db)
         .await
         .map_err(|e| e.to_string())
 }
@@ -531,7 +531,7 @@ pub async fn list_archived_conversations(
 async fn consume_stream(
     app: &tauri::AppHandle,
     stream: &mut std::pin::Pin<
-        Box<dyn futures::Stream<Item = aqbot_core::error::Result<ChatStreamChunk>> + Send>,
+        Box<dyn futures::Stream<Item = frogclaw_core::error::Result<ChatStreamChunk>> + Send>,
     >,
     conversation_id: &str,
     message_id: &str,
@@ -589,7 +589,7 @@ async fn consume_stream(
                 let mut emit_thinking_signal: Option<String> = None;
 
                 // Handle thinking chunks → merge into content with <think> tags
-                // Uses <think data-aq> to distinguish our injected blocks from
+                // Uses <think data-frogclaw> to distinguish our injected blocks from
                 // upstream <think> tags (e.g. DeepSeek returns <think> in content)
                 if let Some(ref t) = thinking_delta {
                     if !t.is_empty() {
@@ -601,7 +601,7 @@ async fn consume_stream(
                             if !full_content.is_empty() {
                                 emit_content.push_str("\n\n");
                             }
-                            emit_content.push_str("<think data-aqbot=\"1\">\n");
+                            emit_content.push_str("<think data-frogclaw=\"1\">\n");
                             in_thinking_block = true;
                             thinking_block_start = Some(std::time::Instant::now());
                         }
@@ -742,7 +742,7 @@ async fn consume_stream(
         full_content.push_str(&disabled_thinking_strip_state.trailing_fragment);
     }
 
-    // Post-process: replace each <think data-aq> with <think totalMs="N">
+    // Post-process: replace each <think data-frogclaw> with <think totalMs="N">
     full_content = fixup_think_tags(&full_content, &thinking_durations);
     if suppress_thinking {
         full_content = strip_disabled_thinking_content(&full_content);
@@ -773,11 +773,11 @@ async fn consume_stream(
     )
 }
 
-/// Replace each `<think data-aqbot="1">` marker with `<think totalMs="N">` using
-/// the collected duration values. Upstream `<think>` tags (without `data-aqbot`)
+/// Replace each `<think data-frogclaw="1">` marker with `<think totalMs="N">` using
+/// the collected duration values. Upstream `<think>` tags (without `data-frogclaw`)
 /// are left unchanged.
 fn fixup_think_tags(content: &str, durations: &[u64]) -> String {
-    const MARKER: &str = "<think data-aqbot=\"1\">";
+    const MARKER: &str = "<think data-frogclaw=\"1\">";
     let mut result = String::with_capacity(content.len());
     let mut remaining = content;
     let mut dur_iter = durations.iter();
@@ -799,7 +799,7 @@ async fn execute_tool_call(
     tool_call: &ToolCall,
     mcp_server_ids: &[String],
 ) -> (String, bool) {
-    let server_and_tool = aqbot_core::repo::mcp_server::find_server_for_tool(
+    let server_and_tool = frogclaw_core::repo::mcp_server::find_server_for_tool(
         db,
         &tool_call.function.name,
         mcp_server_ids,
@@ -829,7 +829,7 @@ async fn execute_tool_call(
         "builtin" => {
             match tokio::time::timeout(
                 timeout_duration,
-                aqbot_core::builtin_tools::dispatch(
+                frogclaw_core::builtin_tools::dispatch(
                     &server.name,
                     &tool_call.function.name,
                     arguments,
@@ -863,7 +863,7 @@ async fn execute_tool_call(
                 .unwrap_or_default();
             match tokio::time::timeout(
                 timeout_duration,
-                aqbot_core::mcp_client::call_tool_stdio(
+                frogclaw_core::mcp_client::call_tool_stdio(
                     &command,
                     &args,
                     &env,
@@ -889,7 +889,7 @@ async fn execute_tool_call(
             };
             match tokio::time::timeout(
                 timeout_duration,
-                aqbot_core::mcp_client::call_tool_http(
+                frogclaw_core::mcp_client::call_tool_http(
                     &endpoint,
                     &tool_call.function.name,
                     arguments,
@@ -913,7 +913,7 @@ async fn execute_tool_call(
             };
             match tokio::time::timeout(
                 timeout_duration,
-                aqbot_core::mcp_client::call_tool_sse(
+                frogclaw_core::mcp_client::call_tool_sse(
                     &endpoint,
                     &tool_call.function.name,
                     arguments,
@@ -990,7 +990,7 @@ pub async fn generate_ai_title(
         let mid = model_id.to_string();
         let db = db.clone();
         async move {
-            aqbot_core::repo::provider::get_model(&db, &pid, &mid)
+            frogclaw_core::repo::provider::get_model(&db, &pid, &mid)
                 .await
                 .ok()
                 .and_then(|m| m.param_overrides)
@@ -1004,7 +1004,7 @@ pub async fn generate_ai_title(
         &settings.title_summary_model_id,
     ) {
         // Try to use the configured title summary provider
-        let provider = match aqbot_core::repo::provider::get_provider(db, pid).await {
+        let provider = match frogclaw_core::repo::provider::get_provider(db, pid).await {
             Ok(p) => p,
             Err(e) => {
                 tracing::warn!("Title summary provider not found, falling back: {}", e);
@@ -1021,7 +1021,7 @@ pub async fn generate_ai_title(
                 .await;
             }
         };
-        let key_row = match aqbot_core::repo::provider::get_active_key(db, pid).await {
+        let key_row = match frogclaw_core::repo::provider::get_active_key(db, pid).await {
             Ok(k) => k,
             Err(e) => {
                 tracing::warn!(
@@ -1041,7 +1041,7 @@ pub async fn generate_ai_title(
                 .await;
             }
         };
-        let dk = match aqbot_core::crypto::decrypt_key(&key_row.key_encrypted, master_key) {
+        let dk = match frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, master_key) {
             Ok(dk) => dk,
             Err(e) => {
                 tracing::warn!("Title summary key decrypt failed, falling back: {}", e);
@@ -1203,12 +1203,12 @@ pub async fn regenerate_conversation_title(
     let master_key = state.master_key;
 
     // Load conversation
-    let conversation = aqbot_core::repo::conversation::get_conversation(&db, &conversation_id)
+    let conversation = frogclaw_core::repo::conversation::get_conversation(&db, &conversation_id)
         .await
         .map_err(|e| e.to_string())?;
 
     // Load messages to get first user + assistant content
-    let messages = aqbot_core::repo::message::list_messages(&db, &conversation_id)
+    let messages = frogclaw_core::repo::message::list_messages(&db, &conversation_id)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -1228,16 +1228,16 @@ pub async fn regenerate_conversation_title(
     }
 
     // Load provider for fallback
-    let provider = aqbot_core::repo::provider::get_provider(&db, &conversation.provider_id)
+    let provider = frogclaw_core::repo::provider::get_provider(&db, &conversation.provider_id)
         .await
         .map_err(|e| e.to_string())?;
-    let key_row = aqbot_core::repo::provider::get_active_key(&db, &provider.id)
+    let key_row = frogclaw_core::repo::provider::get_active_key(&db, &provider.id)
         .await
         .map_err(|e| e.to_string())?;
-    let decrypted_key = aqbot_core::crypto::decrypt_key(&key_row.key_encrypted, &master_key)
+    let decrypted_key = frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, &master_key)
         .map_err(|e| e.to_string())?;
 
-    let global_settings = aqbot_core::repo::settings::get_settings(&db)
+    let global_settings = frogclaw_core::repo::settings::get_settings(&db)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -1288,7 +1288,7 @@ pub async fn regenerate_conversation_title(
         match ai_title {
             Ok(title) => {
                 if let Err(e) =
-                    aqbot_core::repo::conversation::update_conversation_title(&db, &conv_id, &title)
+                    frogclaw_core::repo::conversation::update_conversation_title(&db, &conv_id, &title)
                         .await
                 {
                     tracing::error!("Failed to save regenerated title: {}", e);
@@ -1368,12 +1368,12 @@ fn build_memory_retrieval_tag(sources: &[RagSourceResult]) -> String {
     let mut result = String::new();
     if !knowledge.is_empty() {
         let json = serde_json::to_string(&knowledge).unwrap_or_default();
-        result.push_str(&format!("<knowledge-retrieval status=\"done\" data-aqbot=\"1\">\n{}\n</knowledge-retrieval>\n\n", json));
+        result.push_str(&format!("<knowledge-retrieval status=\"done\" data-frogclaw=\"1\">\n{}\n</knowledge-retrieval>\n\n", json));
     }
     if !memory.is_empty() {
         let json = serde_json::to_string(&memory).unwrap_or_default();
         result.push_str(&format!(
-            "<memory-retrieval status=\"done\" data-aqbot=\"1\">\n{}\n</memory-retrieval>\n\n",
+            "<memory-retrieval status=\"done\" data-frogclaw=\"1\">\n{}\n</memory-retrieval>\n\n",
             json
         ));
     }
@@ -1424,7 +1424,7 @@ fn spawn_stream_task(
         );
         let registry = ProviderRegistry::create_default();
         let registry_key = provider_type_to_registry_key(&provider.provider_type);
-        let adapter: &dyn aqbot_providers::ProviderAdapter = match registry.get(registry_key) {
+        let adapter: &dyn frogclaw_providers::ProviderAdapter = match registry.get(registry_key) {
             Some(a) => a,
             None => {
                 let _ = app.emit(
@@ -1455,7 +1455,7 @@ fn spawn_stream_task(
         // Early create: persist a placeholder message so it survives crash/refresh
         // Skip if the caller already created the placeholder before spawning.
         if !skip_placeholder_create {
-            if let Err(e) = (aqbot_core::entity::messages::ActiveModel {
+            if let Err(e) = (frogclaw_core::entity::messages::ActiveModel {
                 id: Set(assistant_message_id.clone()),
                 conversation_id: Set(conversation_id.clone()),
                 role: Set("assistant".to_string()),
@@ -1467,7 +1467,7 @@ fn spawn_stream_task(
                 completion_tokens: Set(None),
                 attachments: Set("[]".to_string()),
                 thinking: Set(None),
-                created_at: Set(override_created_at.unwrap_or_else(aqbot_core::utils::now_ts)),
+                created_at: Set(override_created_at.unwrap_or_else(frogclaw_core::utils::now_ts)),
                 branch_id: Set(None),
                 parent_message_id: Set(Some(parent_message_id.clone())),
                 version_index: Set(version_index),
@@ -1584,7 +1584,7 @@ fn spawn_stream_task(
             // Persist the intermediate assistant message with tool_calls
             // Returns the generated ID so tool results can reference it as parent
             let intermediate_msg_id =
-                aqbot_core::repo::message::create_assistant_tool_call_message(
+                frogclaw_core::repo::message::create_assistant_tool_call_message(
                     &db,
                     &conversation_id,
                     &content,
@@ -1594,12 +1594,12 @@ fn spawn_stream_task(
                     &parent_message_id,
                 )
                 .await
-                .unwrap_or_else(|_| aqbot_core::utils::gen_id());
+                .unwrap_or_else(|_| frogclaw_core::utils::gen_id());
 
             // Execute each tool call
             for tc in &tool_calls {
                 // Look up server name for events
-                let server_name = match aqbot_core::repo::mcp_server::find_server_for_tool(
+                let server_name = match frogclaw_core::repo::mcp_server::find_server_for_tool(
                     &db,
                     &tc.function.name,
                     &mcp_server_ids,
@@ -1638,7 +1638,7 @@ fn spawn_stream_task(
                 );
 
                 // Create execution record
-                let server_id_for_exec = match aqbot_core::repo::mcp_server::find_server_for_tool(
+                let server_id_for_exec = match frogclaw_core::repo::mcp_server::find_server_for_tool(
                     &db,
                     &tc.function.name,
                     &mcp_server_ids,
@@ -1648,7 +1648,7 @@ fn spawn_stream_task(
                     Ok(Some((srv, _))) => srv.id.clone(),
                     _ => String::new(),
                 };
-                let exec = aqbot_core::repo::tool_execution::create_tool_execution(
+                let exec = frogclaw_core::repo::tool_execution::create_tool_execution(
                     &db,
                     &conversation_id,
                     Some(&assistant_message_id),
@@ -1666,7 +1666,7 @@ fn spawn_stream_task(
 
                 // Update execution record
                 if let Ok(ref exec) = exec {
-                    let _ = aqbot_core::repo::tool_execution::update_tool_execution_status(
+                    let _ = frogclaw_core::repo::tool_execution::update_tool_execution_status(
                         &db,
                         &exec.id,
                         if is_error { "failed" } else { "success" },
@@ -1702,7 +1702,7 @@ fn spawn_stream_task(
                 );
 
                 // Persist tool result message to DB (parent is the intermediate assistant message)
-                let _ = aqbot_core::repo::message::create_tool_result_message(
+                let _ = frogclaw_core::repo::message::create_tool_result_message(
                     &db,
                     &conversation_id,
                     &tc.id,
@@ -1753,8 +1753,8 @@ fn spawn_stream_task(
         } else {
             format!("{}{}", content_prefix, total_content)
         };
-        if let Err(e) = aqbot_core::entity::messages::Entity::update(
-            aqbot_core::entity::messages::ActiveModel {
+        if let Err(e) = frogclaw_core::entity::messages::Entity::update(
+            frogclaw_core::entity::messages::ActiveModel {
                 id: Set(assistant_message_id.clone()),
                 content: Set(saved_content),
                 token_count: Set(token_count.map(|v| v as i64)),
@@ -1776,7 +1776,7 @@ fn spawn_stream_task(
 
         // Increment message count for the assistant message
         if let Err(e) =
-            aqbot_core::repo::conversation::increment_message_count(&db, &conversation_id).await
+            frogclaw_core::repo::conversation::increment_message_count(&db, &conversation_id).await
         {
             tracing::error!("Failed to increment message count: {}", e);
         }
@@ -1790,7 +1790,7 @@ fn spawn_stream_task(
                 user_content.clone()
             };
 
-            if let Err(e) = aqbot_core::repo::conversation::update_conversation_title(
+            if let Err(e) = frogclaw_core::repo::conversation::update_conversation_title(
                 &db,
                 &conversation_id,
                 &fallback_title,
@@ -1833,7 +1833,7 @@ fn spawn_stream_task(
 
             match ai_title {
                 Ok(title) => {
-                    if let Err(e) = aqbot_core::repo::conversation::update_conversation_title(
+                    if let Err(e) = frogclaw_core::repo::conversation::update_conversation_title(
                         &db,
                         &conversation_id,
                         &title,
@@ -1904,7 +1904,7 @@ pub async fn send_message(
         .map_err(|e| e.to_string())?;
 
     // 1. Save user message to DB
-    let user_message = aqbot_core::repo::message::create_message(
+    let user_message = frogclaw_core::repo::message::create_message(
         &state.sea_db,
         &conversation_id,
         MessageRole::User,
@@ -1917,13 +1917,13 @@ pub async fn send_message(
     .map_err(|e| e.to_string())?;
 
     // Increment the persisted message count
-    aqbot_core::repo::conversation::increment_message_count(&state.sea_db, &conversation_id)
+    frogclaw_core::repo::conversation::increment_message_count(&state.sea_db, &conversation_id)
         .await
         .map_err(|e| e.to_string())?;
 
     // 2. Get conversation details (provider_id, model_id)
     let conversation =
-        aqbot_core::repo::conversation::get_conversation(&state.sea_db, &conversation_id)
+        frogclaw_core::repo::conversation::get_conversation(&state.sea_db, &conversation_id)
             .await
             .map_err(|e| e.to_string())?;
 
@@ -1932,18 +1932,18 @@ pub async fn send_message(
 
     // 3. Get provider config + decrypt key
     let provider =
-        aqbot_core::repo::provider::get_provider(&state.sea_db, &conversation.provider_id)
+        frogclaw_core::repo::provider::get_provider(&state.sea_db, &conversation.provider_id)
             .await
             .map_err(|e| e.to_string())?;
     let key_row =
-        aqbot_core::repo::provider::get_active_key(&state.sea_db, &conversation.provider_id)
+        frogclaw_core::repo::provider::get_active_key(&state.sea_db, &conversation.provider_id)
             .await
             .map_err(|e| e.to_string())?;
-    let decrypted_key = aqbot_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
+    let decrypted_key = frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
         .map_err(|e| e.to_string())?;
 
     // Get model info for param overrides and token budget
-    let resolved_model = aqbot_core::repo::provider::get_model(
+    let resolved_model = frogclaw_core::repo::provider::get_model(
         &state.sea_db,
         &conversation.provider_id,
         &conversation.model_id,
@@ -1971,10 +1971,10 @@ pub async fn send_message(
         .and_then(|p| p.reasoning_profile.clone());
 
     // 4. Build ChatRequest from conversation messages
-    let db_messages = aqbot_core::repo::message::list_messages(&state.sea_db, &conversation_id)
+    let db_messages = frogclaw_core::repo::message::list_messages(&state.sea_db, &conversation_id)
         .await
         .map_err(|e| e.to_string())?;
-    let file_store = aqbot_core::file_store::FileStore::new();
+    let file_store = frogclaw_core::file_store::FileStore::new();
 
     let mut chat_messages: Vec<ChatMessage> = Vec::new();
 
@@ -2007,7 +2007,7 @@ pub async fn send_message(
 
     // 5. Generate assistant message ID upfront so early RAG events can target
     // the same assistant row that the stream will later update.
-    let assistant_message_id = aqbot_core::utils::gen_id();
+    let assistant_message_id = frogclaw_core::utils::gen_id();
 
     // RAG retrieval: search enabled knowledge bases and memory namespaces
     let kb_ids = enabled_knowledge_base_ids.unwrap_or_default();
@@ -2082,7 +2082,7 @@ pub async fn send_message(
     }
 
     // Resolve proxy config early (needed for both summary generation and main request)
-    let global_settings = aqbot_core::repo::settings::get_settings(&state.sea_db)
+    let global_settings = frogclaw_core::repo::settings::get_settings(&state.sea_db)
         .await
         .unwrap_or_default();
     let resolved_proxy = ProviderProxyConfig::resolve(&provider.proxy_config, &global_settings);
@@ -2093,7 +2093,7 @@ pub async fn send_message(
 
     // Load existing summary for this conversation
     let existing_summary =
-        aqbot_core::repo::conversation::get_summary(&state.sea_db, &conversation_id)
+        frogclaw_core::repo::conversation::get_summary(&state.sea_db, &conversation_id)
             .await
             .ok()
             .flatten();
@@ -2125,7 +2125,7 @@ pub async fn send_message(
         .await
         {
             // Insert compression marker
-            let _ = aqbot_core::repo::message::create_message(
+            let _ = frogclaw_core::repo::message::create_message(
                 &state.sea_db,
                 &conversation_id,
                 MessageRole::System,
@@ -2193,7 +2193,7 @@ pub async fn send_message(
         let mut all_tools = Vec::new();
         for server_id in &mcp_ids {
             if let Ok(descriptors) =
-                aqbot_core::repo::mcp_server::list_tools_for_server(&state.sea_db, server_id).await
+                frogclaw_core::repo::mcp_server::list_tools_for_server(&state.sea_db, server_id).await
             {
                 for td in descriptors {
                     let parameters: Option<serde_json::Value> = td
@@ -2284,7 +2284,7 @@ pub async fn regenerate_message(
     enabled_memory_namespace_ids: Option<Vec<String>>,
 ) -> Result<(), String> {
     // 1. Get all active messages for the conversation
-    let messages = aqbot_core::repo::message::list_messages(&state.sea_db, &conversation_id)
+    let messages = frogclaw_core::repo::message::list_messages(&state.sea_db, &conversation_id)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -2305,7 +2305,7 @@ pub async fn regenerate_message(
     };
 
     // 2. Count existing AI reply versions for this user message
-    let existing_versions = aqbot_core::repo::message::list_message_versions(
+    let existing_versions = frogclaw_core::repo::message::list_message_versions(
         &state.sea_db,
         &conversation_id,
         &last_user_msg.id,
@@ -2323,7 +2323,7 @@ pub async fn regenerate_message(
     let active_provider_id = active_version.and_then(|v| v.provider_id.clone());
 
     // 3. Deactivate all existing AI reply versions for this user message
-    use aqbot_core::entity::messages as msg_entity;
+    use frogclaw_core::entity::messages as msg_entity;
     use sea_orm::sea_query::Expr;
     msg_entity::Entity::update_many()
         .filter(msg_entity::Column::ConversationId.eq(&conversation_id))
@@ -2335,7 +2335,7 @@ pub async fn regenerate_message(
 
     // 4. Get conversation details
     let mut conversation =
-        aqbot_core::repo::conversation::get_conversation(&state.sea_db, &conversation_id)
+        frogclaw_core::repo::conversation::get_conversation(&state.sea_db, &conversation_id)
             .await
             .map_err(|e| e.to_string())?;
 
@@ -2349,22 +2349,22 @@ pub async fn regenerate_message(
 
     // 5. Get provider config + decrypt key
     let provider =
-        aqbot_core::repo::provider::get_provider(&state.sea_db, &conversation.provider_id)
+        frogclaw_core::repo::provider::get_provider(&state.sea_db, &conversation.provider_id)
             .await
             .map_err(|e| e.to_string())?;
     let key_row =
-        aqbot_core::repo::provider::get_active_key(&state.sea_db, &conversation.provider_id)
+        frogclaw_core::repo::provider::get_active_key(&state.sea_db, &conversation.provider_id)
             .await
             .map_err(|e| e.to_string())?;
-    let decrypted_key = aqbot_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
+    let decrypted_key = frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
         .map_err(|e| e.to_string())?;
 
     // 6. Rebuild chat messages (active messages only — old inactive versions excluded)
     let remaining_messages =
-        aqbot_core::repo::message::list_messages(&state.sea_db, &conversation_id)
+        frogclaw_core::repo::message::list_messages(&state.sea_db, &conversation_id)
             .await
             .map_err(|e| e.to_string())?;
-    let file_store = aqbot_core::file_store::FileStore::new();
+    let file_store = frogclaw_core::file_store::FileStore::new();
 
     let mut chat_messages: Vec<ChatMessage> = Vec::new();
 
@@ -2381,7 +2381,7 @@ pub async fn regenerate_message(
     }
 
     // 7. Spawn streaming with new version
-    let assistant_message_id = aqbot_core::utils::gen_id();
+    let assistant_message_id = frogclaw_core::utils::gen_id();
 
     // RAG retrieval for regeneration
     let memory_tag = {
@@ -2461,7 +2461,7 @@ pub async fn regenerate_message(
         }
     }
 
-    let global_settings = aqbot_core::repo::settings::get_settings(&state.sea_db)
+    let global_settings = frogclaw_core::repo::settings::get_settings(&state.sea_db)
         .await
         .unwrap_or_default();
     let resolved_proxy = ProviderProxyConfig::resolve(&provider.proxy_config, &global_settings);
@@ -2490,7 +2490,7 @@ pub async fn regenerate_message(
         let mut all_tools = Vec::new();
         for server_id in &mcp_ids {
             if let Ok(descriptors) =
-                aqbot_core::repo::mcp_server::list_tools_for_server(&state.sea_db, server_id).await
+                frogclaw_core::repo::mcp_server::list_tools_for_server(&state.sea_db, server_id).await
             {
                 for td in descriptors {
                     let parameters: Option<serde_json::Value> = td
@@ -2515,7 +2515,7 @@ pub async fn regenerate_message(
         }
     };
 
-    let regen_model_overrides = aqbot_core::repo::provider::get_model(
+    let regen_model_overrides = frogclaw_core::repo::provider::get_model(
         &state.sea_db,
         &conversation.provider_id,
         &conversation.model_id,
@@ -2605,7 +2605,7 @@ pub async fn regenerate_with_model(
     enabled_memory_namespace_ids: Option<Vec<String>>,
     is_companion: Option<bool>,
 ) -> Result<(), String> {
-    let messages = aqbot_core::repo::message::list_messages(&state.sea_db, &conversation_id)
+    let messages = frogclaw_core::repo::message::list_messages(&state.sea_db, &conversation_id)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -2616,7 +2616,7 @@ pub async fn regenerate_with_model(
         .clone();
 
     // Count existing versions and preserve original created_at
-    let existing_versions = aqbot_core::repo::message::list_message_versions(
+    let existing_versions = frogclaw_core::repo::message::list_message_versions(
         &state.sea_db,
         &conversation_id,
         &user_msg.id,
@@ -2629,7 +2629,7 @@ pub async fn regenerate_with_model(
     let companion = is_companion.unwrap_or(false);
 
     // Deactivate all existing versions (skip for companion models in multi-model mode)
-    use aqbot_core::entity::messages as msg_entity;
+    use frogclaw_core::entity::messages as msg_entity;
     use sea_orm::sea_query::Expr;
     if !companion {
         msg_entity::Entity::update_many()
@@ -2643,28 +2643,28 @@ pub async fn regenerate_with_model(
 
     // Get conversation, but override model_id and provider_id to target values
     let mut conversation =
-        aqbot_core::repo::conversation::get_conversation(&state.sea_db, &conversation_id)
+        frogclaw_core::repo::conversation::get_conversation(&state.sea_db, &conversation_id)
             .await
             .map_err(|e| e.to_string())?;
     conversation.model_id = target_model_id;
     conversation.provider_id = target_provider_id.clone();
 
     // Use target provider instead of conversation's default
-    let provider = aqbot_core::repo::provider::get_provider(&state.sea_db, &target_provider_id)
+    let provider = frogclaw_core::repo::provider::get_provider(&state.sea_db, &target_provider_id)
         .await
         .map_err(|e| e.to_string())?;
-    let key_row = aqbot_core::repo::provider::get_active_key(&state.sea_db, &target_provider_id)
+    let key_row = frogclaw_core::repo::provider::get_active_key(&state.sea_db, &target_provider_id)
         .await
         .map_err(|e| e.to_string())?;
-    let decrypted_key = aqbot_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
+    let decrypted_key = frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
         .map_err(|e| e.to_string())?;
 
     // Build context messages (same logic as regenerate_message)
     let remaining_messages =
-        aqbot_core::repo::message::list_messages(&state.sea_db, &conversation_id)
+        frogclaw_core::repo::message::list_messages(&state.sea_db, &conversation_id)
             .await
             .map_err(|e| e.to_string())?;
-    let file_store = aqbot_core::file_store::FileStore::new();
+    let file_store = frogclaw_core::file_store::FileStore::new();
     let mut chat_messages: Vec<ChatMessage> = Vec::new();
 
     // Resolve effective system prompt: conversation → category → global default
@@ -2691,7 +2691,7 @@ pub async fn regenerate_with_model(
         );
     }
 
-    let assistant_message_id = aqbot_core::utils::gen_id();
+    let assistant_message_id = frogclaw_core::utils::gen_id();
 
     // RAG retrieval
     let memory_tag = {
@@ -2766,7 +2766,7 @@ pub async fn regenerate_with_model(
         }
     }
 
-    let global_settings = aqbot_core::repo::settings::get_settings(&state.sea_db)
+    let global_settings = frogclaw_core::repo::settings::get_settings(&state.sea_db)
         .await
         .unwrap_or_default();
     let resolved_proxy = ProviderProxyConfig::resolve(&provider.proxy_config, &global_settings);
@@ -2794,7 +2794,7 @@ pub async fn regenerate_with_model(
         let mut all_tools = Vec::new();
         for server_id in &mcp_ids {
             if let Ok(descriptors) =
-                aqbot_core::repo::mcp_server::list_tools_for_server(&state.sea_db, server_id).await
+                frogclaw_core::repo::mcp_server::list_tools_for_server(&state.sea_db, server_id).await
             {
                 for td in descriptors {
                     let parameters: Option<serde_json::Value> = td
@@ -2819,7 +2819,7 @@ pub async fn regenerate_with_model(
         }
     };
 
-    let rwm_overrides = aqbot_core::repo::provider::get_model(
+    let rwm_overrides = frogclaw_core::repo::provider::get_model(
         &state.sea_db,
         &conversation.provider_id,
         &conversation.model_id,
@@ -2862,7 +2862,7 @@ pub async fn regenerate_with_model(
     // model switching in ModelTags without waiting for the first stream chunk.
     {
         use sea_orm::ActiveValue::Set;
-        if let Err(e) = (aqbot_core::entity::messages::ActiveModel {
+        if let Err(e) = (frogclaw_core::entity::messages::ActiveModel {
             id: Set(assistant_message_id.clone()),
             conversation_id: Set(conversation_id.clone()),
             role: Set("assistant".to_string()),
@@ -2874,7 +2874,7 @@ pub async fn regenerate_with_model(
             completion_tokens: Set(None),
             attachments: Set("[]".to_string()),
             thinking: Set(None),
-            created_at: Set(original_created_at.unwrap_or_else(aqbot_core::utils::now_ts)),
+            created_at: Set(original_created_at.unwrap_or_else(frogclaw_core::utils::now_ts)),
             branch_id: Set(None),
             parent_message_id: Set(Some(user_msg.id.clone())),
             version_index: Set(new_version_index),
@@ -2941,7 +2941,7 @@ pub async fn list_message_versions(
     conversation_id: String,
     parent_message_id: String,
 ) -> Result<Vec<Message>, String> {
-    aqbot_core::repo::message::list_message_versions(
+    frogclaw_core::repo::message::list_message_versions(
         &state.sea_db,
         &conversation_id,
         &parent_message_id,
@@ -2957,7 +2957,7 @@ pub async fn switch_message_version(
     parent_message_id: String,
     message_id: String,
 ) -> Result<(), String> {
-    aqbot_core::repo::message::set_active_version(
+    frogclaw_core::repo::message::set_active_version(
         &state.sea_db,
         &conversation_id,
         &parent_message_id,
@@ -2973,12 +2973,12 @@ pub async fn delete_message_group(
     conversation_id: String,
     user_message_id: String,
 ) -> Result<(), String> {
-    let deleted = aqbot_core::repo::message::delete_message_group(&state.sea_db, &user_message_id)
+    let deleted = frogclaw_core::repo::message::delete_message_group(&state.sea_db, &user_message_id)
         .await
         .map_err(|e| e.to_string())?;
     // Decrement message count by deleted count
     for _ in 0..deleted {
-        aqbot_core::repo::conversation::decrement_message_count(&state.sea_db, &conversation_id)
+        frogclaw_core::repo::conversation::decrement_message_count(&state.sea_db, &conversation_id)
             .await
             .map_err(|e| e.to_string())?;
     }
@@ -3008,15 +3008,15 @@ async fn do_compress(
         &settings.compression_provider_id,
         &settings.compression_model_id,
     ) {
-        match aqbot_core::repo::provider::get_provider(db, pid).await {
+        match frogclaw_core::repo::provider::get_provider(db, pid).await {
             Ok(p) => {
                 match p.keys.first() {
                     Some(k) => {
-                        let dk = aqbot_core::crypto::decrypt_key(&k.key_encrypted, master_key)
+                        let dk = frogclaw_core::crypto::decrypt_key(&k.key_encrypted, master_key)
                             .map_err(|e| e.to_string())?;
                         let kid = k.id.clone();
                         let proxy = ProviderProxyConfig::resolve(&p.proxy_config, settings);
-                        let override_umc = aqbot_core::repo::provider::get_model(db, pid, mid)
+                        let override_umc = frogclaw_core::repo::provider::get_model(db, pid, mid)
                             .await
                             .ok()
                             .and_then(|m| m.param_overrides)
@@ -3118,8 +3118,8 @@ async fn do_compress(
         .await
         .map_err(|e| format!("Summary generation failed: {}", e))?;
 
-    let token_count = aqbot_core::token_counter::estimate_tokens(&response.content);
-    aqbot_core::repo::conversation::upsert_summary(
+    let token_count = frogclaw_core::token_counter::estimate_tokens(&response.content);
+    frogclaw_core::repo::conversation::upsert_summary(
         db,
         conversation_id,
         &response.content,
@@ -3148,33 +3148,33 @@ pub async fn compress_context(
     conversation_id: String,
 ) -> Result<ConversationSummary, String> {
     let conversation =
-        aqbot_core::repo::conversation::get_conversation(&state.sea_db, &conversation_id)
+        frogclaw_core::repo::conversation::get_conversation(&state.sea_db, &conversation_id)
             .await
             .map_err(|e| e.to_string())?;
 
     // Get provider + key
     let provider =
-        aqbot_core::repo::provider::get_provider(&state.sea_db, &conversation.provider_id)
+        frogclaw_core::repo::provider::get_provider(&state.sea_db, &conversation.provider_id)
             .await
             .map_err(|e| e.to_string())?;
     let key_row = provider
         .keys
         .first()
         .ok_or_else(|| "No API key configured".to_string())?;
-    let decrypted_key = aqbot_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
+    let decrypted_key = frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
         .map_err(|e| e.to_string())?;
 
-    let global_settings = aqbot_core::repo::settings::get_settings(&state.sea_db)
+    let global_settings = frogclaw_core::repo::settings::get_settings(&state.sea_db)
         .await
         .unwrap_or_default();
     let resolved_proxy = ProviderProxyConfig::resolve(&provider.proxy_config, &global_settings);
 
     // Load messages after last marker
-    let db_messages = aqbot_core::repo::message::list_messages(&state.sea_db, &conversation_id)
+    let db_messages = frogclaw_core::repo::message::list_messages(&state.sea_db, &conversation_id)
         .await
         .map_err(|e| e.to_string())?;
 
-    let file_store = aqbot_core::file_store::FileStore::new();
+    let file_store = frogclaw_core::file_store::FileStore::new();
 
     // For manual compression: try messages after last marker first,
     // fall back to ALL messages if nothing after marker
@@ -3220,13 +3220,13 @@ pub async fn compress_context(
 
     // Load existing summary
     let existing_summary =
-        aqbot_core::repo::conversation::get_summary(&state.sea_db, &conversation_id)
+        frogclaw_core::repo::conversation::get_summary(&state.sea_db, &conversation_id)
             .await
             .ok()
             .flatten();
 
     // Compress
-    let use_max_completion_tokens = aqbot_core::repo::provider::get_model(
+    let use_max_completion_tokens = frogclaw_core::repo::provider::get_model(
         &state.sea_db,
         &conversation.provider_id,
         &conversation.model_id,
@@ -3253,7 +3253,7 @@ pub async fn compress_context(
     .await?;
 
     // Insert compression marker message
-    let marker_msg = aqbot_core::repo::message::create_message(
+    let marker_msg = frogclaw_core::repo::message::create_message(
         &state.sea_db,
         &conversation_id,
         MessageRole::System,
@@ -3272,7 +3272,7 @@ pub async fn compress_context(
     );
 
     // Return the updated summary
-    let summary = aqbot_core::repo::conversation::get_summary(&state.sea_db, &conversation_id)
+    let summary = frogclaw_core::repo::conversation::get_summary(&state.sea_db, &conversation_id)
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Summary not found after compression".to_string())?;
@@ -3286,7 +3286,7 @@ pub async fn get_compression_summary(
     state: State<'_, AppState>,
     conversation_id: String,
 ) -> Result<Option<ConversationSummary>, String> {
-    aqbot_core::repo::conversation::get_summary(&state.sea_db, &conversation_id)
+    frogclaw_core::repo::conversation::get_summary(&state.sea_db, &conversation_id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -3298,15 +3298,15 @@ pub async fn delete_compression(
     conversation_id: String,
 ) -> Result<(), String> {
     // Delete the summary
-    aqbot_core::repo::conversation::delete_summary(&state.sea_db, &conversation_id)
+    frogclaw_core::repo::conversation::delete_summary(&state.sea_db, &conversation_id)
         .await
         .map_err(|e| e.to_string())?;
 
     // Delete all compression marker messages
-    aqbot_core::entity::messages::Entity::delete_many()
-        .filter(aqbot_core::entity::messages::Column::ConversationId.eq(&conversation_id))
+    frogclaw_core::entity::messages::Entity::delete_many()
+        .filter(frogclaw_core::entity::messages::Column::ConversationId.eq(&conversation_id))
         .filter(
-            aqbot_core::entity::messages::Column::Content
+            frogclaw_core::entity::messages::Column::Content
                 .eq(crate::context_manager::COMPRESSION_MARKER),
         )
         .exec(&state.sea_db)
@@ -3322,7 +3322,7 @@ pub async fn send_system_message(
     conversation_id: String,
     content: String,
 ) -> Result<Message, String> {
-    let msg = aqbot_core::repo::message::create_message(
+    let msg = frogclaw_core::repo::message::create_message(
         &state.sea_db,
         &conversation_id,
         MessageRole::System,
@@ -3484,11 +3484,11 @@ mod tests {
     #[test]
     fn build_message_content_turns_images_into_multipart_data_urls() {
         let temp_dir =
-            std::env::temp_dir().join(format!("aqbot-vision-test-{}", aqbot_core::utils::gen_id()));
+            std::env::temp_dir().join(format!("frogclaw-vision-test-{}", frogclaw_core::utils::gen_id()));
         fs::create_dir_all(&temp_dir).unwrap();
 
         let result = (|| {
-            let file_store = aqbot_core::file_store::FileStore::with_root(temp_dir.clone());
+            let file_store = frogclaw_core::file_store::FileStore::with_root(temp_dir.clone());
             let saved = file_store
                 .save_file(b"abc", "image.png", "image/png")
                 .unwrap();
@@ -3543,11 +3543,11 @@ mod tests {
     #[test]
     fn build_message_content_uses_inline_attachment_data_when_file_path_is_missing() {
         let temp_dir =
-            std::env::temp_dir().join(format!("aqbot-vision-test-{}", aqbot_core::utils::gen_id()));
+            std::env::temp_dir().join(format!("frogclaw-vision-test-{}", frogclaw_core::utils::gen_id()));
         fs::create_dir_all(&temp_dir).unwrap();
 
         let result = (|| {
-            let file_store = aqbot_core::file_store::FileStore::with_root(temp_dir.clone());
+            let file_store = frogclaw_core::file_store::FileStore::with_root(temp_dir.clone());
             let message = Message {
                 id: "msg-1".into(),
                 conversation_id: "conv-1".into(),
@@ -3596,14 +3596,14 @@ mod tests {
 
     #[tokio::test]
     async fn delete_conversation_removes_attached_files_and_records() {
-        let db = aqbot_core::db::create_test_pool().await.unwrap().conn;
+        let db = frogclaw_core::db::create_test_pool().await.unwrap().conn;
         let temp_dir = std::env::temp_dir().join(format!(
-            "aqbot-conv-delete-test-{}",
-            aqbot_core::utils::gen_id()
+            "frogclaw-conv-delete-test-{}",
+            frogclaw_core::utils::gen_id()
         ));
         fs::create_dir_all(&temp_dir).unwrap();
 
-        let conversation = aqbot_core::repo::conversation::create_conversation(
+        let conversation = frogclaw_core::repo::conversation::create_conversation(
             &db,
             "Files cleanup",
             "model-1",
@@ -3613,7 +3613,7 @@ mod tests {
         .await
         .unwrap();
 
-        let file_store = aqbot_core::file_store::FileStore::with_root(temp_dir.clone());
+        let file_store = frogclaw_core::file_store::FileStore::with_root(temp_dir.clone());
         let saved = file_store
             .save_file(b"cleanup me", "cleanup.png", "image/png")
             .unwrap();
@@ -3623,7 +3623,7 @@ mod tests {
             "fixture file must exist before deleting the conversation"
         );
 
-        aqbot_core::repo::stored_file::create_stored_file(
+        frogclaw_core::repo::stored_file::create_stored_file(
             &db,
             "file-1",
             &saved.hash,
@@ -3643,13 +3643,13 @@ mod tests {
             "deleting a conversation should clean up its attached files, got: {result:?}"
         );
         assert!(
-            aqbot_core::repo::conversation::get_conversation(&db, &conversation.id)
+            frogclaw_core::repo::conversation::get_conversation(&db, &conversation.id)
                 .await
                 .is_err(),
             "conversation must be deleted"
         );
         assert!(
-            aqbot_core::repo::stored_file::list_stored_files_by_conversation(&db, &conversation.id)
+            frogclaw_core::repo::stored_file::list_stored_files_by_conversation(&db, &conversation.id)
                 .await
                 .unwrap()
                 .is_empty(),
@@ -3667,13 +3667,13 @@ mod tests {
     async fn persist_attachments_registers_stored_files_for_files_page() {
         use base64::Engine;
 
-        let db = aqbot_core::db::create_test_pool().await.unwrap().conn;
+        let db = frogclaw_core::db::create_test_pool().await.unwrap().conn;
         let temp_dir = std::env::temp_dir().join(format!(
-            "aqbot-persist-attachments-test-{}",
-            aqbot_core::utils::gen_id()
+            "frogclaw-persist-attachments-test-{}",
+            frogclaw_core::utils::gen_id()
         ));
         fs::create_dir_all(&temp_dir).unwrap();
-        let conversation = aqbot_core::repo::conversation::create_conversation(
+        let conversation = frogclaw_core::repo::conversation::create_conversation(
             &db,
             "Image indexing",
             "model-1",
@@ -3683,11 +3683,10 @@ mod tests {
         .await
         .unwrap();
 
-        let vector_store = Arc::new(aqbot_core::vector_store::VectorStore::new(db.clone()));
+        let vector_store = Arc::new(frogclaw_core::vector_store::VectorStore::new(db.clone()));
         let state = crate::AppState {
             sea_db: db.clone(),
             master_key: [0; 32],
-            gateway: Arc::new(Mutex::new(None)),
             close_to_tray: Arc::new(AtomicBool::new(false)),
             app_data_dir: temp_dir.clone(),
             db_path: "sqlite::memory:".to_string(),
@@ -3718,7 +3717,7 @@ mod tests {
             persisted[0].file_path
         );
 
-        let stored_files = aqbot_core::repo::stored_file::list_all_stored_files(&db)
+        let stored_files = frogclaw_core::repo::stored_file::list_all_stored_files(&db)
             .await
             .unwrap();
         assert_eq!(
@@ -3730,7 +3729,7 @@ mod tests {
         assert_eq!(stored_files[0].mime_type, "image/png");
 
         // Cleanup: remove file written to documents root
-        let _ = aqbot_core::file_store::FileStore::new().delete_file(&persisted[0].file_path);
+        let _ = frogclaw_core::file_store::FileStore::new().delete_file(&persisted[0].file_path);
         let _ = fs::remove_dir_all(&temp_dir);
     }
 }

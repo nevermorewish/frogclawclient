@@ -1,6 +1,6 @@
 # إعداد المزوّدين
 
-يتصل AQBot بأي عدد من مزوّدي AI في آنٍ واحد. لكل مزوّد مفاتيح API الخاصة به وقائمة نماذج وإعدادات معاملات افتراضية.
+يتصل FrogClawClient بأي عدد من مزوّدي AI في آنٍ واحد. لكل مزوّد مفاتيح API الخاصة به وقائمة نماذج وإعدادات معاملات افتراضية.
 
 ## المزوّدون المدعومون
 
@@ -36,46 +36,46 @@
 
 ## الاستيراد من رابط موقع ويب
 
-يمكن لمواقع المزوّدين أو لوحات خدمات الوساطة أو منصات النماذج الخاصة أو صفحات البوابة المحلية توفير رابط **فتح في AQBot**. عند النقر عليه يفتح المتصفح تطبيق AQBot لسطح المكتب، وينتقل AQBot إلى **الإعدادات ← المزوّدون**، ويعرض مربع تأكيد، ثم يستورد الإعدادات فقط بعد تأكيد المستخدم.
+يمكن لمواقع المزوّدين أو لوحات خدمات الوساطة أو منصات النماذج الخاصة أو صفحات البوابة المحلية توفير رابط **فتح في FrogClawClient**. عند النقر عليه يفتح المتصفح تطبيق FrogClawClient لسطح المكتب، وينتقل FrogClawClient إلى **الإعدادات ← المزوّدون**، ويعرض مربع تأكيد، ثم يستورد الإعدادات فقط بعد تأكيد المستخدم.
 
 ### تدفق الاستخدام
 
-1. ثبّت وافتح إصداراً من AQBot يدعم روابط المزوّدين.
-2. انقر على رابط **فتح في AQBot** الذي يقدمه المزوّد في المتصفح.
-3. راجع في AQBot اسم المزوّد و Base URL ونوع المزوّد وبادئة مفتاح API.
-4. يعيد AQBot استخدام مزوّد موجود له نفس **Base URL + النوع**. إذا لم يوجد، ينشئ مزوّداً جديداً ويضيف مفتاح API فقط إذا لم يكن محفوظاً من قبل.
+1. ثبّت وافتح إصداراً من FrogClawClient يدعم روابط المزوّدين.
+2. انقر على رابط **فتح في FrogClawClient** الذي يقدمه المزوّد في المتصفح.
+3. راجع في FrogClawClient اسم المزوّد و Base URL ونوع المزوّد وبادئة مفتاح API.
+4. يعيد FrogClawClient استخدام مزوّد موجود له نفس **Base URL + النوع**. إذا لم يوجد، ينشئ مزوّداً جديداً ويضيف مفتاح API فقط إذا لم يكن محفوظاً من قبل.
 
-لا يتحقق AQBot من المفتاح تلقائياً ولا يجلب النماذج تلقائياً. بعد الاستيراد، انقر **جلب النماذج** أو أضف النماذج يدوياً.
+لا يتحقق FrogClawClient من المفتاح تلقائياً ولا يجلب النماذج تلقائياً. بعد الاستيراد، انقر **جلب النماذج** أو أضف النماذج يدوياً.
 
 ### صيغة الرابط
 
 ```text
-aqbot://providers?name=<name>&baseurl=<base-url>&apikey=<api-key>&type=<provider-type>
+frogclawclient://providers?name=<name>&baseurl=<base-url>&apikey=<api-key>&type=<provider-type>
 ```
 
 مثال:
 
 ```text
-aqbot://providers?name=OpenAI&baseurl=https%3A%2F%2Fapi.openai.com&apikey=sk-xxx&type=openai
+frogclawclient://providers?name=OpenAI&baseurl=https%3A%2F%2Fapi.openai.com&apikey=sk-xxx&type=openai
 ```
 
 ### المعاملات
 
 | المعامل | مطلوب | الوصف |
 |---------|--------|-------|
-| `name` | نعم | اسم العرض في AQBot، مثل `OpenAI` أو `My Relay` |
+| `name` | نعم | اسم العرض في FrogClawClient، مثل `OpenAI` أو `My Relay` |
 | `baseurl` | نعم | Base URL بعد ترميزه كرابط. يُقبل `http` و `https` فقط، ويتم رفض query و hash. |
-| `apikey` | نعم | مفتاح API المراد حفظه في AQBot. يعرض AQBot البادئة فقط في مربع التأكيد. |
+| `apikey` | نعم | مفتاح API المراد حفظه في FrogClawClient. يعرض FrogClawClient البادئة فقط في مربع التأكيد. |
 | `type` | نعم | نوع المزوّد. القيم المسموحة: `openai`، `openai_responses`، `anthropic`، `gemini`، `custom`. |
 
-يمكن أن يستخدم `baseurl` لاحقة الإجبار الموجودة في AQBot، مثل `https://example.com!`. عند الاستيراد عبر الرابط لا يتم تعيين `api_path`، ويواصل AQBot استخدام المسار الافتراضي لنوع المزوّد المختار.
+يمكن أن يستخدم `baseurl` لاحقة الإجبار الموجودة في FrogClawClient، مثل `https://example.com!`. عند الاستيراد عبر الرابط لا يتم تعيين `api_path`، ويواصل FrogClawClient استخدام المسار الافتراضي لنوع المزوّد المختار.
 
 ### إعداد الرابط في الموقع
 
 قم بترميز كل القيم الديناميكية باستخدام `encodeURIComponent` أو `URLSearchParams`:
 
 ```html
-<a id="open-aqbot" href="#">فتح في AQBot</a>
+<a id="open-frogclaw" href="#">فتح في FrogClawClient</a>
 
 <script>
   const provider = {
@@ -92,7 +92,7 @@ aqbot://providers?name=OpenAI&baseurl=https%3A%2F%2Fapi.openai.com&apikey=sk-xxx
     type: provider.type,
   });
 
-  document.getElementById('open-aqbot').href = `aqbot://providers?${params.toString()}`;
+  document.getElementById('open-frogclaw').href = `frogclawclient://providers?${params.toString()}`;
 </script>
 ```
 
@@ -103,14 +103,14 @@ aqbot://providers?name=OpenAI&baseurl=https%3A%2F%2Fapi.openai.com&apikey=sk-xxx
 :::
 
 ::: tip الاختبار
-`aqbot://` بروتوكول مخصص يسجله تطبيق سطح المكتب المثبت في النظام. تشغيل الموقع أو خادم Vite فقط لا يسجل البروتوكول. إذا لم يفتح الرابط AQBot، فثبّت أو أعد بناء أحدث تطبيق AQBot لسطح المكتب أولاً.
+`frogclawclient://` بروتوكول مخصص يسجله تطبيق سطح المكتب المثبت في النظام. تشغيل الموقع أو خادم Vite فقط لا يسجل البروتوكول. إذا لم يفتح الرابط FrogClawClient، فثبّت أو أعد بناء أحدث تطبيق FrogClawClient لسطح المكتب أولاً.
 :::
 
 ---
 
 ## تدوير مفاتيح متعددة
 
-يدعم AQBot مفاتيح API متعددة لكل مزوّد. انقر **إضافة مفتاح** في لوحة تفاصيل المزوّد.
+يدعم FrogClawClient مفاتيح API متعددة لكل مزوّد. انقر **إضافة مفتاح** في لوحة تفاصيل المزوّد.
 
 ---
 
@@ -123,7 +123,7 @@ aqbot://providers?name=OpenAI&baseurl=https%3A%2F%2Fapi.openai.com&apikey=sk-xxx
 ## Ollama (النماذج المحلية)
 
 1. ثبّت وأطلق [Ollama](https://ollama.com/).
-2. في AQBot، أنشئ مزوّداً جديداً من النوع **OpenAI**.
+2. في FrogClawClient، أنشئ مزوّداً جديداً من النوع **OpenAI**.
 3. اضبط **Base URL** على `http://localhost:11434`.
 4. انقر **جلب النماذج** لاكتشاف النماذج المحمّلة محلياً.
 

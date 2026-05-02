@@ -1,20 +1,20 @@
 ---
 layout: home
-title: AQBot — Cliente de escritorio IA open-source & Pasarela
+title: FrogClawClient — Cliente de escritorio IA open-source & Pasarela
 titleTemplate: false
 
 head:
   - - meta
     - name: description
-      content: AQBot es un cliente de escritorio IA gratuito y de código abierto con pasarela IA integrada. Conecta OpenAI, Claude, Gemini, DeepSeek y más LLMs. Soporte para servidor MCP, base de conocimiento, privacidad primero.
+      content: FrogClawClient es un cliente de escritorio IA gratuito y de código abierto con pasarela IA integrada. Conecta OpenAI, Claude, Gemini, DeepSeek y más LLMs. Soporte para servidor MCP, base de conocimiento, privacidad primero.
 
 hero:
-  name: AQBot
+  name: FrogClawClient
   text: Tu asistente IA de escritorio
   tagline: Chat multi-modelo, herramientas MCP, pasarela API, base de conocimiento — todo en un solo cliente open-source
   image:
     src: /logo.png
-    alt: AQBot
+    alt: FrogClawClient
   actions:
     - theme: brand
       text: Comenzar
@@ -24,7 +24,7 @@ hero:
       link: /es/download
     - theme: alt
       text: GitHub
-      link: https://github.com/AQBot-Desktop/AQBot
+      link: https://github.com/FrogClawClient-Desktop/FrogClawClient
 
 features:
   - icon: robot
@@ -35,10 +35,10 @@ features:
     details: Modo Agent para ejecución autónoma de tareas. Leer/escribir archivos, ejecutar comandos, analizar código — tres niveles de permisos + sandbox de directorio de trabajo.
   - icon: api
     title: Llamada de herramientas MCP
-    details: Implementación completa del Model Context Protocol. Soporte para stdio, SSE, StreamableHTTP. Conecta herramientas externas con un clic. Herramientas MCP integradas como @aqbot/fetch.
+    details: Implementación completa del Model Context Protocol. Soporte para stdio, SSE, StreamableHTTP. Conecta herramientas externas con un clic. Herramientas MCP integradas como @frogclaw/fetch.
   - icon: cloud-server
     title: Pasarela API integrada
-    details: Servidor API local compatible con OpenAI. Usa AQBot como backend para Claude Code, Codex, Gemini CLI y más. Gestión de claves, limitación de velocidad, SSL/TLS.
+    details: Servidor API local compatible con OpenAI. Usa FrogClawClient como backend para Claude Code, Codex, Gemini CLI y más. Gestión de claves, limitación de velocidad, SSL/TLS.
   - icon: book
     title: Base de conocimiento & RAG
     details: Embeddings vectoriales locales con sqlite-vec. Respuestas IA basadas en tus documentos privados — los datos nunca abandonan tu máquina.

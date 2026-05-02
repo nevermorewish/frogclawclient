@@ -2,7 +2,7 @@ use sea_orm::*;
 use sea_orm::prelude::Expr;
 
 use crate::entity::conversation_categories;
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 use crate::types::{
     ConversationCategory, CreateConversationCategoryInput, UpdateConversationCategoryInput,
 };
@@ -83,7 +83,7 @@ pub async fn update_conversation_category(
     let row = conversation_categories::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("ConversationCategory {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("ConversationCategory {}", id)))?;
 
     let mut am: conversation_categories::ActiveModel = row.into();
     if let Some(name) = input.name {
@@ -122,7 +122,7 @@ pub async fn update_conversation_category(
     let updated = conversation_categories::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("ConversationCategory {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("ConversationCategory {}", id)))?;
     Ok(category_from_entity(updated))
 }
 
@@ -174,7 +174,7 @@ pub async fn set_conversation_category_collapsed(
     let row = conversation_categories::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("ConversationCategory {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("ConversationCategory {}", id)))?;
 
     let mut am: conversation_categories::ActiveModel = row.into();
     am.is_collapsed = Set(if collapsed { 1 } else { 0 });

@@ -1,5 +1,5 @@
-use aqbot_core::error::{AQBotError, Result};
-use aqbot_core::types::*;
+use frogclaw_core::error::{FrogClawClientError, Result};
+use frogclaw_core::types::*;
 use async_trait::async_trait;
 use futures::{Stream, stream};
 use serde::Deserialize;
@@ -36,8 +36,8 @@ impl VoyageAdapter {
 }
 
 fn unsupported<T>() -> Result<T> {
-    Err(AQBotError::Provider(
-        "Voyage provider only supports rerank in AQBot".into(),
+    Err(FrogClawClientError::Provider(
+        "Voyage provider only supports rerank in FrogClawClient".into(),
     ))
 }
 
@@ -81,7 +81,7 @@ struct NativeRerankResult {
 
 pub(crate) fn parse_voyage_rerank_response(body: &str) -> Result<RerankResponse> {
     let parsed: NativeRerankResponse = serde_json::from_str(body)
-        .map_err(|e| AQBotError::Provider(format!("Voyage rerank parse error: {e}")))?;
+        .map_err(|e| FrogClawClientError::Provider(format!("Voyage rerank parse error: {e}")))?;
     Ok(RerankResponse {
         results: parsed
             .results
@@ -110,8 +110,8 @@ impl ProviderAdapter for VoyageAdapter {
         _request: ChatRequest,
     ) -> Pin<Box<dyn Stream<Item = Result<ChatStreamChunk>> + Send>> {
         Box::pin(stream::once(async {
-            Err(AQBotError::Provider(
-                "Voyage provider only supports rerank in AQBot".into(),
+            Err(FrogClawClientError::Provider(
+                "Voyage provider only supports rerank in FrogClawClient".into(),
             ))
         }))
     }
@@ -143,12 +143,12 @@ impl ProviderAdapter for VoyageAdapter {
         )
         .send()
         .await
-        .map_err(|e| AQBotError::Provider(format!("Voyage rerank request failed: {e}")))?;
+        .map_err(|e| FrogClawClientError::Provider(format!("Voyage rerank request failed: {e}")))?;
 
         if !resp.status().is_success() {
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
-            return Err(AQBotError::Provider(format!(
+            return Err(FrogClawClientError::Provider(format!(
                 "Voyage rerank API error {status}: {text}"
             )));
         }
@@ -156,7 +156,7 @@ impl ProviderAdapter for VoyageAdapter {
         let text = resp
             .text()
             .await
-            .map_err(|e| AQBotError::Provider(format!("Voyage rerank body error: {e}")))?;
+            .map_err(|e| FrogClawClientError::Provider(format!("Voyage rerank body error: {e}")))?;
         parse_voyage_rerank_response(&text)
     }
 

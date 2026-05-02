@@ -1,5 +1,5 @@
 use crate::AppState;
-use aqbot_core::types::*;
+use frogclaw_core::types::*;
 use tauri::State;
 
 #[tauri::command]
@@ -7,7 +7,7 @@ pub async fn list_messages(
     state: State<'_, AppState>,
     conversation_id: String,
 ) -> Result<Vec<Message>, String> {
-    aqbot_core::repo::message::list_messages(&state.sea_db, &conversation_id)
+    frogclaw_core::repo::message::list_messages(&state.sea_db, &conversation_id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -19,7 +19,7 @@ pub async fn list_messages_page(
     limit: Option<u64>,
     before_message_id: Option<String>,
 ) -> Result<MessagePage, String> {
-    aqbot_core::repo::message::list_messages_page(
+    frogclaw_core::repo::message::list_messages_page(
         &state.sea_db,
         &conversation_id,
         limit.unwrap_or(10),
@@ -31,7 +31,7 @@ pub async fn list_messages_page(
 
 #[tauri::command]
 pub async fn delete_message(state: State<'_, AppState>, id: String) -> Result<(), String> {
-    aqbot_core::repo::message::delete_message(&state.sea_db, &id)
+    frogclaw_core::repo::message::delete_message(&state.sea_db, &id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -42,7 +42,7 @@ pub async fn update_message_content(
     id: String,
     content: String,
 ) -> Result<Message, String> {
-    aqbot_core::repo::message::update_message_content(&state.sea_db, &id, &content)
+    frogclaw_core::repo::message::update_message_content(&state.sea_db, &id, &content)
         .await
         .map_err(|e| e.to_string())
 }
@@ -52,12 +52,12 @@ pub async fn clear_conversation_messages(
     state: State<'_, AppState>,
     conversation_id: String,
 ) -> Result<u64, String> {
-    let rows = aqbot_core::repo::message::clear_conversation_messages(&state.sea_db, &conversation_id)
+    let rows = frogclaw_core::repo::message::clear_conversation_messages(&state.sea_db, &conversation_id)
         .await
         .map_err(|e| e.to_string())?;
 
     // Also clear the agent session's SDK context so the agent doesn't retain old history
-    let _ = aqbot_core::repo::agent_session::clear_sdk_context_by_conversation_id(
+    let _ = frogclaw_core::repo::agent_session::clear_sdk_context_by_conversation_id(
         &state.sea_db,
         &conversation_id,
     )
@@ -73,10 +73,10 @@ pub async fn export_conversation(
     format: String,
 ) -> Result<String, String> {
     let conversation =
-        aqbot_core::repo::conversation::get_conversation(&state.sea_db, &conversation_id)
+        frogclaw_core::repo::conversation::get_conversation(&state.sea_db, &conversation_id)
             .await
             .map_err(|e| e.to_string())?;
-    let messages = aqbot_core::repo::message::list_messages(&state.sea_db, &conversation_id)
+    let messages = frogclaw_core::repo::message::list_messages(&state.sea_db, &conversation_id)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -108,7 +108,7 @@ pub async fn get_conversation_stats(
     state: State<'_, AppState>,
     conversation_id: String,
 ) -> Result<ConversationStats, String> {
-    aqbot_core::repo::message::get_conversation_stats(&state.sea_db, &conversation_id)
+    frogclaw_core::repo::message::get_conversation_stats(&state.sea_db, &conversation_id)
         .await
         .map_err(|e| e.to_string())
 }

@@ -1,16 +1,16 @@
 //! Path encoding/decoding for cross-device portability.
 //!
-//! Replaces absolute path prefixes with variables (`{{AQBOT_HOME}}`, `{{DOCUMENTS}}`,
+//! Replaces absolute path prefixes with variables (`{{FROGCLAW_HOME}}`, `{{DOCUMENTS}}`,
 //! `{{HOME}}`) when writing to the database, and resolves them back to platform-specific
 //! absolute paths when reading.  This allows backups and WebDAV syncs to be restored on
 //! a different machine without hard-coded user paths breaking.
 
-const VAR_AQBOT_HOME: &str = "{{AQBOT_HOME}}";
+const VAR_FROGCLAW_HOME: &str = "{{FROGCLAW_HOME}}";
 const VAR_DOCUMENTS: &str = "{{DOCUMENTS}}";
 const VAR_HOME: &str = "{{HOME}}";
 
 /// Encode an absolute path by replacing known prefixes with variables.
-/// More-specific prefixes (AQBOT_HOME, DOCUMENTS) are tried before HOME.
+/// More-specific prefixes (FROGCLAW_HOME, DOCUMENTS) are tried before HOME.
 pub fn encode_path(absolute_path: &str) -> String {
     if absolute_path.is_empty() {
         return absolute_path.to_string();
@@ -20,12 +20,12 @@ pub fn encode_path(absolute_path: &str) -> String {
         Some(h) => h,
         None => return absolute_path.to_string(),
     };
-    let aqbot_home = home.join(".aqbot");
+    let frogclaw_home = home.join(".frogclaw");
     let documents_root = crate::storage_paths::documents_root();
 
-    // Try the most specific prefix first so that e.g. ~/.aqbot/… is not
-    // encoded as {{HOME}}/.aqbot/… when {{AQBOT_HOME}}/… is more precise.
-    if let Some(encoded) = try_encode(absolute_path, &aqbot_home.to_string_lossy(), VAR_AQBOT_HOME)
+    // Try the most specific prefix first so that e.g. ~/.frogclaw/… is not
+    // encoded as {{HOME}}/.frogclaw/… when {{FROGCLAW_HOME}}/… is more precise.
+    if let Some(encoded) = try_encode(absolute_path, &frogclaw_home.to_string_lossy(), VAR_FROGCLAW_HOME)
     {
         return encoded;
     }
@@ -51,13 +51,13 @@ pub fn decode_path(encoded_path: &str) -> String {
         Some(h) => h,
         None => return encoded_path.to_string(),
     };
-    let aqbot_home = home.join(".aqbot");
+    let frogclaw_home = home.join(".frogclaw");
     let documents_root = crate::storage_paths::documents_root();
 
-    if let Some(rest) = encoded_path.strip_prefix(VAR_AQBOT_HOME) {
+    if let Some(rest) = encoded_path.strip_prefix(VAR_FROGCLAW_HOME) {
         return format!(
             "{}{}",
-            aqbot_home.to_string_lossy(),
+            frogclaw_home.to_string_lossy(),
             platform_sep(rest)
         );
     }
@@ -131,8 +131,6 @@ fn platform_sep(s: &str) -> String {
 /// Settings keys that store filesystem paths.
 const PATH_SETTING_KEYS: &[&str] = &[
     "backup_dir",
-    "gateway_ssl_cert_path",
-    "gateway_ssl_key_path",
 ];
 
 /// Migrate hardcoded absolute paths in settings to use dynamic variables.
@@ -202,18 +200,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn roundtrip_aqbot_home() {
+    fn roundtrip_frogclaw_home() {
         let home = dirs::home_dir().unwrap();
         let original = home
-            .join(".aqbot")
+            .join(".frogclaw")
             .join("ssl")
             .join("cert.pem")
             .to_string_lossy()
             .to_string();
         let encoded = encode_path(&original);
         assert!(
-            encoded.starts_with(VAR_AQBOT_HOME),
-            "expected AQBOT_HOME prefix, got: {}",
+            encoded.starts_with(VAR_FROGCLAW_HOME),
+            "expected FROGCLAW_HOME prefix, got: {}",
             encoded
         );
         assert_eq!(decode_path(&encoded), original);
@@ -221,7 +219,7 @@ mod tests {
 
     #[test]
     fn roundtrip_documents() {
-        let docs = dirs::document_dir().unwrap().join("aqbot");
+        let docs = dirs::document_dir().unwrap().join("frogclaw");
         let original = docs
             .join("images")
             .join("photo.jpg")
@@ -255,17 +253,17 @@ mod tests {
     }
 
     #[test]
-    fn aqbot_home_takes_priority_over_home() {
+    fn frogclaw_home_takes_priority_over_home() {
         let home = dirs::home_dir().unwrap();
         let original = home
-            .join(".aqbot")
+            .join(".frogclaw")
             .join("backups")
             .to_string_lossy()
             .to_string();
         let encoded = encode_path(&original);
         assert!(
-            encoded.starts_with(VAR_AQBOT_HOME),
-            "AQBOT_HOME should take priority over HOME, got: {}",
+            encoded.starts_with(VAR_FROGCLAW_HOME),
+            "FROGCLAW_HOME should take priority over HOME, got: {}",
             encoded
         );
     }
@@ -293,12 +291,12 @@ mod tests {
     fn option_helpers_some() {
         let home = dirs::home_dir().unwrap();
         let path = home
-            .join(".aqbot")
+            .join(".frogclaw")
             .join("backups")
             .to_string_lossy()
             .to_string();
         let encoded = encode_path_opt(&Some(path.clone()));
-        assert!(encoded.as_ref().unwrap().starts_with(VAR_AQBOT_HOME));
+        assert!(encoded.as_ref().unwrap().starts_with(VAR_FROGCLAW_HOME));
         let decoded = decode_path_opt(&encoded);
         assert_eq!(decoded, Some(path));
     }
@@ -306,18 +304,18 @@ mod tests {
     #[test]
     fn exact_prefix_without_trailing_component() {
         let home = dirs::home_dir().unwrap();
-        let exact = home.join(".aqbot").to_string_lossy().to_string();
+        let exact = home.join(".frogclaw").to_string_lossy().to_string();
         let encoded = encode_path(&exact);
-        assert_eq!(encoded, VAR_AQBOT_HOME);
+        assert_eq!(encoded, VAR_FROGCLAW_HOME);
         assert_eq!(decode_path(&encoded), exact);
     }
 
     #[test]
     fn already_encoded_path_is_decoded() {
-        let decoded = decode_path("{{AQBOT_HOME}}/ssl/cert.pem");
+        let decoded = decode_path("{{FROGCLAW_HOME}}/ssl/cert.pem");
         let home = dirs::home_dir().unwrap();
         let expected = home
-            .join(".aqbot")
+            .join(".frogclaw")
             .join("ssl")
             .join("cert.pem")
             .to_string_lossy()
@@ -329,7 +327,7 @@ mod tests {
     fn path_without_variable_left_unchanged_by_decode() {
         let home = dirs::home_dir().unwrap();
         let abs = home
-            .join(".aqbot")
+            .join(".frogclaw")
             .join("foo")
             .to_string_lossy()
             .to_string();

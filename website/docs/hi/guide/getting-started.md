@@ -2,23 +2,23 @@
 
 ## इंस्टॉलेशन
 
-[डाउनलोड पेज](/hi/download) या [GitHub Releases](https://github.com/AQBot-Desktop/AQBot/releases) से नवीनतम इंस्टॉलर डाउनलोड करें।
+[डाउनलोड पेज](/hi/download) या [GitHub Releases](https://github.com/FrogClawClient-Desktop/FrogClawClient/releases) से नवीनतम इंस्टॉलर डाउनलोड करें।
 
 ### macOS
 
 | चिप | फ़ाइल |
 |-----|-------|
-| Apple Silicon (M1 / M2 / M3 / M4) | `AQBot_x.x.x_aarch64.dmg` |
-| Intel | `AQBot_x.x.x_x64.dmg` |
+| Apple Silicon (M1 / M2 / M3 / M4) | `FrogClawClient_x.x.x_aarch64.dmg` |
+| Intel | `FrogClawClient_x.x.x_x64.dmg` |
 
-1. `.dmg` खोलें और **AQBot** को **Applications** फोल्डर में ड्रैग करें।
-2. AQBot लॉन्च करें। अगर macOS ऐप को ब्लॉक करे, **System Settings → Privacy & Security** में जाएं और **Open Anyway** क्लिक करें।
+1. `.dmg` खोलें और **FrogClawClient** को **Applications** फोल्डर में ड्रैग करें।
+2. FrogClawClient लॉन्च करें। अगर macOS ऐप को ब्लॉक करे, **System Settings → Privacy & Security** में जाएं और **Open Anyway** क्लिक करें।
 
 ::: warning macOS: "App Is Damaged" या "Cannot Verify Developer"
 अगर ये संदेश दिखाई दें, तो Terminal खोलें और चलाएं:
 
 ```bash
-xattr -c /Applications/AQBot.app
+xattr -c /Applications/FrogClawClient.app
 ```
 
 फिर ऐप दोबारा लॉन्च करें।
@@ -28,8 +28,8 @@ xattr -c /Applications/AQBot.app
 
 | आर्किटेक्चर | फ़ाइल |
 |------------|-------|
-| x64 (अधिकांश PC) | `AQBot_x.x.x_x64-setup.exe` |
-| ARM64 | `AQBot_x.x.x_arm64-setup.exe` |
+| x64 (अधिकांश PC) | `FrogClawClient_x.x.x_x64-setup.exe` |
+| ARM64 | `FrogClawClient_x.x.x_arm64-setup.exe` |
 
 इंस्टॉलर चलाएं और विज़ार्ड का पालन करें।
 
@@ -37,14 +37,14 @@ xattr -c /Applications/AQBot.app
 
 ```bash
 # Debian / Ubuntu
-sudo dpkg -i AQBot_x.x.x_amd64.deb
+sudo dpkg -i FrogClawClient_x.x.x_amd64.deb
 
 # Fedora / openSUSE
-sudo rpm -i AQBot_x.x.x_x86_64.rpm
+sudo rpm -i FrogClawClient_x.x.x_x86_64.rpm
 
 # AppImage
-chmod +x AQBot_x.x.x_amd64.AppImage
-./AQBot_x.x.x_amd64.AppImage
+chmod +x FrogClawClient_x.x.x_amd64.AppImage
+./FrogClawClient_x.x.x_amd64.AppImage
 ```
 
 ---
@@ -53,7 +53,7 @@ chmod +x AQBot_x.x.x_amd64.AppImage
 
 ### 1. Settings खोलें
 
-AQBot लॉन्च करें और साइडबार के नीचे **gear आइकन** क्लिक करें, या <kbd>Cmd/Ctrl</kbd>+<kbd>,</kbd> दबाएं।
+FrogClawClient लॉन्च करें और साइडबार के नीचे **gear आइकन** क्लिक करें, या <kbd>Cmd/Ctrl</kbd>+<kbd>,</kbd> दबाएं।
 
 ### 2. प्रदाता जोड़ें
 
@@ -83,7 +83,7 @@ AQBot लॉन्च करें और साइडबार के नीच
 1. साइडबार में **New Chat** क्लिक करें (या <kbd>Cmd/Ctrl</kbd>+<kbd>N</kbd> दबाएं)।
 2. चैट के शीर्ष पर मॉडल सेलेक्टर से एक मॉडल चुनें।
 3. एक संदेश टाइप करें और <kbd>Enter</kbd> दबाएं।
-4. AQBot रियल-टाइम में रेस्पॉन्स स्ट्रीम करता है।
+4. FrogClawClient रियल-टाइम में रेस्पॉन्स स्ट्रीम करता है।
 
 ---
 
@@ -105,8 +105,8 @@ AQBot लॉन्च करें और साइडबार के नीच
 
 | पथ | सामग्री |
 |----|---------|
-| `~/.aqbot/` | एप्लिकेशन स्टेट — डेटाबेस, एन्क्रिप्शन कीज़, वेक्टर DB, SSL सर्टिफिकेट |
-| `~/Documents/aqbot/` | यूज़र फ़ाइलें — इमेज, दस्तावेज़, बैकअप |
+| `~/.frogclaw/` | एप्लिकेशन स्टेट — डेटाबेस, एन्क्रिप्शन कीज़, वेक्टर DB, SSL सर्टिफिकेट |
+| `~/Documents/frogclaw/` | यूज़र फ़ाइलें — इमेज, दस्तावेज़, बैकअप |
 
 ---
 

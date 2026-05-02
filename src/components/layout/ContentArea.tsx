@@ -1,9 +1,8 @@
 import type { PageKey } from '@/types';
 import { ChatPage } from '@/pages/ChatPage';
+import { HomePage } from '@/pages/HomePage';
 import { DrawingPage } from '@/pages/DrawingPage';
-import { KnowledgePage } from '@/pages/KnowledgePage';
 import { MemoryPage } from '@/pages/MemoryPage';
-import { GatewayPage } from '@/pages/GatewayPage';
 import { FilesPage } from '@/pages/FilesPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { SkillsPage } from '@/pages/SkillsPage';
@@ -14,22 +13,22 @@ interface ContentAreaProps {
 
 export function ContentArea({ activePage }: ContentAreaProps) {
   switch (activePage) {
+    case 'home':
+      return <HomePage />;
     case 'chat':
       return <ChatPage />;
     case 'drawing':
       return <DrawingPage />;
-    case 'knowledge':
-      return <KnowledgePage />;
     case 'memory':
       return <MemoryPage />;
-    case 'gateway':
-      return <GatewayPage />;
     case 'files':
       return <FilesPage />;
     case 'settings':
       return <SettingsPage />;
     case 'skills':
       return <SkillsPage />;
+    case 'knowledge':
+      return <ChatPage />;
     default: {
       const _exhaustive: never = activePage;
       throw new Error(`Unhandled page key: ${_exhaustive}`);

@@ -1,10 +1,10 @@
 use crate::AppState;
-use aqbot_core::types::*;
+use frogclaw_core::types::*;
 use tauri::State;
 
 #[tauri::command]
 pub async fn list_mcp_servers(state: State<'_, AppState>) -> Result<Vec<McpServer>, String> {
-    aqbot_core::repo::mcp_server::list_mcp_servers(&state.sea_db)
+    frogclaw_core::repo::mcp_server::list_mcp_servers(&state.sea_db)
         .await
         .map_err(|e| e.to_string())
 }
@@ -14,7 +14,7 @@ pub async fn create_mcp_server(
     state: State<'_, AppState>,
     input: CreateMcpServerInput,
 ) -> Result<McpServer, String> {
-    aqbot_core::repo::mcp_server::create_mcp_server(&state.sea_db, input)
+    frogclaw_core::repo::mcp_server::create_mcp_server(&state.sea_db, input)
         .await
         .map_err(|e| e.to_string())
 }
@@ -25,14 +25,14 @@ pub async fn update_mcp_server(
     id: String,
     input: CreateMcpServerInput,
 ) -> Result<McpServer, String> {
-    aqbot_core::repo::mcp_server::update_mcp_server(&state.sea_db, &id, input)
+    frogclaw_core::repo::mcp_server::update_mcp_server(&state.sea_db, &id, input)
         .await
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn delete_mcp_server(state: State<'_, AppState>, id: String) -> Result<(), String> {
-    aqbot_core::repo::mcp_server::delete_mcp_server(&state.sea_db, &id)
+    frogclaw_core::repo::mcp_server::delete_mcp_server(&state.sea_db, &id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -51,7 +51,7 @@ pub async fn list_mcp_tools(
     state: State<'_, AppState>,
     server_id: String,
 ) -> Result<Vec<ToolDescriptor>, String> {
-    aqbot_core::repo::mcp_server::list_tools_for_server(&state.sea_db, &server_id)
+    frogclaw_core::repo::mcp_server::list_tools_for_server(&state.sea_db, &server_id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -61,12 +61,12 @@ pub async fn discover_mcp_tools(
     state: State<'_, AppState>,
     id: String,
 ) -> Result<Vec<ToolDescriptor>, String> {
-    let server = aqbot_core::repo::mcp_server::get_mcp_server(&state.sea_db, &id)
+    let server = frogclaw_core::repo::mcp_server::get_mcp_server(&state.sea_db, &id)
         .await
         .map_err(|e| e.to_string())?;
 
     if server.source == "builtin" {
-        return aqbot_core::repo::mcp_server::list_tools_for_server(&state.sea_db, &id)
+        return frogclaw_core::repo::mcp_server::list_tools_for_server(&state.sea_db, &id)
             .await
             .map_err(|e| e.to_string());
     }
@@ -92,7 +92,7 @@ pub async fn discover_mcp_tools(
                 .unwrap_or_default();
             tokio::time::timeout(
                 timeout_duration,
-                aqbot_core::mcp_client::discover_tools_stdio(command, &args, &env),
+                frogclaw_core::mcp_client::discover_tools_stdio(command, &args, &env),
             )
             .await
             .map_err(|_| format!("Tool discovery timed out after {}s", timeout_secs))?
@@ -105,7 +105,7 @@ pub async fn discover_mcp_tools(
                 .ok_or_else(|| "HTTP server has no endpoint configured".to_string())?;
             tokio::time::timeout(
                 timeout_duration,
-                aqbot_core::mcp_client::discover_tools_http(endpoint),
+                frogclaw_core::mcp_client::discover_tools_http(endpoint),
             )
             .await
             .map_err(|_| format!("Tool discovery timed out after {}s", timeout_secs))?
@@ -118,7 +118,7 @@ pub async fn discover_mcp_tools(
                 .ok_or_else(|| "SSE server has no endpoint configured".to_string())?;
             tokio::time::timeout(
                 timeout_duration,
-                aqbot_core::mcp_client::discover_tools_sse(endpoint),
+                frogclaw_core::mcp_client::discover_tools_sse(endpoint),
             )
             .await
             .map_err(|_| format!("Tool discovery timed out after {}s", timeout_secs))?
@@ -127,7 +127,7 @@ pub async fn discover_mcp_tools(
         other => return Err(format!("Unsupported transport: {}", other)),
     };
 
-    aqbot_core::repo::mcp_server::save_tool_descriptors(&state.sea_db, &id, tools)
+    frogclaw_core::repo::mcp_server::save_tool_descriptors(&state.sea_db, &id, tools)
         .await
         .map_err(|e| e.to_string())
 }
@@ -137,7 +137,7 @@ pub async fn list_tool_executions(
     state: State<'_, AppState>,
     conversation_id: String,
 ) -> Result<Vec<ToolExecution>, String> {
-    aqbot_core::repo::tool_execution::list_tool_executions(&state.sea_db, &conversation_id)
+    frogclaw_core::repo::tool_execution::list_tool_executions(&state.sea_db, &conversation_id)
         .await
         .map_err(|e| e.to_string())
 }

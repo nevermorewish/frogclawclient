@@ -5,32 +5,32 @@ use tauri::{
     AppHandle, Manager,
 };
 
-const TRAY_ID: &str = "aqbot-tray";
+const TRAY_ID: &str = "frogclawclient-tray";
 
 fn tray_labels(language: &str) -> (&'static str, &'static str) {
     let lang = language.to_ascii_lowercase();
     if lang == "en" || lang.starts_with("en-") {
         ("Show", "Quit")
     } else if lang == "zh-tw" {
-        ("顯示主視窗", "退出 AQBot")
+        ("顯示主視窗", "退出 FrogClawClient")
     } else if lang == "ja" {
-        ("メインウィンドウを表示", "AQBot を終了")
+        ("メインウィンドウを表示", "FrogClawClient を終了")
     } else if lang == "ko" {
-        ("메인 창 표시", "AQBot 종료")
+        ("메인 창 표시", "FrogClawClient 종료")
     } else if lang == "fr" {
-        ("Afficher", "Quitter AQBot")
+        ("Afficher", "Quitter FrogClawClient")
     } else if lang == "de" {
-        ("Anzeigen", "AQBot beenden")
+        ("Anzeigen", "FrogClawClient beenden")
     } else if lang == "es" {
-        ("Mostrar", "Salir de AQBot")
+        ("Mostrar", "Salir de FrogClawClient")
     } else if lang == "ru" {
-        ("Показать", "Выйти из AQBot")
+        ("Показать", "Выйти из FrogClawClient")
     } else if lang == "hi" {
-        ("दिखाएं", "AQBot छोड़ें")
+        ("दिखाएं", "FrogClawClient छोड़ें")
     } else if lang == "ar" {
-        ("عرض", "إنهاء AQBot")
+        ("عرض", "إنهاء FrogClawClient")
     } else {
-        ("显示主窗口", "退出 AQBot")
+        ("显示主窗口", "退出 FrogClawClient")
     }
 }
 
@@ -56,7 +56,7 @@ pub fn create_tray(app: &AppHandle, language: &str) -> Result<(), Box<dyn std::e
         .icon(icon)
         .menu(&menu)
         .show_menu_on_left_click(false)
-        .tooltip("AQBot")
+        .tooltip("FrogClawClient")
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => {
                 if let Some(w) = app.get_webview_window("main") {

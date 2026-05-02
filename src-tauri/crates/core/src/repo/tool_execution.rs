@@ -1,7 +1,7 @@
 use sea_orm::*;
 
 use crate::entity::tool_executions;
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 use crate::types::ToolExecution;
 use crate::utils::gen_id;
 
@@ -67,7 +67,7 @@ pub async fn create_tool_execution(
     let model = tool_executions::Entity::find_by_id(&id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("ToolExecution {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("ToolExecution {}", id)))?;
 
     Ok(model_to_tool_execution(model))
 }
@@ -82,7 +82,7 @@ pub async fn update_tool_execution_status(
     let model = tool_executions::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("ToolExecution {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("ToolExecution {}", id)))?;
 
     let mut am: tool_executions::ActiveModel = model.into();
     am.status = Set(status.to_string());
@@ -101,7 +101,7 @@ pub async fn update_tool_execution_approval_status(
     let model = tool_executions::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("ToolExecution {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("ToolExecution {}", id)))?;
 
     let mut am: tool_executions::ActiveModel = model.into();
     am.approval_status = Set(Some(approval_status.to_string()));

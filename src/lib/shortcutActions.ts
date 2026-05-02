@@ -3,8 +3,6 @@ import { message } from 'antd';
 import { isTauri } from '@/lib/invoke';
 import { useUIStore } from '@/stores/uiStore';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { invoke } from '@/lib/invoke';
-import type { GatewayStatus } from '@/types';
 import { SHORTCUT_ACTION_LABEL_KEYS, type ShortcutAction } from '@/lib/shortcuts';
 import i18n from '@/i18n';
 
@@ -60,15 +58,6 @@ async function closeCurrentWindow() {
   await getCurrentWindow().close();
 }
 
-async function toggleGatewayPage() {
-  const status = await invoke<GatewayStatus>('get_gateway_status');
-  if (status.is_running) {
-    await invoke('stop_gateway');
-  } else {
-    await invoke('start_gateway');
-  }
-}
-
 export async function executeShortcutAction(action: ShortcutAction): Promise<void> {
   switch (action) {
     case 'toggleCurrentWindow':
@@ -85,7 +74,7 @@ export async function executeShortcutAction(action: ShortcutAction): Promise<voi
       return;
     case 'newConversation':
       notifyShortcutTriggered(action);
-      dispatchChatScopedEvent('aqbot:new-conversation');
+      dispatchChatScopedEvent('frogclaw:new-conversation');
       return;
     case 'openSettings':
       notifyShortcutTriggered(action);
@@ -97,27 +86,23 @@ export async function executeShortcutAction(action: ShortcutAction): Promise<voi
       return;
     case 'toggleModelSelector':
       notifyShortcutTriggered(action);
-      dispatchChatScopedEvent('aqbot:toggle-model-selector');
+      dispatchChatScopedEvent('frogclaw:toggle-model-selector');
       return;
     case 'fillLastMessage':
       notifyShortcutTriggered(action);
-      dispatchChatScopedEvent('aqbot:fill-last-message');
+      dispatchChatScopedEvent('frogclaw:fill-last-message');
       return;
     case 'clearContext':
       notifyShortcutTriggered(action);
-      dispatchChatScopedEvent('aqbot:clear-context');
+      dispatchChatScopedEvent('frogclaw:clear-context');
       return;
     case 'clearConversationMessages':
       notifyShortcutTriggered(action);
-      dispatchChatScopedEvent('aqbot:clear-conversation-messages');
-      return;
-    case 'toggleGateway':
-      notifyShortcutTriggered(action);
-      await toggleGatewayPage();
+      dispatchChatScopedEvent('frogclaw:clear-conversation-messages');
       return;
     case 'toggleMode':
       notifyShortcutTriggered(action);
-      dispatchChatScopedEvent('aqbot:toggle-mode');
+      dispatchChatScopedEvent('frogclaw:toggle-mode');
       return;
   }
 }

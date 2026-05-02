@@ -1,4 +1,4 @@
-//! AQBotProviderBridge: adapts AQBot's ProviderAdapter to the SDK's LLMProvider trait.
+//! FrogClawClientProviderBridge: adapts FrogClawClient's ProviderAdapter to the SDK's LLMProvider trait.
 
 use async_trait::async_trait;
 use futures::StreamExt;
@@ -9,17 +9,17 @@ use open_agent_sdk::{
     ApiType, ContentBlock, LLMProvider, Message, MessageRole, ProviderResponse, SDKMessage, Usage,
 };
 
-use aqbot_core::types::{
+use frogclaw_core::types::{
     ChatContent, ChatMessage, ChatRequest, ChatTool, ChatToolFunction, ContentPart, ImageUrl,
     TokenUsage, ToolCall, ToolCallFunction,
 };
-use aqbot_providers::{ProviderAdapter, ProviderRequestContext};
+use frogclaw_providers::{ProviderAdapter, ProviderRequestContext};
 use serde_json::Value;
 use std::sync::Arc;
 use tauri::Emitter;
 
-/// Bridge between AQBot providers and the open-agent-sdk LLMProvider interface.
-pub struct AQBotProviderBridge {
+/// Bridge between FrogClawClient providers and the open-agent-sdk LLMProvider interface.
+pub struct FrogClawClientProviderBridge {
     adapter: Arc<dyn ProviderAdapter>,
     ctx: ProviderRequestContext,
     api_type: ApiType,
@@ -27,7 +27,7 @@ pub struct AQBotProviderBridge {
     conversation_id: Option<String>,
 }
 
-impl AQBotProviderBridge {
+impl FrogClawClientProviderBridge {
     pub fn new(
         adapter: Arc<dyn ProviderAdapter>,
         ctx: ProviderRequestContext,
@@ -66,7 +66,7 @@ impl AQBotProviderBridge {
 }
 
 #[async_trait]
-impl LLMProvider for AQBotProviderBridge {
+impl LLMProvider for FrogClawClientProviderBridge {
     fn api_type(&self) -> ApiType {
         self.api_type.clone()
     }
@@ -139,7 +139,7 @@ impl LLMProvider for AQBotProviderBridge {
             total_tokens: 0,
         });
 
-        let response = aqbot_core::types::ChatResponse {
+        let response = frogclaw_core::types::ChatResponse {
             id: String::new(),
             model: String::new(),
             content: accumulated_text,
@@ -157,7 +157,7 @@ impl LLMProvider for AQBotProviderBridge {
 }
 
 // ---------------------------------------------------------------------------
-// SDK ProviderRequest → AQBot ChatRequest
+// SDK ProviderRequest → FrogClawClient ChatRequest
 // ---------------------------------------------------------------------------
 
 fn convert_request(request: ProviderRequest<'_>) -> ChatRequest {
@@ -219,7 +219,7 @@ fn convert_request(request: ProviderRequest<'_>) -> ChatRequest {
     }
 }
 
-/// Convert a single SDK Message into one or more AQBot ChatMessages.
+/// Convert a single SDK Message into one or more FrogClawClient ChatMessages.
 /// ToolResult content blocks become separate tool-role messages.
 fn convert_sdk_message_to_chat_messages(msg: &Message) -> Vec<ChatMessage> {
     let role = match msg.role {
@@ -333,10 +333,10 @@ fn convert_sdk_message_to_chat_messages(msg: &Message) -> Vec<ChatMessage> {
 }
 
 // ---------------------------------------------------------------------------
-// AQBot ChatResponse → SDK ProviderResponse
+// FrogClawClient ChatResponse → SDK ProviderResponse
 // ---------------------------------------------------------------------------
 
-fn convert_response(response: aqbot_core::types::ChatResponse) -> ProviderResponse {
+fn convert_response(response: frogclaw_core::types::ChatResponse) -> ProviderResponse {
     let mut content_blocks: Vec<ContentBlock> = Vec::new();
 
     if let Some(thinking) = &response.thinking {
@@ -416,7 +416,7 @@ fn parse_http_status(err: &str) -> Option<u16> {
 
 /// Classify a provider error into the appropriate SDK ApiError variant,
 /// so the retry logic only retries truly transient errors.
-fn classify_provider_error(e: aqbot_core::error::AQBotError) -> ApiError {
+fn classify_provider_error(e: frogclaw_core::error::FrogClawClientError) -> ApiError {
     let err_str = e.to_string();
     if let Some(status) = parse_http_status(&err_str) {
         if status == 401 || status == 403 {

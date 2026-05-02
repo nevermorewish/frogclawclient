@@ -2,13 +2,13 @@
 
 ## Qu'est-ce que MCP ?
 
-Le [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) est un standard ouvert qui permet aux modèles IA d'interagir avec des outils et des sources de données externes. AQBot agit comme un client MCP — vous ajoutez des serveurs MCP, et l'IA peut appeler les outils qu'ils exposent pendant une conversation.
+Le [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) est un standard ouvert qui permet aux modèles IA d'interagir avec des outils et des sources de données externes. FrogClawClient agit comme un client MCP — vous ajoutez des serveurs MCP, et l'IA peut appeler les outils qu'ils exposent pendant une conversation.
 
 ---
 
 ## Protocoles de transport
 
-AQBot supporte trois protocoles de transport pour communiquer avec les serveurs MCP :
+FrogClawClient supporte trois protocoles de transport pour communiquer avec les serveurs MCP :
 
 | Protocole | Connexion | Cas d'utilisation | Configuration |
 |-----------|-----------|------------------|---------------|
@@ -30,7 +30,7 @@ AQBot supporte trois protocoles de transport pour communiquer avec les serveurs 
 
 ### Import JSON
 
-Cliquez sur **Import JSON** et collez un objet de configuration. AQBot accepte le format JSON MCP standard :
+Cliquez sur **Import JSON** et collez un objet de configuration. FrogClawClient accepte le format JSON MCP standard :
 
 ```json
 {
@@ -49,8 +49,8 @@ Cliquez sur **Import JSON** et collez un objet de configuration. AQBot accepte l
 
 | Outil | Description |
 |-------|-------------|
-| **@aqbot/fetch** | Récupérer des pages web et des ressources HTTP |
-| **@aqbot/search-file** | Rechercher des fichiers sur votre système de fichiers local |
+| **@frogclaw/fetch** | Récupérer des pages web et des ressources HTTP |
+| **@frogclaw/search-file** | Rechercher des fichiers sur votre système de fichiers local |
 
 ---
 

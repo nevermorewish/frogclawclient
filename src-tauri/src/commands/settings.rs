@@ -1,18 +1,14 @@
 use crate::AppState;
-use aqbot_core::types::*;
+use frogclaw_core::types::*;
 use tauri::AppHandle;
 use tauri::State;
 
 #[tauri::command]
 pub async fn get_settings(state: State<'_, AppState>) -> Result<AppSettings, String> {
-    let mut settings = aqbot_core::repo::settings::get_settings(&state.sea_db)
+    let mut settings = frogclaw_core::repo::settings::get_settings(&state.sea_db)
         .await
         .map_err(|e| e.to_string())?;
-    settings.backup_dir = aqbot_core::path_vars::decode_path_opt(&settings.backup_dir);
-    settings.gateway_ssl_cert_path =
-        aqbot_core::path_vars::decode_path_opt(&settings.gateway_ssl_cert_path);
-    settings.gateway_ssl_key_path =
-        aqbot_core::path_vars::decode_path_opt(&settings.gateway_ssl_key_path);
+    settings.backup_dir = frogclaw_core::path_vars::decode_path_opt(&settings.backup_dir);
     Ok(settings)
 }
 
@@ -22,12 +18,8 @@ pub async fn save_settings(
     state: State<'_, AppState>,
     mut settings: AppSettings,
 ) -> Result<(), String> {
-    settings.backup_dir = aqbot_core::path_vars::encode_path_opt(&settings.backup_dir);
-    settings.gateway_ssl_cert_path =
-        aqbot_core::path_vars::encode_path_opt(&settings.gateway_ssl_cert_path);
-    settings.gateway_ssl_key_path =
-        aqbot_core::path_vars::encode_path_opt(&settings.gateway_ssl_key_path);
-    aqbot_core::repo::settings::save_settings(&state.sea_db, &settings)
+    settings.backup_dir = frogclaw_core::path_vars::encode_path_opt(&settings.backup_dir);
+    frogclaw_core::repo::settings::save_settings(&state.sea_db, &settings)
         .await
         .map_err(|e| e.to_string())?;
 

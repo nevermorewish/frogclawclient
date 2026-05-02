@@ -36,7 +36,7 @@ describe('Phase C output control regressions', () => {
     const source = readSource('src/lib/exportChat.ts');
 
     expect(source).toContain('includeThinking');
-    expect(source).toContain('stripAqbotTags');
+    expect(source).toContain('stripFrogclawTags');
     expect(source).toContain('copyTranscript');
   });
 });

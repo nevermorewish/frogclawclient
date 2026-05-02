@@ -5,7 +5,6 @@ import { ContentArea } from '@/components/layout/ContentArea';
 import { FilesPage } from '@/pages/FilesPage';
 
 vi.mock('@/pages/ChatPage', () => ({ ChatPage: () => <div>chat</div> }));
-vi.mock('@/pages/GatewayPage', () => ({ GatewayPage: () => <div>gateway</div> }));
 vi.mock('@/pages/SettingsPage', () => ({ SettingsPage: () => <div>settings</div> }));
 
 // ──────────────────────────────────────────────────────────────────────────────

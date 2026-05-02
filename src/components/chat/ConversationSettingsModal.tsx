@@ -16,7 +16,7 @@ interface ConversationSettingsModalProps {
   onClose: () => void;
 }
 
-const CONTEXT_LIMIT_KEY = (id: string) => `aqbot_context_limit_${id}`;
+const CONTEXT_LIMIT_KEY = (id: string) => `frogclaw_context_limit_${id}`;
 
 export function ConversationSettingsModal({ open, onClose }: ConversationSettingsModalProps) {
   const { token } = theme.useToken();

@@ -29,7 +29,7 @@ export function DataManager() {
         const { save } = await import('@tauri-apps/plugin-dialog');
         const { writeTextFile } = await import('@tauri-apps/plugin-fs');
         const filePath = await save({
-          defaultPath: `aqbot-export-${new Date().toISOString().slice(0, 10)}.json`,
+          defaultPath: `frogclaw-export-${new Date().toISOString().slice(0, 10)}.json`,
           filters: [{ name: 'JSON', extensions: ['json'] }],
         });
         if (filePath) {
@@ -41,7 +41,7 @@ export function DataManager() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `aqbot-export-${new Date().toISOString().slice(0, 10)}.json`;
+        a.download = `frogclaw-export-${new Date().toISOString().slice(0, 10)}.json`;
         a.click();
         URL.revokeObjectURL(url);
         message.success(t('settings.exportSuccess') || '导出成功');

@@ -1,4 +1,4 @@
-use aqbot_core::types::ChatRequest;
+use frogclaw_core::types::ChatRequest;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ReasoningStyle {
@@ -165,7 +165,7 @@ fn level_to_budget(level: &str) -> Option<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aqbot_core::types::{ChatContent, ChatMessage};
+    use frogclaw_core::types::{ChatContent, ChatMessage};
 
     fn request(thinking_level: Option<&str>, thinking_budget: Option<u32>) -> ChatRequest {
         ChatRequest {

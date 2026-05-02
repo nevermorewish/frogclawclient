@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   getStreamingLoadingState,
-  hasAqbotDisplayContent,
+  hasFrogclawDisplayContent,
   hasModelVisibleContent,
   shouldRenderAssistantMarkdownFromContent,
-  splitLeadingAqbotDisplayContent,
-  stripLeadingAqbotDisplayTags,
+  splitLeadingFrogclawDisplayContent,
+  stripLeadingFrogclawDisplayTags,
 } from '../chatStreaming';
 
 describe('chat streaming helpers', () => {
@@ -34,46 +34,46 @@ describe('chat streaming helpers', () => {
 
   it('ignores display-only tags when deciding whether model text exists', () => {
     const stripDisplayTags = (content: string) => content
-      .replace(/<knowledge-retrieval [^>]*data-aqbot="1"[^>]*>[\s\S]*?<\/knowledge-retrieval>\s*/g, '')
+      .replace(/<knowledge-retrieval [^>]*data-frogclaw="1"[^>]*>[\s\S]*?<\/knowledge-retrieval>\s*/g, '')
       .replace(/<think[^>]*>[\s\S]*?<\/think>\s*/g, '')
       .trim();
 
     expect(hasModelVisibleContent(
-      '<knowledge-retrieval status="done" data-aqbot="1">[]</knowledge-retrieval>',
+      '<knowledge-retrieval status="done" data-frogclaw="1">[]</knowledge-retrieval>',
       stripDisplayTags,
     )).toBe(false);
     expect(hasModelVisibleContent(
-      '<knowledge-retrieval status="done" data-aqbot="1">[]</knowledge-retrieval>\n\nanswer',
+      '<knowledge-retrieval status="done" data-frogclaw="1">[]</knowledge-retrieval>\n\nanswer',
       stripDisplayTags,
     )).toBe(true);
   });
 
-  it('detects AQBot display tags independently from model text', () => {
-    expect(hasAqbotDisplayContent(
-      '<knowledge-retrieval status="done" data-aqbot="1">[]</knowledge-retrieval>',
+  it('detects FrogClawClient display tags independently from model text', () => {
+    expect(hasFrogclawDisplayContent(
+      '<knowledge-retrieval status="done" data-frogclaw="1">[]</knowledge-retrieval>',
     )).toBe(true);
-    expect(hasAqbotDisplayContent('answer')).toBe(false);
+    expect(hasFrogclawDisplayContent('answer')).toBe(false);
   });
 
-  it('splits leading AQBot display tags from streamed model text', () => {
-    const knowledge = '<knowledge-retrieval status="done" data-aqbot="1">[]</knowledge-retrieval>\n\n';
-    const memory = '<memory-retrieval status="done" data-aqbot="1">[]</memory-retrieval>\n\n';
+  it('splits leading FrogClawClient display tags from streamed model text', () => {
+    const knowledge = '<knowledge-retrieval status="done" data-frogclaw="1">[]</knowledge-retrieval>\n\n';
+    const memory = '<memory-retrieval status="done" data-frogclaw="1">[]</memory-retrieval>\n\n';
 
-    expect(splitLeadingAqbotDisplayContent(`${knowledge}${memory}answer`)).toEqual({
+    expect(splitLeadingFrogclawDisplayContent(`${knowledge}${memory}answer`)).toEqual({
       prefix: `${knowledge}${memory}`,
       body: 'answer',
     });
-    expect(splitLeadingAqbotDisplayContent(`answer\n${knowledge}`)).toEqual({
+    expect(splitLeadingFrogclawDisplayContent(`answer\n${knowledge}`)).toEqual({
       prefix: '',
       body: `answer\n${knowledge}`,
     });
   });
 
   it('strips selected leading display tags while preserving other display prefixes', () => {
-    const web = '<web-search status="done" data-aqbot="1">[]</web-search>\n\n';
-    const knowledge = '<knowledge-retrieval status="done" data-aqbot="1">[]</knowledge-retrieval>\n\n';
+    const web = '<web-search status="done" data-frogclaw="1">[]</web-search>\n\n';
+    const knowledge = '<knowledge-retrieval status="done" data-frogclaw="1">[]</knowledge-retrieval>\n\n';
 
-    expect(stripLeadingAqbotDisplayTags(
+    expect(stripLeadingFrogclawDisplayTags(
       `${web}${knowledge}answer`,
       ['knowledge-retrieval', 'memory-retrieval'],
     )).toBe(`${web}answer`);

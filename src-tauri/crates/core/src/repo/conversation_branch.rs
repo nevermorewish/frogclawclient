@@ -1,7 +1,7 @@
 use sea_orm::*;
 
 use crate::entity::conversation_branches;
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 use crate::types::ConversationBranch;
 use crate::utils::gen_id;
 
@@ -34,7 +34,7 @@ pub async fn get_branch(db: &DatabaseConnection, id: &str) -> Result<Conversatio
     let model = conversation_branches::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("ConversationBranch {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("ConversationBranch {}", id)))?;
 
     Ok(model_to_branch(model))
 }

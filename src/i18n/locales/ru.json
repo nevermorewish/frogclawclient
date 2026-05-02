@@ -1,8 +1,9 @@
-{
+﻿{
   "app": {
-    "name": "AQBot"
+    "name": "FrogClawClient"
   },
   "nav": {
+    "home": "Главная",
     "chat": "Чат",
     "knowledge": "База знаний",
     "memory": "Память",
@@ -931,7 +932,7 @@
     "maxCount": "Макс. резервных копий",
     "copies": "шт.",
     "backupDir": "Директория резервных копий",
-    "defaultDir": "Директория по умолчанию AQBot",
+    "defaultDir": "Директория по умолчанию FrogClawClient",
     "effectiveDir": "Текущая директория",
     "formatSqliteDesc": "Быстро, прямое восстановление",
     "formatJsonDesc": "Читаемый формат, файл больше",
@@ -1086,7 +1087,7 @@
     "reloadConfirmOk": "Перезагрузить",
     "reloadConfirmCancel": "Отмена",
     "closeConfirmTitle": "Закрыть приложение",
-    "closeConfirmContent": "Вы уверены, что хотите закрыть AQBot?",
+    "closeConfirmContent": "Вы уверены, что хотите закрыть FrogClawClient?",
     "closeConfirmOk": "Закрыть",
     "closeConfirmCancel": "Отмена",
     "startMinimized": "Запускать свёрнутым",
@@ -1196,7 +1197,7 @@
     "uninstallConfirm": "Вы уверены, что хотите удалить навык \"{{name}}\"?",
     "detail": "Детали навыка",
     "source": {
-      "aqbot": "AQBot",
+      "frogclaw": "FrogClawClient",
       "claude": "Claude",
       "agents": "Agents",
       "builtin": "Встроенный",

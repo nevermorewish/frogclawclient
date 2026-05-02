@@ -5,7 +5,7 @@ export interface ConvIcon {
   value: string;
 }
 
-export const CONV_ICON_KEY = (id: string) => `aqbot_conv_icon_${id}`;
+export const CONV_ICON_KEY = (id: string) => `frogclaw_conv_icon_${id}`;
 
 export function getConvIcon(conversationId: string): ConvIcon | null {
   const stored = localStorage.getItem(CONV_ICON_KEY(conversationId));

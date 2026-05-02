@@ -13,7 +13,7 @@ const backupStoreState = {
     enabled: false,
     intervalHours: 24,
     maxCount: 10,
-    backupDir: '/Users/test/.aqbot/backups',
+    backupDir: '/Users/test/.frogclaw/backups',
   },
   loadBackups: vi.fn(),
   createBackup: vi.fn(),
@@ -48,7 +48,7 @@ describe('BackupCenter', () => {
     await user.click(screen.getByRole('button', { name: 'backup.autoBackup' }));
 
     expect(await screen.findByTestId('backup-effective-dir')).toHaveTextContent(
-      '/Users/test/.aqbot/backups',
+      '/Users/test/.frogclaw/backups',
     );
   });
 });

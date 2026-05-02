@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -21,7 +21,7 @@ impl CliTool {
             "gemini" => Ok(Self::Gemini),
             "opencode" => Ok(Self::OpenCode),
             "cursor" => Ok(Self::Cursor),
-            _ => Err(AQBotError::NotFound(format!("Unknown CLI tool: {}", s))),
+            _ => Err(FrogClawClientError::NotFound(format!("Unknown CLI tool: {}", s))),
         }
     }
 
@@ -156,7 +156,7 @@ fn check_cursor_installed() -> bool {
 // ─── Config Paths ───────────────────────────────────────
 
 fn home_dir() -> Result<PathBuf> {
-    dirs_next().ok_or_else(|| AQBotError::NotFound("Could not determine home directory".into()))
+    dirs_next().ok_or_else(|| FrogClawClientError::NotFound("Could not determine home directory".into()))
 }
 
 fn dirs_next() -> Option<PathBuf> {
@@ -195,7 +195,7 @@ fn config_paths(tool: CliTool) -> Result<Vec<PathBuf>> {
             #[cfg(target_os = "windows")]
             {
                 let appdata = std::env::var("APPDATA")
-                    .map_err(|_| AQBotError::NotFound("APPDATA not set".into()))?;
+                    .map_err(|_| FrogClawClientError::NotFound("APPDATA not set".into()))?;
                 Ok(vec![
                     PathBuf::from(appdata).join("Cursor/User/settings.json")
                 ])
@@ -212,7 +212,7 @@ fn config_paths(tool: CliTool) -> Result<Vec<PathBuf>> {
 
 fn backup_dir() -> Result<PathBuf> {
     let home = home_dir()?;
-    Ok(home.join(".aqbot").join("backups"))
+    Ok(home.join(".frogclaw").join("backups"))
 }
 
 fn backup_path(tool: CliTool, filename: &str) -> Result<PathBuf> {
@@ -230,10 +230,10 @@ fn backup_file(path: &Path, tool: CliTool) -> Result<()> {
     let dest = backup_path(tool, filename)?;
     if let Some(parent) = dest.parent() {
         std::fs::create_dir_all(parent)
-            .map_err(|e| AQBotError::Gateway(format!("Failed to create backup dir: {}", e)))?;
+            .map_err(|e| FrogClawClientError::Gateway(format!("Failed to create backup dir: {}", e)))?;
     }
     std::fs::copy(path, &dest)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to backup {}: {}", path.display(), e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to backup {}: {}", path.display(), e)))?;
     Ok(())
 }
 
@@ -243,7 +243,7 @@ fn restore_file(tool: CliTool, filename: &str, dest: &Path) -> Result<bool> {
         return Ok(false);
     }
     std::fs::copy(&src, dest)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to restore backup: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to restore backup: {}", e)))?;
     Ok(true)
 }
 
@@ -251,13 +251,13 @@ fn restore_file(tool: CliTool, filename: &str, dest: &Path) -> Result<bool> {
 fn atomic_write(path: &Path, content: &str) -> Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
-            .map_err(|e| AQBotError::Gateway(format!("Failed to create dir: {}", e)))?;
+            .map_err(|e| FrogClawClientError::Gateway(format!("Failed to create dir: {}", e)))?;
     }
     let tmp = path.with_extension("tmp");
     std::fs::write(&tmp, content)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to write temp file: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to write temp file: {}", e)))?;
     std::fs::rename(&tmp, path)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to rename temp file: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to rename temp file: {}", e)))?;
     Ok(())
 }
 
@@ -345,10 +345,10 @@ fn check_codex_connected(auth_path: &Path, config_path: &Path, gateway_url: &str
         return Ok(false);
     }
     let content = std::fs::read_to_string(config_path)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to read config.toml: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read config.toml: {}", e)))?;
     let doc = content
         .parse::<toml_edit::DocumentMut>()
-        .map_err(|e| AQBotError::Gateway(format!("Failed to parse TOML: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to parse TOML: {}", e)))?;
     let provider_ok = doc.get("model_provider").and_then(|v| v.as_str()) == Some("any");
     let base_url_ok = doc
         .get("model_providers")
@@ -391,7 +391,7 @@ fn check_gemini_connected(
 
     // Check .env
     let content = std::fs::read_to_string(env_path)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to read .env: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read .env: {}", e)))?;
     let mut base_url_ok = false;
     let mut key_ok = false;
     for line in content.lines() {
@@ -425,18 +425,18 @@ fn check_gemini_connected(
 }
 
 /// OpenCode (~/.config/opencode/opencode.json):
-/// connected = provider.aqbot.baseURL == gateway_url AND provider.aqbot.apiKey is non-empty.
+/// connected = provider.frogclaw.baseURL == gateway_url AND provider.frogclaw.apiKey is non-empty.
 fn check_opencode_connected(path: &Path, gateway_url: &str) -> Result<bool> {
     if !path.exists() {
         return Ok(false);
     }
     let json = read_json_file(path)?;
-    let aqbot = json.get("provider").and_then(|p| p.get("aqbot"));
-    let url_ok = aqbot
+    let frogclaw = json.get("provider").and_then(|p| p.get("frogclaw"));
+    let url_ok = frogclaw
         .and_then(|a| a.get("baseURL"))
         .and_then(|v| v.as_str())
         == Some(gateway_url);
-    let key_ok = aqbot
+    let key_ok = frogclaw
         .and_then(|a| a.get("apiKey"))
         .and_then(|v| v.as_str())
         .map(|k| !k.is_empty())
@@ -500,7 +500,7 @@ pub fn connect(tool: CliTool, gateway_url: &str, api_key: &str) -> Result<()> {
     };
     if let Err(e) = write_result {
         rollback_to_backup(tool);
-        return Err(AQBotError::Gateway(format!(
+        return Err(FrogClawClientError::Gateway(format!(
             "Failed to write {} config (rolled back): {}",
             tool.display_name(),
             e
@@ -513,14 +513,14 @@ pub fn connect(tool: CliTool, gateway_url: &str, api_key: &str) -> Result<()> {
         Ok(true) => Ok(()),
         Ok(false) => {
             rollback_to_backup(tool);
-            Err(AQBotError::Gateway(format!(
+            Err(FrogClawClientError::Gateway(format!(
                 "Post-write validation failed for {}: config does not appear connected after write (rolled back)",
                 tool.display_name()
             )))
         }
         Err(e) => {
             rollback_to_backup(tool);
-            Err(AQBotError::Gateway(format!(
+            Err(FrogClawClientError::Gateway(format!(
                 "Post-write validation error for {} (rolled back): {}",
                 tool.display_name(),
                 e
@@ -539,7 +539,7 @@ fn connect_claude_code(
     let mut settings = read_json_or_empty(settings_path)?;
     let obj = settings
         .as_object_mut()
-        .ok_or_else(|| AQBotError::Gateway("Claude Code settings is not a JSON object".into()))?;
+        .ok_or_else(|| FrogClawClientError::Gateway("Claude Code settings is not a JSON object".into()))?;
     obj.insert(
         "apiBaseUrl".into(),
         serde_json::Value::String(gateway_url.into()),
@@ -552,7 +552,7 @@ fn connect_claude_code(
         .get_mut("env")
         .and_then(|value| value.as_object_mut())
         .ok_or_else(|| {
-            AQBotError::Gateway("Claude Code settings.env is not a JSON object".into())
+            FrogClawClientError::Gateway("Claude Code settings.env is not a JSON object".into())
         })?;
     env.insert(
         "ANTHROPIC_BASE_URL".into(),
@@ -563,20 +563,20 @@ fn connect_claude_code(
         serde_json::Value::String(api_key.into()),
     );
     let content = serde_json::to_string_pretty(&settings)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to serialize JSON: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to serialize JSON: {}", e)))?;
     atomic_write(settings_path, &content)?;
 
     // Write config.json
     let mut config = read_json_or_empty(config_path)?;
     let config_obj = config
         .as_object_mut()
-        .ok_or_else(|| AQBotError::Gateway("Claude Code config is not a JSON object".into()))?;
+        .ok_or_else(|| FrogClawClientError::Gateway("Claude Code config is not a JSON object".into()))?;
     config_obj.insert(
         "primaryApiKey".into(),
         serde_json::Value::String("any".into()),
     );
     let config_content = serde_json::to_string_pretty(&config)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to serialize config JSON: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to serialize config JSON: {}", e)))?;
     atomic_write(config_path, &config_content)
 }
 
@@ -591,20 +591,20 @@ fn connect_codex(
         "OPENAI_API_KEY": api_key
     });
     let auth_content = serde_json::to_string_pretty(&auth_json)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to serialize auth JSON: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to serialize auth JSON: {}", e)))?;
     atomic_write(auth_path, &auth_content)?;
 
     // Edit config.toml preserving format
     let content = if config_path.exists() {
         std::fs::read_to_string(config_path)
-            .map_err(|e| AQBotError::Gateway(format!("Failed to read config.toml: {}", e)))?
+            .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read config.toml: {}", e)))?
     } else {
         String::new()
     };
 
     let mut doc = content
         .parse::<toml_edit::DocumentMut>()
-        .map_err(|e| AQBotError::Gateway(format!("Failed to parse TOML: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to parse TOML: {}", e)))?;
 
     doc["model_provider"] = toml_edit::value("any");
 
@@ -614,16 +614,16 @@ fn connect_codex(
     }
     let providers = doc["model_providers"]
         .as_table_mut()
-        .ok_or_else(|| AQBotError::Gateway("model_providers is not a table".into()))?;
+        .ok_or_else(|| FrogClawClientError::Gateway("model_providers is not a table".into()))?;
 
     if !providers.contains_key("any") {
         providers["any"] = toml_edit::Item::Table(toml_edit::Table::new());
     }
     let any = providers["any"]
         .as_table_mut()
-        .ok_or_else(|| AQBotError::Gateway("model_providers.any is not a table".into()))?;
+        .ok_or_else(|| FrogClawClientError::Gateway("model_providers.any is not a table".into()))?;
 
-    any["name"] = toml_edit::value("AQBot Gateway");
+    any["name"] = toml_edit::value("FrogClawClient Gateway");
     any["base_url"] = toml_edit::value(gateway_url);
     any["wire_api"] = toml_edit::value("responses");
     any["requires_openai_auth"] = toml_edit::value(true);
@@ -643,7 +643,7 @@ fn connect_gemini(
 
     if env_path.exists() {
         let content = std::fs::read_to_string(env_path)
-            .map_err(|e| AQBotError::Gateway(format!("Failed to read .env: {}", e)))?;
+            .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read .env: {}", e)))?;
         for line in content.lines() {
             let trimmed = line.trim();
             if trimmed.is_empty() || trimmed.starts_with('#') {
@@ -682,7 +682,7 @@ fn connect_gemini(
     let mut settings = read_json_or_empty(settings_path)?;
     let obj = settings
         .as_object_mut()
-        .ok_or_else(|| AQBotError::Gateway("Gemini settings is not a JSON object".into()))?;
+        .ok_or_else(|| FrogClawClientError::Gateway("Gemini settings is not a JSON object".into()))?;
 
     // Ensure security.auth.selectedType == "gemini-api-key"
     if !obj.contains_key("security") {
@@ -692,7 +692,7 @@ fn connect_gemini(
         .get_mut("security")
         .unwrap()
         .as_object_mut()
-        .ok_or_else(|| AQBotError::Gateway("security is not a JSON object".into()))?;
+        .ok_or_else(|| FrogClawClientError::Gateway("security is not a JSON object".into()))?;
 
     if !security.contains_key("auth") {
         security.insert("auth".into(), serde_json::json!({}));
@@ -701,7 +701,7 @@ fn connect_gemini(
         .get_mut("auth")
         .unwrap()
         .as_object_mut()
-        .ok_or_else(|| AQBotError::Gateway("security.auth is not a JSON object".into()))?;
+        .ok_or_else(|| FrogClawClientError::Gateway("security.auth is not a JSON object".into()))?;
 
     auth.insert(
         "selectedType".into(),
@@ -709,7 +709,7 @@ fn connect_gemini(
     );
 
     let settings_content = serde_json::to_string_pretty(&settings)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to serialize settings JSON: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to serialize settings JSON: {}", e)))?;
     atomic_write(settings_path, &settings_content)
 }
 
@@ -717,7 +717,7 @@ fn connect_opencode(config_path: &Path, gateway_url: &str, api_key: &str) -> Res
     let mut json = read_json_or_empty(config_path)?;
     let obj = json
         .as_object_mut()
-        .ok_or_else(|| AQBotError::Gateway("OpenCode config is not a JSON object".into()))?;
+        .ok_or_else(|| FrogClawClientError::Gateway("OpenCode config is not a JSON object".into()))?;
 
     if !obj.contains_key("$schema") {
         obj.insert(
@@ -735,10 +735,10 @@ fn connect_opencode(config_path: &Path, gateway_url: &str, api_key: &str) -> Res
         .get_mut("provider")
         .unwrap()
         .as_object_mut()
-        .ok_or_else(|| AQBotError::Gateway("provider is not a JSON object".into()))?;
+        .ok_or_else(|| FrogClawClientError::Gateway("provider is not a JSON object".into()))?;
 
     provider.insert(
-        "aqbot".into(),
+        "frogclaw".into(),
         serde_json::json!({
             "apiKey": api_key,
             "baseURL": gateway_url,
@@ -751,7 +751,7 @@ fn connect_opencode(config_path: &Path, gateway_url: &str, api_key: &str) -> Res
     );
 
     let content = serde_json::to_string_pretty(&json)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to serialize JSON: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to serialize JSON: {}", e)))?;
     atomic_write(config_path, &content)
 }
 
@@ -759,7 +759,7 @@ fn connect_cursor(settings_path: &Path, gateway_url: &str, api_key: &str) -> Res
     let mut json = read_json_or_empty(settings_path)?;
     let obj = json
         .as_object_mut()
-        .ok_or_else(|| AQBotError::Gateway("Cursor settings is not a JSON object".into()))?;
+        .ok_or_else(|| FrogClawClientError::Gateway("Cursor settings is not a JSON object".into()))?;
     obj.insert(
         "openai.apiBaseUrl".into(),
         serde_json::Value::String(gateway_url.into()),
@@ -769,7 +769,7 @@ fn connect_cursor(settings_path: &Path, gateway_url: &str, api_key: &str) -> Res
         serde_json::Value::String(api_key.into()),
     );
     let content = serde_json::to_string_pretty(&json)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to serialize JSON: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to serialize JSON: {}", e)))?;
     atomic_write(settings_path, &content)
 }
 
@@ -795,7 +795,7 @@ fn disconnect_restore(tool: CliTool) -> Result<()> {
         }
     }
     if !any_restored {
-        return Err(AQBotError::Gateway(format!(
+        return Err(FrogClawClientError::Gateway(format!(
             "No backup found for {}. \
              To disconnect without restoring, use the standard disconnect path (restoreBackup: false).",
             tool.display_name()
@@ -823,11 +823,11 @@ fn disconnect_remove_fields(tool: CliTool, gateway_url: &str) -> Result<()> {
             // Two-file operation: remove auth.json then clean config.toml.
             let auth_result = if paths[0].exists() {
                 std::fs::remove_file(&paths[0])
-                    .map_err(|e| AQBotError::Gateway(format!("Failed to remove auth.json: {}", e)))
+                    .map_err(|e| FrogClawClientError::Gateway(format!("Failed to remove auth.json: {}", e)))
             } else {
                 Ok(())
             };
-            auth_result.and_then(|_| remove_toml_aqbot_config(&paths[1]))
+            auth_result.and_then(|_| remove_toml_frogclaw_config(&paths[1]))
         }
         CliTool::Gemini => {
             let env_result = remove_env_keys(
@@ -837,13 +837,13 @@ fn disconnect_remove_fields(tool: CliTool, gateway_url: &str) -> Result<()> {
             let settings_result = remove_gemini_settings_selected_type(&paths[1]);
             env_result.and(settings_result)
         }
-        CliTool::OpenCode => remove_json_provider(&paths[0], "aqbot"),
+        CliTool::OpenCode => remove_json_provider(&paths[0], "frogclaw"),
         CliTool::Cursor => remove_json_fields(&paths[0], &["openai.apiBaseUrl", "openai.apiKey"]),
     };
 
     if let Err(e) = remove_result {
         rollback_to_backup(tool);
-        return Err(AQBotError::Gateway(format!(
+        return Err(FrogClawClientError::Gateway(format!(
             "Failed to remove {} config fields (rolled back): {}",
             tool.display_name(),
             e
@@ -855,14 +855,14 @@ fn disconnect_remove_fields(tool: CliTool, gateway_url: &str) -> Result<()> {
         Ok(false) => Ok(()),
         Ok(true) => {
             rollback_to_backup(tool);
-            Err(AQBotError::Gateway(format!(
+            Err(FrogClawClientError::Gateway(format!(
                 "Disconnect validation failed for {}: gateway config still present after field removal (rolled back)",
                 tool.display_name()
             )))
         }
         Err(e) => {
             rollback_to_backup(tool);
-            Err(AQBotError::Gateway(format!(
+            Err(FrogClawClientError::Gateway(format!(
                 "Post-disconnect validation error for {} (rolled back): {}",
                 tool.display_name(),
                 e
@@ -876,28 +876,28 @@ fn remove_json_fields(path: &Path, keys: &[&str]) -> Result<()> {
         return Ok(());
     }
     let content = std::fs::read_to_string(path)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to read: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read: {}", e)))?;
     let mut json: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to parse JSON: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to parse JSON: {}", e)))?;
     if let Some(obj) = json.as_object_mut() {
         for key in keys {
             obj.remove(*key);
         }
     }
     let output = serde_json::to_string_pretty(&json)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to serialize JSON: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to serialize JSON: {}", e)))?;
     atomic_write(path, &output)
 }
 
-fn remove_toml_aqbot_config(path: &Path) -> Result<()> {
+fn remove_toml_frogclaw_config(path: &Path) -> Result<()> {
     if !path.exists() {
         return Ok(());
     }
     let content = std::fs::read_to_string(path)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to read TOML: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read TOML: {}", e)))?;
     let mut doc = content
         .parse::<toml_edit::DocumentMut>()
-        .map_err(|e| AQBotError::Gateway(format!("Failed to parse TOML: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to parse TOML: {}", e)))?;
 
     // Remove model_provider if it was "any"
     if doc.get("model_provider").and_then(|v| v.as_str()) == Some("any") {
@@ -922,7 +922,7 @@ fn remove_env_keys(path: &Path, keys: &[&str]) -> Result<()> {
         return Ok(());
     }
     let content = std::fs::read_to_string(path)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to read .env: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read .env: {}", e)))?;
     let mut output = String::new();
     for line in content.lines() {
         let trimmed = line.trim();
@@ -949,16 +949,16 @@ fn remove_json_provider(path: &Path, provider_name: &str) -> Result<()> {
         return Ok(());
     }
     let content = std::fs::read_to_string(path)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to read: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read: {}", e)))?;
     let mut json: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to parse JSON: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to parse JSON: {}", e)))?;
     if let Some(obj) = json.as_object_mut() {
         if let Some(provider) = obj.get_mut("provider").and_then(|p| p.as_object_mut()) {
             provider.remove(provider_name);
         }
     }
     let output = serde_json::to_string_pretty(&json)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to serialize JSON: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to serialize JSON: {}", e)))?;
     atomic_write(path, &output)
 }
 
@@ -967,9 +967,9 @@ fn remove_claude_config_primary_api_key(path: &Path) -> Result<()> {
         return Ok(());
     }
     let content = std::fs::read_to_string(path)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to read config.json: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read config.json: {}", e)))?;
     let mut json: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to parse JSON: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to parse JSON: {}", e)))?;
 
     if let Some(obj) = json.as_object_mut() {
         // Only remove primaryApiKey if it's "any"
@@ -979,7 +979,7 @@ fn remove_claude_config_primary_api_key(path: &Path) -> Result<()> {
     }
 
     let output = serde_json::to_string_pretty(&json)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to serialize JSON: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to serialize JSON: {}", e)))?;
     atomic_write(path, &output)
 }
 
@@ -988,9 +988,9 @@ fn remove_claude_settings_gateway_fields(path: &Path, gateway_url: &str) -> Resu
         return Ok(());
     }
     let content = std::fs::read_to_string(path)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to read settings.json: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read settings.json: {}", e)))?;
     let mut json: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to parse JSON: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to parse JSON: {}", e)))?;
 
     if let Some(obj) = json.as_object_mut() {
         let remove_legacy_top_level =
@@ -1015,7 +1015,7 @@ fn remove_claude_settings_gateway_fields(path: &Path, gateway_url: &str) -> Resu
     }
 
     let output = serde_json::to_string_pretty(&json)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to serialize JSON: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to serialize JSON: {}", e)))?;
     atomic_write(path, &output)
 }
 
@@ -1024,9 +1024,9 @@ fn remove_gemini_settings_selected_type(path: &Path) -> Result<()> {
         return Ok(());
     }
     let content = std::fs::read_to_string(path)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to read settings.json: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read settings.json: {}", e)))?;
     let mut json: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to parse JSON: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to parse JSON: {}", e)))?;
 
     if let Some(obj) = json.as_object_mut() {
         // Only remove selectedType if it's "gemini-api-key"
@@ -1047,7 +1047,7 @@ fn remove_gemini_settings_selected_type(path: &Path) -> Result<()> {
     }
 
     let output = serde_json::to_string_pretty(&json)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to serialize JSON: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to serialize JSON: {}", e)))?;
     atomic_write(path, &output)
 }
 
@@ -1056,10 +1056,10 @@ fn remove_gemini_settings_selected_type(path: &Path) -> Result<()> {
 fn read_json_or_empty(path: &Path) -> Result<serde_json::Value> {
     if path.exists() {
         let content = std::fs::read_to_string(path).map_err(|e| {
-            AQBotError::Gateway(format!("Failed to read {}: {}", path.display(), e))
+            FrogClawClientError::Gateway(format!("Failed to read {}: {}", path.display(), e))
         })?;
         serde_json::from_str(&content)
-            .map_err(|e| AQBotError::Gateway(format!("Failed to parse JSON: {}", e)))
+            .map_err(|e| FrogClawClientError::Gateway(format!("Failed to parse JSON: {}", e)))
     } else {
         Ok(serde_json::json!({}))
     }
@@ -1067,9 +1067,9 @@ fn read_json_or_empty(path: &Path) -> Result<serde_json::Value> {
 
 fn read_json_file(path: &Path) -> Result<serde_json::Value> {
     let content = std::fs::read_to_string(path)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to read {}: {}", path.display(), e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read {}: {}", path.display(), e)))?;
     serde_json::from_str(&content).map_err(|e| {
-        AQBotError::Gateway(format!("Failed to parse JSON in {}: {}", path.display(), e))
+        FrogClawClientError::Gateway(format!("Failed to parse JSON in {}: {}", path.display(), e))
     })
 }
 

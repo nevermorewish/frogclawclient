@@ -206,15 +206,15 @@ function getEffectiveThinkingLevel(get: () => ConversationState, conversationId:
 }
 
 const RAG_DISPLAY_TAGS = new Set(['knowledge-retrieval', 'memory-retrieval']);
-const AQBOT_DISPLAY_TAGS = ['knowledge-retrieval', 'memory-retrieval', 'web-search'];
+const FROGCLAW_DISPLAY_TAGS = ['knowledge-retrieval', 'memory-retrieval', 'web-search'];
 
-function readLeadingAqbotDisplayTag(content: string): { tag: string; raw: string } | null {
+function readLeadingFrogclawDisplayTag(content: string): { tag: string; raw: string } | null {
   const leadingWhitespace = content.match(/^\s*/)?.[0] ?? '';
   const offset = leadingWhitespace.length;
   const rest = content.slice(offset);
 
-  for (const tag of AQBOT_DISPLAY_TAGS) {
-    const openMatch = rest.match(new RegExp(`^<${tag}\\b[^>]*data-aqbot=["']1["'][^>]*>`, 'i'));
+  for (const tag of FROGCLAW_DISPLAY_TAGS) {
+    const openMatch = rest.match(new RegExp(`^<${tag}\\b[^>]*data-frogclaw=["']1["'][^>]*>`, 'i'));
     if (!openMatch) continue;
 
     const closeTag = `</${tag}>`;
@@ -230,12 +230,12 @@ function readLeadingAqbotDisplayTag(content: string): { tag: string; raw: string
   return null;
 }
 
-function readLeadingAqbotDisplayTags(content: string): { tags: { tag: string; raw: string }[]; body: string } {
+function readLeadingFrogclawDisplayTags(content: string): { tags: { tag: string; raw: string }[]; body: string } {
   let remaining = content;
   const tags: { tag: string; raw: string }[] = [];
 
   for (;;) {
-    const tag = readLeadingAqbotDisplayTag(remaining);
+    const tag = readLeadingFrogclawDisplayTag(remaining);
     if (!tag) break;
     tags.push(tag);
     remaining = remaining.slice(tag.raw.length);
@@ -249,7 +249,7 @@ function extractLeadingRagDisplayPrefix(content: string): string {
   let prefix = '';
 
   for (;;) {
-    const tag = readLeadingAqbotDisplayTag(remaining);
+    const tag = readLeadingFrogclawDisplayTag(remaining);
     if (!tag) break;
     if (RAG_DISPLAY_TAGS.has(tag.tag)) {
       prefix += tag.raw;
@@ -265,7 +265,7 @@ function stripLeadingRagDisplayTags(content: string): string {
   let keptPrefix = '';
 
   for (;;) {
-    const tag = readLeadingAqbotDisplayTag(remaining);
+    const tag = readLeadingFrogclawDisplayTag(remaining);
     if (!tag) break;
     if (!RAG_DISPLAY_TAGS.has(tag.tag)) {
       keptPrefix += tag.raw;
@@ -283,16 +283,16 @@ function mergeDbRagDisplayPrefix(dbContent: string, localContent: string): strin
 }
 
 function hasLeadingDisplayTag(content: string, tagName: string): boolean {
-  return readLeadingAqbotDisplayTags(content).tags.some(({ tag }) => tag === tagName);
+  return readLeadingFrogclawDisplayTags(content).tags.some(({ tag }) => tag === tagName);
 }
 
 function insertAfterLeadingDisplayTags(content: string, rawTag: string): string {
-  const { tags, body } = readLeadingAqbotDisplayTags(content);
+  const { tags, body } = readLeadingFrogclawDisplayTags(content);
   return tags.map(({ raw }) => raw).join('') + rawTag + body;
 }
 
 function mergeIncomingDisplayChunk(currentContent: string, incomingContent: string): string {
-  const { tags, body } = readLeadingAqbotDisplayTags(incomingContent);
+  const { tags, body } = readLeadingFrogclawDisplayTags(incomingContent);
   const ragTags = tags.filter(({ tag }) => RAG_DISPLAY_TAGS.has(tag));
 
   if (ragTags.length === 0) {
@@ -1671,7 +1671,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
           // 1. Process buffered thinking chunks first
           if (thinkingChunk) {
             if (!wasThinking) {
-              content += '<think data-aqbot="1">\n';
+              content += '<think data-frogclaw="1">\n';
             }
             content += thinkingChunk;
             thinking += thinkingChunk;

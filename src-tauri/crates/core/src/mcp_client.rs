@@ -1,4 +1,4 @@
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 use rmcp::{
     model::{CallToolRequestParams, CallToolResult, Tool},
     transport::streamable_http_client::StreamableHttpClientWorker,
@@ -85,8 +85,8 @@ fn shell_candidates() -> Vec<String> {
 
 #[cfg(unix)]
 fn read_path_from_shell(shell: &str) -> Option<String> {
-    const START: &str = "__AQBOT_PATH_START__";
-    const END: &str = "__AQBOT_PATH_END__";
+    const START: &str = "__FROGCLAW_PATH_START__";
+    const END: &str = "__FROGCLAW_PATH_END__";
 
     let output = std::process::Command::new(shell)
         .args([
@@ -210,20 +210,20 @@ pub async fn call_tool_stdio(
             configure_stdio_env(cmd, &env_clone);
         }))
         .map_err(|e| {
-            AQBotError::Gateway(format!("Failed to spawn MCP server '{}': {}", command, e))
+            FrogClawClientError::Gateway(format!("Failed to spawn MCP server '{}': {}", command, e))
         })?;
 
     let client = ()
         .serve(transport)
         .await
-        .map_err(|e| AQBotError::Gateway(format!("MCP handshake failed: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("MCP handshake failed: {}", e)))?;
 
     let params = CallToolRequestParams::new(tool_name.to_string())
         .with_arguments(value_to_map(tool_arguments));
     let result = client
         .call_tool(params)
         .await
-        .map_err(|e| AQBotError::Gateway(format!("MCP tool call failed: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("MCP tool call failed: {}", e)))?;
 
     let _ = client.cancel().await;
 
@@ -246,18 +246,18 @@ pub async fn discover_tools_stdio(
             configure_stdio_env(cmd, &env_clone);
         }))
         .map_err(|e| {
-            AQBotError::Gateway(format!("Failed to spawn MCP server '{}': {}", command, e))
+            FrogClawClientError::Gateway(format!("Failed to spawn MCP server '{}': {}", command, e))
         })?;
 
     let client = ()
         .serve(transport)
         .await
-        .map_err(|e| AQBotError::Gateway(format!("MCP handshake failed: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("MCP handshake failed: {}", e)))?;
 
     let tools = client
         .list_all_tools()
         .await
-        .map_err(|e| AQBotError::Gateway(format!("MCP tools/list failed: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("MCP tools/list failed: {}", e)))?;
 
     let _ = client.cancel().await;
 
@@ -279,14 +279,14 @@ pub async fn call_tool_http(
     let client = ()
         .serve(transport)
         .await
-        .map_err(|e| AQBotError::Gateway(format!("MCP HTTP connect failed: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("MCP HTTP connect failed: {}", e)))?;
 
     let params = CallToolRequestParams::new(tool_name.to_string())
         .with_arguments(value_to_map(tool_arguments));
     let result = client
         .call_tool(params)
         .await
-        .map_err(|e| AQBotError::Gateway(format!("MCP tool call failed: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("MCP tool call failed: {}", e)))?;
 
     let _ = client.cancel().await;
 
@@ -315,7 +315,7 @@ pub async fn call_tool_sse(
             .get("error")
             .map(|e| e.to_string())
             .unwrap_or_else(|| "unknown error".into());
-        AQBotError::Gateway(format!("MCP tool call error: {}", err))
+        FrogClawClientError::Gateway(format!("MCP tool call error: {}", err))
     })?;
     let content_arr = result_obj.get("content").and_then(|c| c.as_array());
     let texts: Vec<String> = content_arr
@@ -350,12 +350,12 @@ pub async fn discover_tools_http(endpoint: &str) -> Result<Vec<DiscoveredTool>> 
     let client = ()
         .serve(transport)
         .await
-        .map_err(|e| AQBotError::Gateway(format!("MCP HTTP connect failed: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("MCP HTTP connect failed: {}", e)))?;
 
     let tools = client
         .list_all_tools()
         .await
-        .map_err(|e| AQBotError::Gateway(format!("MCP tools/list failed: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("MCP tools/list failed: {}", e)))?;
 
     let _ = client.cancel().await;
 
@@ -380,7 +380,7 @@ pub async fn discover_tools_sse(endpoint: &str) -> Result<Vec<DiscoveredTool>> {
             .get("error")
             .map(|e| format!("tools/list error: {}", e))
             .unwrap_or_else(|| format!("tools/list unexpected response: {}", response));
-        AQBotError::Gateway(err_msg)
+        FrogClawClientError::Gateway(err_msg)
     })?;
     let empty_tools = Vec::new();
     let tools = result
@@ -414,7 +414,7 @@ async fn sse_send_request(sse_url: &str, request: Value) -> Result<Value> {
         .http1_only()
         .connect_timeout(std::time::Duration::from_secs(10))
         .build()
-        .map_err(|e| AQBotError::Gateway(format!("Failed to build SSE client: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to build SSE client: {}", e)))?;
 
     // 1. GET the SSE endpoint to open a persistent stream
     tracing::info!("SSE: connecting to {}", sse_url);
@@ -423,10 +423,10 @@ async fn sse_send_request(sse_url: &str, request: Value) -> Result<Value> {
         .header("Accept", "text/event-stream")
         .send()
         .await
-        .map_err(|e| AQBotError::Gateway(format!("SSE connect failed: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("SSE connect failed: {}", e)))?;
 
     if !sse_resp.status().is_success() {
-        return Err(AQBotError::Gateway(format!(
+        return Err(FrogClawClientError::Gateway(format!(
             "SSE connect returned {}",
             sse_resp.status()
         )));
@@ -435,7 +435,7 @@ async fn sse_send_request(sse_url: &str, request: Value) -> Result<Value> {
 
     let base_url = {
         let parsed = reqwest::Url::parse(sse_url)
-            .map_err(|e| AQBotError::Gateway(format!("Invalid SSE URL: {}", e)))?;
+            .map_err(|e| FrogClawClientError::Gateway(format!("Invalid SSE URL: {}", e)))?;
         format!("{}://{}", parsed.scheme(), parsed.authority())
     };
 
@@ -447,8 +447,8 @@ async fn sse_send_request(sse_url: &str, request: Value) -> Result<Value> {
         let chunk = byte_stream
             .next()
             .await
-            .ok_or_else(|| AQBotError::Gateway("SSE stream ended before endpoint event".into()))?
-            .map_err(|e| AQBotError::Gateway(format!("SSE read error: {}", e)))?;
+            .ok_or_else(|| FrogClawClientError::Gateway("SSE stream ended before endpoint event".into()))?
+            .map_err(|e| FrogClawClientError::Gateway(format!("SSE read error: {}", e)))?;
         let text = String::from_utf8_lossy(&chunk)
             .replace("\r\n", "\n")
             .replace('\r', "\n");
@@ -468,7 +468,7 @@ async fn sse_send_request(sse_url: &str, request: Value) -> Result<Value> {
         "params": {
             "protocolVersion": "2024-11-05",
             "capabilities": {},
-            "clientInfo": { "name": "AQBot", "version": "1.0.0" }
+            "clientInfo": { "name": "FrogClawClient", "version": "1.0.0" }
         }
     });
     let init_resp = client
@@ -476,9 +476,9 @@ async fn sse_send_request(sse_url: &str, request: Value) -> Result<Value> {
         .json(&init_request)
         .send()
         .await
-        .map_err(|e| AQBotError::Gateway(format!("SSE initialize POST failed: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("SSE initialize POST failed: {}", e)))?;
     if !init_resp.status().is_success() {
-        return Err(AQBotError::Gateway(format!(
+        return Err(FrogClawClientError::Gateway(format!(
             "SSE initialize returned {}",
             init_resp.status()
         )));
@@ -509,9 +509,9 @@ async fn sse_send_request(sse_url: &str, request: Value) -> Result<Value> {
         .json(&request)
         .send()
         .await
-        .map_err(|e| AQBotError::Gateway(format!("SSE request POST failed: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("SSE request POST failed: {}", e)))?;
     if !resp.status().is_success() {
-        return Err(AQBotError::Gateway(format!(
+        return Err(FrogClawClientError::Gateway(format!(
             "SSE request returned {}",
             resp.status()
         )));
@@ -573,13 +573,13 @@ where
 
         let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
         match tokio::time::timeout(remaining, stream.next()).await {
-            Err(_) => return Err(AQBotError::Gateway("SSE response timed out".into())),
+            Err(_) => return Err(FrogClawClientError::Gateway("SSE response timed out".into())),
             Ok(None) => {
-                return Err(AQBotError::Gateway(
+                return Err(FrogClawClientError::Gateway(
                     "SSE stream ended before response".into(),
                 ))
             }
-            Ok(Some(Err(e))) => return Err(AQBotError::Gateway(format!("SSE read error: {}", e))),
+            Ok(Some(Err(e))) => return Err(FrogClawClientError::Gateway(format!("SSE read error: {}", e))),
             Ok(Some(Ok(chunk))) => {
                 let text = String::from_utf8_lossy(chunk.as_ref())
                     .replace("\r\n", "\n")
@@ -703,12 +703,12 @@ mod tests {
         let fake_node_dir = dir.path().join("bin");
         fs::create_dir_all(&fake_node_dir).unwrap();
         let interactive_path = std::iter::once(fake_node_dir.to_string_lossy().to_string())
-            .chain((0..24).map(|index| format!("/tmp/aqbot-shell-{index}")))
+            .chain((0..24).map(|index| format!("/tmp/frogclaw-shell-{index}")))
             .collect::<Vec<_>>()
             .join(":");
 
         let script = format!(
-            "#!/bin/sh\nmode=plain\nfor arg in \"$@\"; do\n  if [ \"$arg\" = \"-i\" ]; then\n    mode=interactive\n  fi\ndone\nif [ \"$mode\" = \"interactive\" ]; then\n  printf '__AQBOT_PATH_START__%s__AQBOT_PATH_END__\\n' '{}:/usr/bin:/bin'\nelse\n  printf '__AQBOT_PATH_START__%s__AQBOT_PATH_END__\\n' '/usr/bin:/bin'\nfi\n",
+            "#!/bin/sh\nmode=plain\nfor arg in \"$@\"; do\n  if [ \"$arg\" = \"-i\" ]; then\n    mode=interactive\n  fi\ndone\nif [ \"$mode\" = \"interactive\" ]; then\n  printf '__FROGCLAW_PATH_START__%s__FROGCLAW_PATH_END__\\n' '{}:/usr/bin:/bin'\nelse\n  printf '__FROGCLAW_PATH_START__%s__FROGCLAW_PATH_END__\\n' '/usr/bin:/bin'\nfi\n",
             interactive_path
         );
         fs::write(&fake_shell, script).unwrap();

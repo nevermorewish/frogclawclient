@@ -1,11 +1,11 @@
-use aqbot_core::db::create_test_pool;
-use aqbot_core::repo::{gateway, provider};
-use aqbot_core::types::{CreateProviderInput, ProviderType};
+use frogclaw_core::db::create_test_pool;
+use frogclaw_core::repo::{gateway, provider};
+use frogclaw_core::types::{CreateProviderInput, ProviderType};
 
 async fn seed_gateway_usage() -> (
-    aqbot_core::db::DbHandle,
-    aqbot_core::types::GatewayKey,
-    aqbot_core::types::ProviderConfig,
+    frogclaw_core::db::DbHandle,
+    frogclaw_core::types::GatewayKey,
+    frogclaw_core::types::ProviderConfig,
 ) {
     let h = create_test_pool().await.unwrap();
     let db = &h.conn;

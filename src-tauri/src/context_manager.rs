@@ -6,8 +6,8 @@
 //!   a `<!-- context-compressed -->` marker is inserted, and subsequent sends use
 //!   the summary + only messages after the marker.
 
-use aqbot_core::token_counter;
-use aqbot_core::types::{ChatContent, ChatMessage};
+use frogclaw_core::token_counter;
+use frogclaw_core::types::{ChatContent, ChatMessage};
 
 /// Fraction of context window that triggers auto-compression (70%).
 const THRESHOLD_RATIO: f64 = 0.70;

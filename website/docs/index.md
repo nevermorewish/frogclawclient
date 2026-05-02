@@ -1,15 +1,15 @@
 ---
 layout: home
-title: AQBot — Open-source AI Desktop Client & Gateway
+title: FrogClawClient — Open-source AI Desktop Client & Gateway
 titleTemplate: false
 
 head:
   - - meta
     - name: description
-      content: AQBot is a free, open-source AI desktop client with built-in AI gateway. Connect OpenAI, Claude, Gemini, DeepSeek and more LLMs. MCP server support, knowledge base, privacy-first.
+      content: FrogClawClient is a free, open-source AI desktop client with built-in AI gateway. Connect OpenAI, Claude, Gemini, DeepSeek and more LLMs. MCP server support, knowledge base, privacy-first.
 
 hero:
-  name: AQBot
+  name: FrogClawClient
   text: Your AI Desktop Assistant
   tagline: Multi-model chat, MCP tools, API gateway, knowledge base — all in one open-source client
 
@@ -22,10 +22,10 @@ features:
     details: Agent mode for autonomous task execution. Read/write files, run commands, analyze code — with three permission levels and working directory sandboxing.
   - icon: api
     title: MCP Tool Calling
-    details: Full Model Context Protocol support — stdio, SSE, StreamableHTTP. Connect external tools with one click. Built-in MCP tools like @aqbot/fetch.
+    details: Full Model Context Protocol support — stdio, SSE, StreamableHTTP. Connect external tools with one click. Built-in MCP tools like @frogclaw/fetch.
   - icon: cloud-server
     title: Built-in API Gateway
-    details: Local OpenAI-compatible API server. Use AQBot as the backend for Claude Code, Codex, Gemini CLI, and more. Key management, rate limiting, SSL/TLS.
+    details: Local OpenAI-compatible API server. Use FrogClawClient as the backend for Claude Code, Codex, Gemini CLI, and more. Key management, rate limiting, SSL/TLS.
   - icon: book
     title: Knowledge Base & RAG
     details: Local vector embeddings with sqlite-vec. AI answers based on your private documents — data never leaves your machine.

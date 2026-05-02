@@ -2,11 +2,11 @@
 
 ## ما هي بوابة API؟
 
-يتضمن AQBot خادم API محلي مدمجاً يكشف مزوّديك المُكوَّنين كطرف **متوافق مع OpenAI** و**Claude الأصلي** و**Gemini الأصلي**. أي أداة أو عميل يستخدم أحد هذه البروتوكولات يمكنه استخدام AQBot كخلفية — دون مفاتيح API منفصلة أو خدمات وسيطة مطلوبة.
+يتضمن FrogClawClient خادم API محلي مدمجاً يكشف مزوّديك المُكوَّنين كطرف **متوافق مع OpenAI** و**Claude الأصلي** و**Gemini الأصلي**. أي أداة أو عميل يستخدم أحد هذه البروتوكولات يمكنه استخدام FrogClawClient كخلفية — دون مفاتيح API منفصلة أو خدمات وسيطة مطلوبة.
 
 حالات الاستخدام:
 
-- تشغيل **Claude Code CLI** أو **OpenAI Codex CLI** أو **Gemini CLI** أو **OpenCode** عبر AQBot.
+- تشغيل **Claude Code CLI** أو **OpenAI Codex CLI** أو **Gemini CLI** أو **OpenCode** عبر FrogClawClient.
 - تغذية امتدادات IDE الخاصة بك بطرف واحد مُدار محلياً.
 - مشاركة مجموعة من مفاتيح المزوّد عبر أدوات كثيرة مع تحديد معدل لكل مفتاح.
 
@@ -19,7 +19,7 @@
 3. بشكل افتراضي، يستمع الخادم على `127.0.0.1:8080` (HTTP).
 
 ::: tip
-فعّل **البدء التلقائي** في إعدادات البوابة لتشغيل الخادم تلقائياً عند إطلاق AQBot.
+فعّل **البدء التلقائي** في إعدادات البوابة لتشغيل الخادم تلقائياً عند إطلاق FrogClawClient.
 :::
 
 ---
@@ -39,14 +39,14 @@
 
 ```bash
 claude config set --global apiUrl http://127.0.0.1:8080
-claude config set --global apiKey aqbot-xxxx
+claude config set --global apiKey frogclaw-xxxx
 ```
 
 ### OpenAI Codex CLI
 
 ```bash
 export OPENAI_BASE_URL=http://127.0.0.1:8080/v1
-export OPENAI_API_KEY=aqbot-xxxx
+export OPENAI_API_KEY=frogclaw-xxxx
 codex
 ```
 
@@ -54,7 +54,7 @@ codex
 
 ```bash
 export GEMINI_API_BASE=http://127.0.0.1:8080
-export GEMINI_API_KEY=aqbot-xxxx
+export GEMINI_API_KEY=frogclaw-xxxx
 gemini
 ```
 
@@ -62,7 +62,7 @@ gemini
 
 ```
 Base URL:  http://127.0.0.1:8080/v1
-API Key:   aqbot-xxxx
+API Key:   frogclaw-xxxx
 ```
 
 ---

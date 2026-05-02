@@ -2,7 +2,7 @@ use sea_orm::*;
 use serde_json;
 
 use crate::entity::{conversation_summaries, conversations, messages};
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 use crate::types::{
     Conversation, ConversationSearchResult, ConversationSummary, UpdateConversationInput,
 };
@@ -72,7 +72,7 @@ pub async fn get_conversation(db: &DatabaseConnection, id: &str) -> Result<Conve
     let row = conversations::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("Conversation {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("Conversation {}", id)))?;
 
     Ok(conversation_from_entity(row))
 }
@@ -113,7 +113,7 @@ pub async fn update_conversation(
     let row = conversations::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("Conversation {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("Conversation {}", id)))?;
 
     let now = now_ts();
     let existing = conversation_from_entity(row.clone());
@@ -206,7 +206,7 @@ pub async fn toggle_pin(db: &DatabaseConnection, id: &str) -> Result<Conversatio
     let row = conversations::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("Conversation {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("Conversation {}", id)))?;
 
     let new_pinned = if row.is_pinned != 0 { 0 } else { 1 };
     let now = now_ts();
@@ -223,7 +223,7 @@ pub async fn toggle_archive(db: &DatabaseConnection, id: &str) -> Result<Convers
     let row = conversations::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("Conversation {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("Conversation {}", id)))?;
 
     let new_archived = if row.is_archived != 0 { 0 } else { 1 };
     let now = now_ts();
@@ -240,7 +240,7 @@ pub async fn delete_conversation(db: &DatabaseConnection, id: &str) -> Result<()
     let result = conversations::Entity::delete_by_id(id).exec(db).await?;
 
     if result.rows_affected == 0 {
-        return Err(AQBotError::NotFound(format!("Conversation {}", id)));
+        return Err(FrogClawClientError::NotFound(format!("Conversation {}", id)));
     }
     Ok(())
 }
@@ -258,7 +258,7 @@ pub async fn branch_conversation(
     let source = conversations::Entity::find_by_id(conversation_id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("Conversation {}", conversation_id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("Conversation {}", conversation_id)))?;
 
     // 2. Load all active messages ordered by created_at
     let all_msgs = messages::Entity::find()
@@ -273,7 +273,7 @@ pub async fn branch_conversation(
         .iter()
         .position(|m| m.id == until_message_id)
         .ok_or_else(|| {
-            AQBotError::NotFound(format!("Message {} in conversation", until_message_id))
+            FrogClawClientError::NotFound(format!("Message {} in conversation", until_message_id))
         })?;
 
     // 4. Slice messages up to (and including) the target
@@ -515,7 +515,7 @@ pub async fn upsert_summary(
     }
 
     get_summary(db, conversation_id).await?.ok_or_else(|| {
-        AQBotError::Database(sea_orm::DbErr::Custom(
+        FrogClawClientError::Database(sea_orm::DbErr::Custom(
             "Failed to read back upserted summary".into(),
         ))
     })

@@ -1,7 +1,7 @@
 use sea_orm::*;
 
 use crate::entity::search_providers;
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 use crate::types::{CreateSearchProviderInput, SearchProvider};
 use crate::utils::gen_id;
 
@@ -34,7 +34,7 @@ pub async fn get_search_provider(db: &DatabaseConnection, id: &str) -> Result<Se
     let model = search_providers::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("SearchProvider {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("SearchProvider {}", id)))?;
 
     Ok(model_to_search_provider(model))
 }
@@ -72,7 +72,7 @@ pub async fn update_search_provider(
     let model = search_providers::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("SearchProvider {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("SearchProvider {}", id)))?;
 
     let name = if input.name.is_empty() {
         model.name.clone()
@@ -113,7 +113,7 @@ pub async fn delete_search_provider(db: &DatabaseConnection, id: &str) -> Result
     let result = search_providers::Entity::delete_by_id(id).exec(db).await?;
 
     if result.rows_affected == 0 {
-        return Err(AQBotError::NotFound(format!("SearchProvider {}", id)));
+        return Err(FrogClawClientError::NotFound(format!("SearchProvider {}", id)));
     }
     Ok(())
 }

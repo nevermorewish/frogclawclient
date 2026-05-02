@@ -193,42 +193,42 @@ b, strong, th,
   scrollbar-width: none !important;
 }
 
-.aqbot-input-textarea {
+.frogclaw-input-textarea {
   scrollbar-width: thin !important;
   scrollbar-color: rgba(0, 0, 0, 0.18) transparent;
 }
 
-.aqbot-input-textarea::-webkit-scrollbar {
+.frogclaw-input-textarea::-webkit-scrollbar {
   width: 6px;
 }
 
-.aqbot-input-textarea::-webkit-scrollbar-track {
+.frogclaw-input-textarea::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.aqbot-input-textarea::-webkit-scrollbar-thumb {
+.frogclaw-input-textarea::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.18);
   border-radius: 999px;
 }
 
-.aqbot-input-textarea::-webkit-scrollbar-thumb:hover {
+.frogclaw-input-textarea::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.28);
 }
 
-html[data-theme="dark"] .aqbot-input-textarea {
+html[data-theme="dark"] .frogclaw-input-textarea {
   scrollbar-color: rgba(255, 255, 255, 0.24) transparent;
 }
 
-html[data-theme="dark"] .aqbot-input-textarea::-webkit-scrollbar-thumb {
+html[data-theme="dark"] .frogclaw-input-textarea::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.24);
 }
 
-html[data-theme="dark"] .aqbot-input-textarea::-webkit-scrollbar-thumb:hover {
+html[data-theme="dark"] .frogclaw-input-textarea::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.34);
 }
 
 /* ── OverlayScrollbars custom theme ──────────────────────────────── */
-.os-theme-aqbot {
+.os-theme-frogclaw {
   --os-size: 5px;
   --os-padding-perpendicular: 0;
   --os-padding-axis: 2px;
@@ -244,7 +244,7 @@ html[data-theme="dark"] .aqbot-input-textarea::-webkit-scrollbar-thumb:hover {
   --os-handle-perpendicular-size-hover: 100%;
   --os-handle-perpendicular-size-active: 100%;
 }
-html[data-theme="dark"] .os-theme-aqbot {
+html[data-theme="dark"] .os-theme-frogclaw {
   --os-handle-bg: rgba(255, 255, 255, 0.08);
   --os-handle-bg-hover: rgba(255, 255, 255, 0.18);
   --os-handle-bg-active: rgba(255, 255, 255, 0.28);
@@ -365,7 +365,7 @@ html[data-theme="dark"] .drawing-image-action-button.ant-btn-variant-filled:hove
 }
 
 /* Custom action item hover style (for actionRender items in @ant-design/x Actions) */
-.aqbot-action-item {
+.frogclaw-action-item {
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -374,7 +374,7 @@ html[data-theme="dark"] .drawing-image-action-button.ant-btn-variant-filled:hove
   border-radius: 4px;
   transition: all 0.2s ease-in-out;
 }
-.aqbot-action-item:hover {
+.frogclaw-action-item:hover {
   background: var(--ant-color-bg-text-hover, rgba(0, 0, 0, 0.06));
 }
 
@@ -413,19 +413,6 @@ svg.lucide {
   border-inline-end: none !important;
 }
 
-.gateway-quick-connect-card.ant-card {
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease,
-    transform 0.2s ease;
-}
-
-.gateway-quick-connect-card.ant-card:hover {
-  border-color: var(--color-primary) !important;
-  box-shadow: none !important;
-  transform: none !important;
-}
-
 /* ModelSelector: compact modal content padding */
 .model-selector-modal .ant-modal-container {
   padding: 6px !important;
@@ -460,7 +447,7 @@ svg.lucide {
   50% { opacity: 0.7; }
 }
 
-@keyframes aqbot-drawing-shimmer {
+@keyframes frogclaw-drawing-shimmer {
   0% { background-position: 120% 0; }
   100% { background-position: -120% 0; }
 }
@@ -473,13 +460,13 @@ html[data-theme="dark"] .markstream-react .thematic-break {
 /* Chat markdown runs inside a Tauri WebView where `content-visibility:auto`
  * can leave freshly completed assistant content unpainted until the next
  * scroll/repaint. Keep chat message renderers painted in this shell only. */
-.aqbot-chat-markdown > .markdown-renderer,
-.aqbot-chat-markdown .code-block-container {
+.frogclaw-chat-markdown > .markdown-renderer,
+.frogclaw-chat-markdown .code-block-container {
   content-visibility: visible;
   contain-intrinsic-size: auto;
 }
 
-/* Let AQBot own chat bottom-lock behavior instead of browser scroll anchoring.
+/* Let FrogClawClient own chat bottom-lock behavior instead of browser scroll anchoring.
  * Async math / diagram rendering can otherwise move the viewport without any
  * user input and trick the chat into thinking the user scrolled away. */
 [data-message-area] .ant-bubble-list-scroll-box {
@@ -512,15 +499,15 @@ html[data-theme="dark"] .markstream-react .table-node thead {
 }
 
 /* Multi-model side-by-side: constrain bubble ancestors so overflow works */
-.ant-bubble:has(.aqbot-multi-model-scroll) {
+.ant-bubble:has(.frogclaw-multi-model-scroll) {
   overflow: hidden;
   min-width: 0;
 }
-.ant-bubble:has(.aqbot-multi-model-scroll) .ant-bubble-body {
+.ant-bubble:has(.frogclaw-multi-model-scroll) .ant-bubble-body {
   overflow: hidden;
   min-width: 0;
 }
-.ant-bubble:has(.aqbot-multi-model-scroll) .ant-bubble-content {
+.ant-bubble:has(.frogclaw-multi-model-scroll) .ant-bubble-content {
   overflow: hidden;
   min-width: 0;
 }

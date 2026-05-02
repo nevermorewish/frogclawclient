@@ -43,8 +43,7 @@ export function useKeyboardShortcuts() {
           e.preventDefault();
           setActivePage('chat');
           setTimeout(() => {
-            const searchInput = document.querySelector<HTMLInputElement>('.chat-sidebar-search input');
-            searchInput?.focus();
+            window.dispatchEvent(new CustomEvent('frogclaw:focus-conversation-search'));
           }, 50);
           return;
         case 'w':
@@ -68,7 +67,7 @@ export function useKeyboardShortcuts() {
         return;
       }
       // Close voice overlay or modals via custom event
-      window.dispatchEvent(new CustomEvent('aqbot:escape'));
+      window.dispatchEvent(new CustomEvent('frogclaw:escape'));
     }
   }, [activePage, exitSettings]);
 

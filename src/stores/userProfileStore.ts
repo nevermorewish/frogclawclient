@@ -55,6 +55,6 @@ export const useUserProfileStore = create<UserProfileState>()(
         }
       },
     }),
-    { name: 'aqbot_user_profile' },
+    { name: 'frogclaw_user_profile' },
   ),
 );

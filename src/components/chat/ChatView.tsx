@@ -26,7 +26,7 @@ import { useResolvedDarkMode } from '@/hooks/useResolvedDarkMode';
 import { InputArea } from './InputArea';
 import { ModelSelector } from './ModelSelector';
 import { parseSearchContent } from '@/lib/searchUtils';
-import { CHAT_CUSTOM_HTML_TAGS, parseChatMarkdown, stripAqbotTags, type ChatMarkdownNode } from '@/lib/chatMarkdown';
+import { CHAT_CUSTOM_HTML_TAGS, parseChatMarkdown, stripFrogclawTags, type ChatMarkdownNode } from '@/lib/chatMarkdown';
 import {
   hasMultipleModelVersions,
   selectRenderableVersionSet,
@@ -49,14 +49,14 @@ import {
   shouldStickToBottomOnLayoutChange,
   shouldShowScrollToBottom,
 } from './chatScroll';
-import { formatTokenCount, formatSpeed, formatDuration } from '../gateway/tokenFormat';
+import { formatTokenCount, formatSpeed, formatDuration } from '@/lib/tokenFormat';
 import {
   getStreamingLoadingState,
-  hasAqbotDisplayContent,
+  hasFrogclawDisplayContent,
   hasModelVisibleContent,
   shouldRenderAssistantMarkdownFromContent,
-  splitLeadingAqbotDisplayContent,
-  stripLeadingAqbotDisplayTags,
+  splitLeadingFrogclawDisplayContent,
+  stripLeadingFrogclawDisplayTags,
 } from './chatStreaming';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { buildAssistantDisplayContent, shouldHideAssistantBubble } from './toolCallDisplay';
@@ -75,7 +75,7 @@ import type { Message, Attachment, ConversationStats } from '@/types';
 
 // ── markstream-react custom thinking component ──────────────────────────
 
-const THINKING_LOADING_MARKER = '<!--aqbot-thinking-loading-->';
+const THINKING_LOADING_MARKER = '<!--frogclaw-thinking-loading-->';
 const DEFAULT_LIGHT_CODE_BLOCK_THEME = 'github-light';
 const DEFAULT_DARK_CODE_BLOCK_THEME = 'poimandres';
 const DANGEROUS_D2_STYLE_PATTERNS = [
@@ -539,7 +539,7 @@ function ThinkNode(props: NodeComponentProps<{
       title={title}
       blink={isStreaming}
       loading={isStreaming ? (
-        <SyncOutlined style={{ fontSize: 12, animation: 'aqbot-think-spin 1s linear infinite' }} />
+        <SyncOutlined style={{ fontSize: 12, animation: 'frogclaw-think-spin 1s linear infinite' }} />
       ) : false}
       icon={<Brain size={14} />}
       expanded={expanded}
@@ -1072,12 +1072,12 @@ const AssistantMarkdown = React.memo(function AssistantMarkdown({
   const rendererKey = `${isDarkMode ? 'dark' : 'light'}:${codeBlockDarkTheme}:${codeBlockLightTheme}`;
   const contentWithoutExplicitDisplay = useMemo(() => (
     displayPrefix
-      ? stripLeadingAqbotDisplayTags(content, ['knowledge-retrieval', 'memory-retrieval'])
+      ? stripLeadingFrogclawDisplayTags(content, ['knowledge-retrieval', 'memory-retrieval'])
       : content
   ), [content, displayPrefix]);
   const displaySplit = useMemo(() => {
     if (nodes) return { prefix: displayPrefix ?? '', body: content };
-    const split = splitLeadingAqbotDisplayContent(contentWithoutExplicitDisplay);
+    const split = splitLeadingFrogclawDisplayContent(contentWithoutExplicitDisplay);
     return {
       prefix: `${split.prefix}${displayPrefix ?? ''}`,
       body: split.body,
@@ -1147,7 +1147,7 @@ const AssistantMarkdown = React.memo(function AssistantMarkdown({
 
   if (hasDeferredHeavyNodes && !readyToRenderHeavyNodes) {
     return (
-      <div className="aqbot-chat-markdown">
+      <div className="frogclaw-chat-markdown">
         <div
           ref={containerRef}
           className="my-4 rounded-lg border"
@@ -1169,7 +1169,7 @@ const AssistantMarkdown = React.memo(function AssistantMarkdown({
   }
 
   return (
-    <div className="aqbot-chat-markdown">
+    <div className="frogclaw-chat-markdown">
       {nodes ? (
         <NodeRenderer
           key={rendererKey}
@@ -1495,7 +1495,7 @@ function DeleteLastVersionPopover({
       }
     >
       <Tooltip title={t('chat.delete')}>
-        <span className="aqbot-action-item" style={{ color: token.colorError }}>
+        <span className="frogclaw-action-item" style={{ color: token.colorError }}>
           <Trash2 size={14} />
         </span>
       </Tooltip>
@@ -1682,7 +1682,7 @@ function AssistantFooter({
                   overrideCurrentModel={currentModelOverride}
                 >
                   <Tooltip title={t('chat.switchModel')}>
-                    <span className="aqbot-action-item" style={{ color: token.colorTextSecondary }}>
+                    <span className="frogclaw-action-item" style={{ color: token.colorTextSecondary }}>
                       <ArrowLeftRight size={14} />
                     </span>
                   </Tooltip>
@@ -1719,7 +1719,7 @@ function AssistantFooter({
                   placement="bottom"
                 >
                   <Tooltip title={t('chat.branchConversation')}>
-                    <span className="aqbot-action-item" style={{ color: token.colorTextSecondary }}>
+                    <span className="frogclaw-action-item" style={{ color: token.colorTextSecondary }}>
                       <GitBranch size={14} />
                     </span>
                   </Tooltip>
@@ -1760,7 +1760,7 @@ function AssistantFooter({
                     cancelText={t('common.cancel')}
                   >
                     <Tooltip title={t('chat.delete')}>
-                      <span className="aqbot-action-item" style={{ color: token.colorError }}>
+                      <span className="frogclaw-action-item" style={{ color: token.colorError }}>
                         <Trash2 size={14} />
                       </span>
                     </Tooltip>
@@ -1981,10 +1981,10 @@ export function ChatView() {
 
   // Pre-load Shiki themes into the singleton highlighter when theme settings change
   useEffect(() => {
-    console.log('[AQBot Theme Debug] themes changed:', { codeBlockDarkTheme, codeBlockLightTheme, codeBlockThemes, isDarkMode });
+    console.log('[FrogClawClient Theme Debug] themes changed:', { codeBlockDarkTheme, codeBlockLightTheme, codeBlockThemes, isDarkMode });
     if (codeBlockThemes.length > 0) {
       registerHighlight({ themes: codeBlockThemes as any }).catch((err) => {
-        console.error('[AQBot Theme Debug] registerHighlight failed:', err);
+        console.error('[FrogClawClient Theme Debug] registerHighlight failed:', err);
       });
     }
   }, [codeBlockThemes, codeBlockDarkTheme, codeBlockLightTheme, isDarkMode]);
@@ -2205,7 +2205,7 @@ export function ChatView() {
       if (scrollBox) scrollBoxRef.current = scrollBox;
     }
     if (!scrollBox) return;
-    const marker = scrollBox.querySelector(`[data-aqbot-msg="${messageId}"]`);
+    const marker = scrollBox.querySelector(`[data-frogclaw-msg="${messageId}"]`);
     if (!marker) return;
     // Walk up from marker to find the bubble wrapper (near-child of scrollBox)
     let el: Element = marker;
@@ -2795,14 +2795,14 @@ export function ChatView() {
           aiContent += THINKING_LOADING_MARKER + '\n</think>\n\n';
         }
       }
-      if (msg.role === 'assistant' && !aiContent.includes('data-aqbot="1"')) {
+      if (msg.role === 'assistant' && !aiContent.includes('data-frogclaw="1"')) {
         const parentSearch = msg.parent_message_id
           ? userSearchContentById.get(msg.parent_message_id)
           : undefined;
         if (parentSearch?.hasSearch && parentSearch.sources.length > 0) {
           const { sources } = parentSearch;
           const resultsJson = JSON.stringify(sources.map((s) => ({ title: s.title, url: s.url })));
-          aiContent = `<web-search status="done" data-aqbot="1">\n${resultsJson}\n</web-search>\n\n${aiContent}`;
+          aiContent = `<web-search status="done" data-frogclaw="1">\n${resultsJson}\n</web-search>\n\n${aiContent}`;
         }
       }
 
@@ -2988,7 +2988,7 @@ export function ChatView() {
       contentRender: attachments.length > 0
         ? (content: string) => (
             <div style={{ textAlign: 'right' }}>
-              <span data-aqbot-msg={msg?.id} style={{ height: 0, overflow: 'hidden', lineHeight: 0 }} />
+              <span data-frogclaw-msg={msg?.id} style={{ height: 0, overflow: 'hidden', lineHeight: 0 }} />
               {content && (
                 settings.render_user_markdown
                   ? <AssistantMarkdown
@@ -3015,7 +3015,7 @@ export function ChatView() {
           )
         : (content: string) => (
             <>
-              <span data-aqbot-msg={msg?.id} style={{ height: 0, overflow: 'hidden', lineHeight: 0 }} />
+              <span data-frogclaw-msg={msg?.id} style={{ height: 0, overflow: 'hidden', lineHeight: 0 }} />
               {settings.render_user_markdown
                 ? <AssistantMarkdown
                     content={content}
@@ -3047,10 +3047,10 @@ export function ChatView() {
           items={[
             {
               key: 'copy',
-              icon: (() => { const ct = stripAqbotTags(String(bubbleData.content ?? '')); return isUserMsgCopied(ct) ? <Check size={14} style={{ color: token.colorSuccess }} /> : <Copy size={14} />; })(),
+              icon: (() => { const ct = stripFrogclawTags(String(bubbleData.content ?? '')); return isUserMsgCopied(ct) ? <Check size={14} style={{ color: token.colorSuccess }} /> : <Copy size={14} />; })(),
               label: t('chat.copy'),
               onItemClick: () => {
-                void copyMessage(stripAqbotTags(String(bubbleData.content ?? ''))).then(ok => {
+                void copyMessage(stripFrogclawTags(String(bubbleData.content ?? ''))).then(ok => {
                   if (ok) messageApi.success(t('chat.copied'));
                 });
               },
@@ -3095,7 +3095,7 @@ export function ChatView() {
                   cancelText={t('common.cancel')}
                 >
                   <Tooltip title={t('chat.delete')}>
-                    <span className="aqbot-action-item" style={{ color: token.colorError }}>
+                    <span className="frogclaw-action-item" style={{ color: token.colorError }}>
                       <Trash2 size={14} />
                     </span>
                   </Tooltip>
@@ -3116,13 +3116,13 @@ export function ChatView() {
       isStreaming,
       Boolean(msg?.id && contentRendererMessageIdsRef.current.has(msg.id)),
     );
-    const assistantCopyText = stripAqbotTags(msg?.content ?? (typeof bubbleData.content === 'string' ? bubbleData.content : ''));
+    const assistantCopyText = stripFrogclawTags(msg?.content ?? (typeof bubbleData.content === 'string' ? bubbleData.content : ''));
     const ragDisplayPrefix = msg?.id ? ragDisplayByMessageId[msg.id] : undefined;
     const parsedNodes = shouldRenderFromContent || ragDisplayPrefix
       ? undefined
       : aiContentNodesById.get(String(bubbleData.key));
     const { footerLoading: rawFooterLoading } = getStreamingLoadingState(isStreaming, bubbleData.content);
-    const hasModelText = hasModelVisibleContent(bubbleData.content, stripAqbotTags);
+    const hasModelText = hasModelVisibleContent(bubbleData.content, stripFrogclawTags);
     const footerLoading = rawFooterLoading && hasModelText;
     // Never let Ant Design Bubble's loading state replace AI content while a
     // stream is active; the markdown renderer receives incremental content and
@@ -3168,10 +3168,10 @@ export function ChatView() {
           ? content
           : (msg?.content ?? '');
         const renderLoadingState = getStreamingLoadingState(isStreaming, renderContent);
-        const hasDisplayContent = hasAqbotDisplayContent(renderContent) || Boolean(ragDisplayPrefix);
-        const hasRenderedModelText = hasModelVisibleContent(renderContent, stripAqbotTags);
+        const hasDisplayContent = hasFrogclawDisplayContent(renderContent) || Boolean(ragDisplayPrefix);
+        const hasRenderedModelText = hasModelVisibleContent(renderContent, stripFrogclawTags);
         const shouldShowInitialDots = renderLoadingState.bubbleLoading && !hasDisplayContent;
-        const msgMarker = <span data-aqbot-msg={msg?.id} style={{ height: 0, overflow: 'hidden', lineHeight: 0 }} />;
+        const msgMarker = <span data-frogclaw-msg={msg?.id} style={{ height: 0, overflow: 'hidden', lineHeight: 0 }} />;
         // Multi-model non-tabs mode: render all versions in side-by-side or stacked layout
         if (isNonTabsMultiModel && parentId && activeConversationId) {
           // Prefer ref-based versions (from AssistantFooter DB query, includes inactive)
@@ -3206,7 +3206,7 @@ export function ChatView() {
 
         if (!isAgentMsg && shouldShowInitialDots) {
           return (
-            <>{msgMarker}<span className="aqbot-streaming-dots" aria-hidden="true">
+            <>{msgMarker}<span className="frogclaw-streaming-dots" aria-hidden="true">
               <span /><span /><span />
             </span></>
           );
@@ -3234,7 +3234,7 @@ export function ChatView() {
         // In agent mode: show inline loading dots only when no content AND no permissions/asks yet
         if (isAgentMsg && shouldShowInitialDots && msgPermissions.length === 0 && msgAskUsers.length === 0) {
           return (
-            <>{msgMarker}<span className="aqbot-streaming-dots" aria-hidden="true">
+            <>{msgMarker}<span className="frogclaw-streaming-dots" aria-hidden="true">
               <span /><span /><span />
             </span></>
           );
@@ -3255,7 +3255,7 @@ export function ChatView() {
               displayPrefix={ragDisplayPrefix}
             />
             {!isAgentMsg && isStreaming && hasDisplayContent && !hasRenderedModelText && (
-              <div className="aqbot-streaming-dots" aria-hidden="true" style={{ marginTop: 8 }}>
+              <div className="frogclaw-streaming-dots" aria-hidden="true" style={{ marginTop: 8 }}>
                 <span /><span /><span />
               </div>
             )}
@@ -3288,7 +3288,7 @@ export function ChatView() {
             ))}
             {/* Show loading dots when agent is streaming but footer dots are NOT showing (no text content yet) */}
             {isAgentMsg && isStreaming && !footerLoading && (
-              <div className="aqbot-streaming-dots" aria-hidden="true" style={{ marginTop: 8 }}>
+              <div className="frogclaw-streaming-dots" aria-hidden="true" style={{ marginTop: 8 }}>
                 <span /><span /><span />
               </div>
             )}
@@ -3332,7 +3332,7 @@ export function ChatView() {
               }}
               aria-label={t('chat.generating')}
             >
-              <span className="aqbot-streaming-dots" aria-hidden="true">
+              <span className="frogclaw-streaming-dots" aria-hidden="true">
                 <span />
                 <span />
                 <span />
@@ -3360,7 +3360,7 @@ export function ChatView() {
           }}
           aria-label={t('chat.generating')}
         >
-          <span className="aqbot-streaming-dots" aria-hidden="true">
+          <span className="frogclaw-streaming-dots" aria-hidden="true">
             <span />
             <span />
             <span />
@@ -3505,7 +3505,7 @@ export function ChatView() {
     <div className="flex flex-col h-full min-h-0">
       {/* Bubble style overrides */}
       <style>{`
-        @keyframes aqbot-think-spin {
+        @keyframes frogclaw-think-spin {
           from {
             transform: rotate(0deg);
           }
@@ -3513,7 +3513,7 @@ export function ChatView() {
             transform: rotate(360deg);
           }
         }
-        @keyframes aqbot-stream-dot-bounce {
+        @keyframes frogclaw-stream-dot-bounce {
           0%, 80%, 100% {
             transform: translateY(0);
             opacity: 0.45;
@@ -3583,23 +3583,23 @@ export function ChatView() {
           border: none !important;
           padding: 4px 0;
         }
-        .aqbot-streaming-dots {
+        .frogclaw-streaming-dots {
           display: inline-flex;
           align-items: center;
           gap: 4px;
           min-height: 16px;
         }
-        .aqbot-streaming-dots span {
+        .frogclaw-streaming-dots span {
           width: 6px;
           height: 6px;
           border-radius: 999px;
           background: currentColor;
-          animation: aqbot-stream-dot-bounce 1s ease-in-out infinite;
+          animation: frogclaw-stream-dot-bounce 1s ease-in-out infinite;
         }
-        .aqbot-streaming-dots span:nth-child(2) {
+        .frogclaw-streaming-dots span:nth-child(2) {
           animation-delay: 0.15s;
         }
-        .aqbot-streaming-dots span:nth-child(3) {
+        .frogclaw-streaming-dots span:nth-child(3) {
           animation-delay: 0.3s;
         }
       `}</style>

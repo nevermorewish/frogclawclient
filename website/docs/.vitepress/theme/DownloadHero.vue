@@ -11,7 +11,7 @@ import {
 declare const __APP_VERSION__: string;
 
 const VERSION = __APP_VERSION__;
-const BASE = `https://github.com/AQBot-Desktop/AQBot/releases/download/v${VERSION}`;
+const BASE = `https://github.com/FrogClawClient-Desktop/FrogClawClient/releases/download/v${VERSION}`;
 
 type OS = 'macos' | 'windows' | 'linux';
 
@@ -25,17 +25,17 @@ interface DownloadItem {
 }
 
 const downloads: DownloadItem[] = [
-  { os: 'macos', arch: 'Apple Silicon', labelEn: 'Apple Silicon (M1/M2/M3/M4)', labelZh: 'Apple Silicon（M 系列芯片）', file: `AQBot_${VERSION}_aarch64.dmg`, primary: true },
-  { os: 'macos', arch: 'Intel', labelEn: 'Intel', labelZh: 'Intel（英特尔芯片）', file: `AQBot_${VERSION}_x64.dmg`, primary: true },
-  { os: 'windows', arch: 'x64', labelEn: 'Windows x64', labelZh: 'Windows x64', file: `AQBot_${VERSION}_x64-setup.exe`, primary: true },
-  { os: 'windows', arch: 'x64 Portable', labelEn: 'Windows x64 Portable', labelZh: 'Windows x64 绿色版', file: `AQBot_v${VERSION}_windows-x64-portable.zip` },
-  { os: 'windows', arch: 'ARM64', labelEn: 'Windows ARM64', labelZh: 'Windows ARM64', file: `AQBot_${VERSION}_arm64-setup.exe` },
-  { os: 'windows', arch: 'ARM64 Portable', labelEn: 'Windows ARM64 Portable', labelZh: 'Windows ARM64 绿色版', file: `AQBot_v${VERSION}_windows-arm64-portable.zip` },
-  { os: 'linux', arch: 'x64 deb', labelEn: 'x64 .deb (Debian/Ubuntu)', labelZh: 'x64 .deb（Debian/Ubuntu）', file: `AQBot_${VERSION}_amd64.deb`, primary: true },
-  { os: 'linux', arch: 'x64 AppImage', labelEn: 'x64 AppImage', labelZh: 'x64 AppImage', file: `AQBot_${VERSION}_amd64.AppImage` },
-  { os: 'linux', arch: 'ARM64 deb', labelEn: 'ARM64 .deb', labelZh: 'ARM64 .deb', file: `AQBot_${VERSION}_arm64.deb` },
-  { os: 'linux', arch: 'x64 rpm', labelEn: 'x64 .rpm (Fedora/RHEL)', labelZh: 'x64 .rpm（Fedora/RHEL）', file: `AQBot-${VERSION}-1.x86_64.rpm` },
-  { os: 'linux', arch: 'ARM64 rpm', labelEn: 'ARM64 .rpm', labelZh: 'ARM64 .rpm', file: `AQBot-${VERSION}-1.aarch64.rpm` },
+  { os: 'macos', arch: 'Apple Silicon', labelEn: 'Apple Silicon (M1/M2/M3/M4)', labelZh: 'Apple Silicon（M 系列芯片）', file: `FrogClawClient_${VERSION}_aarch64.dmg`, primary: true },
+  { os: 'macos', arch: 'Intel', labelEn: 'Intel', labelZh: 'Intel（英特尔芯片）', file: `FrogClawClient_${VERSION}_x64.dmg`, primary: true },
+  { os: 'windows', arch: 'x64', labelEn: 'Windows x64', labelZh: 'Windows x64', file: `FrogClawClient_${VERSION}_x64-setup.exe`, primary: true },
+  { os: 'windows', arch: 'x64 Portable', labelEn: 'Windows x64 Portable', labelZh: 'Windows x64 绿色版', file: `FrogClawClient_v${VERSION}_windows-x64-portable.zip` },
+  { os: 'windows', arch: 'ARM64', labelEn: 'Windows ARM64', labelZh: 'Windows ARM64', file: `FrogClawClient_${VERSION}_arm64-setup.exe` },
+  { os: 'windows', arch: 'ARM64 Portable', labelEn: 'Windows ARM64 Portable', labelZh: 'Windows ARM64 绿色版', file: `FrogClawClient_v${VERSION}_windows-arm64-portable.zip` },
+  { os: 'linux', arch: 'x64 deb', labelEn: 'x64 .deb (Debian/Ubuntu)', labelZh: 'x64 .deb（Debian/Ubuntu）', file: `FrogClawClient_${VERSION}_amd64.deb`, primary: true },
+  { os: 'linux', arch: 'x64 AppImage', labelEn: 'x64 AppImage', labelZh: 'x64 AppImage', file: `FrogClawClient_${VERSION}_amd64.AppImage` },
+  { os: 'linux', arch: 'ARM64 deb', labelEn: 'ARM64 .deb', labelZh: 'ARM64 .deb', file: `FrogClawClient_${VERSION}_arm64.deb` },
+  { os: 'linux', arch: 'x64 rpm', labelEn: 'x64 .rpm (Fedora/RHEL)', labelZh: 'x64 .rpm（Fedora/RHEL）', file: `FrogClawClient-${VERSION}-1.x86_64.rpm` },
+  { os: 'linux', arch: 'ARM64 rpm', labelEn: 'ARM64 .rpm', labelZh: 'ARM64 .rpm', file: `FrogClawClient-${VERSION}-1.aarch64.rpm` },
 ];
 
 const osTabs: { id: OS; label: string }[] = [
@@ -87,12 +87,12 @@ const installInstructions = computed<InstallStep[]>(() => {
       titleEn: 'Installation',
       stepsZh: [
         '打开下载的 .dmg 文件',
-        '将 AQBot 拖入「应用程序」文件夹',
+        '将 FrogClawClient 拖入「应用程序」文件夹',
         '首次运行时，在「系统设置 → 隐私与安全性」中允许运行',
       ],
       stepsEn: [
         'Open the downloaded .dmg file',
-        'Drag AQBot to the Applications folder',
+        'Drag FrogClawClient to the Applications folder',
         'On first launch, allow it in System Settings → Privacy & Security',
       ],
     }];
@@ -118,11 +118,11 @@ const installInstructions = computed<InstallStep[]>(() => {
         titleEn: 'Portable',
         stepsZh: [
           '解压 .zip 文件到任意目录',
-          '双击 AQBot.exe 即可运行',
+          '双击 FrogClawClient.exe 即可运行',
         ],
         stepsEn: [
           'Extract the .zip file to any directory',
-          'Double-click AQBot.exe to run',
+          'Double-click FrogClawClient.exe to run',
         ],
       },
     ];
@@ -131,14 +131,14 @@ const installInstructions = computed<InstallStep[]>(() => {
     titleZh: '安装步骤',
     titleEn: 'Installation',
     stepsZh: [
-      'Debian/Ubuntu: sudo dpkg -i AQBot_x.x.x_amd64.deb',
-      'AppImage: chmod +x AQBot_x.x.x_amd64.AppImage && ./AQBot_x.x.x_amd64.AppImage',
-      'RPM: sudo rpm -i AQBot-x.x.x-1.x86_64.rpm',
+      'Debian/Ubuntu: sudo dpkg -i FrogClawClient_x.x.x_amd64.deb',
+      'AppImage: chmod +x FrogClawClient_x.x.x_amd64.AppImage && ./FrogClawClient_x.x.x_amd64.AppImage',
+      'RPM: sudo rpm -i FrogClawClient-x.x.x-1.x86_64.rpm',
     ],
     stepsEn: [
-      'Debian/Ubuntu: sudo dpkg -i AQBot_x.x.x_amd64.deb',
-      'AppImage: chmod +x AQBot_x.x.x_amd64.AppImage && ./AQBot_x.x.x_amd64.AppImage',
-      'RPM: sudo rpm -i AQBot-x.x.x-1.x86_64.rpm',
+      'Debian/Ubuntu: sudo dpkg -i FrogClawClient_x.x.x_amd64.deb',
+      'AppImage: chmod +x FrogClawClient_x.x.x_amd64.AppImage && ./FrogClawClient_x.x.x_amd64.AppImage',
+      'RPM: sudo rpm -i FrogClawClient-x.x.x-1.x86_64.rpm',
     ],
   }];
 });
@@ -155,7 +155,7 @@ const sysReq = computed(() => {
   <div class="download-page">
     <!-- Version badge -->
     <div class="version-header">
-      <a class="version-badge" href="https://github.com/AQBot-Desktop/AQBot/releases" target="_blank" rel="noopener">
+      <a class="version-badge" href="https://github.com/FrogClawClient-Desktop/FrogClawClient/releases" target="_blank" rel="noopener">
         <ClockCircleOutlined />
         {{ isZh ? '最新发行版本' : 'Latest Release' }}：v{{ VERSION }}
       </a>
@@ -201,7 +201,7 @@ const sysReq = computed(() => {
       <!-- GitHub Releases link -->
       <a
         class="releases-link"
-        href="https://github.com/AQBot-Desktop/AQBot/releases"
+        href="https://github.com/FrogClawClient-Desktop/FrogClawClient/releases"
         target="_blank"
         rel="noopener"
       >

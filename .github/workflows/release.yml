@@ -1,4 +1,4 @@
-name: Release
+﻿name: Release
 
 on:
   push:
@@ -62,7 +62,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: 'AQBot ${{ github.ref_name }}'
+          name: 'FrogClawClient ${{ github.ref_name }}'
           body: ${{ steps.cliff.outputs.content }}
           draft: true
           prerelease: ${{ contains(github.ref_name, '-rc') }}
@@ -185,7 +185,7 @@ jobs:
           APPLE_SIGNING_IDENTITY: ${{ matrix.os == 'macos-latest' && '-' || '' }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'AQBot ${{ github.ref_name }}'
+          releaseName: 'FrogClawClient ${{ github.ref_name }}'
           releaseBody: ${{ needs.draft-release-notes.outputs.body }}
           releaseDraft: true
           prerelease: ${{ contains(github.ref_name, '-rc') }}
@@ -197,9 +197,9 @@ jobs:
         if: contains(matrix.target, 'windows')
         shell: pwsh
         run: |
-          $exe = "src-tauri/target/${{ matrix.target }}/release/AQBot.exe"
+          $exe = "src-tauri/target/${{ matrix.target }}/release/FrogClawClient.exe"
           $arch = if ("${{ matrix.target }}" -match "aarch64") { "arm64" } else { "x64" }
-          $zipName = "AQBot_${{ github.ref_name }}_windows-${arch}-portable.zip"
+          $zipName = "FrogClawClient_${{ github.ref_name }}_windows-${arch}-portable.zip"
           Compress-Archive -Path $exe -DestinationPath $zipName
 
       - name: Upload Windows portable to release
@@ -209,7 +209,7 @@ jobs:
           tag_name: ${{ github.ref_name }}
           draft: true
           token: ${{ secrets.GITHUB_TOKEN }}
-          files: AQBot_${{ github.ref_name }}_windows-*-portable.zip
+          files: FrogClawClient_${{ github.ref_name }}_windows-*-portable.zip
 
   # ── Build for Linux ARM64 (cross-compile) ──────────────
   release-linux-arm:
@@ -325,7 +325,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: 'AQBot ${{ github.ref_name }}'
+          name: 'FrogClawClient ${{ github.ref_name }}'
           draft: true
           prerelease: ${{ contains(github.ref_name, '-rc') }}
           token: ${{ secrets.GITHUB_TOKEN }}

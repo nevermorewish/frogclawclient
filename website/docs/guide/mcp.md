@@ -2,13 +2,13 @@
 
 ## What is MCP?
 
-The [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) is an open standard that lets AI models interact with external tools and data sources. AQBot acts as an MCP client — you add MCP servers, and the AI can call the tools they expose during a conversation.
+The [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) is an open standard that lets AI models interact with external tools and data sources. FrogClawClient acts as an MCP client — you add MCP servers, and the AI can call the tools they expose during a conversation.
 
 ---
 
 ## Transport Protocols
 
-AQBot supports three transport protocols for communicating with MCP servers:
+FrogClawClient supports three transport protocols for communicating with MCP servers:
 
 | Protocol | Connection | Use Case | Configuration |
 |----------|-----------|----------|---------------|
@@ -33,7 +33,7 @@ AQBot supports three transport protocols for communicating with MCP servers:
 
 ### JSON Import
 
-Click **JSON Import** and paste a configuration object. AQBot accepts the standard MCP JSON format:
+Click **JSON Import** and paste a configuration object. FrogClawClient accepts the standard MCP JSON format:
 
 #### Stdio server
 
@@ -171,12 +171,12 @@ Pass API keys or configuration to the server process via environment variables.
 
 ## Built-in Tools
 
-AQBot ships with built-in tools that are available without adding any external MCP server:
+FrogClawClient ships with built-in tools that are available without adding any external MCP server:
 
 | Tool | Description |
 |------|-------------|
-| **@aqbot/fetch** | Fetch web pages and HTTP resources |
-| **@aqbot/search-file** | Search for files on your local file system |
+| **@frogclaw/fetch** | Fetch web pages and HTTP resources |
+| **@frogclaw/search-file** | Search for files on your local file system |
 
 Built-in tools are listed in the MCP Servers settings alongside your custom servers and can be enabled or disabled individually.
 
@@ -184,7 +184,7 @@ Built-in tools are listed in the MCP Servers settings alongside your custom serv
 
 ## Tool Execution Panel
 
-When the AI calls an MCP tool during a conversation, AQBot displays a **tool execution panel** inline in the chat. The panel shows:
+When the AI calls an MCP tool during a conversation, FrogClawClient displays a **tool execution panel** inline in the chat. The panel shows:
 
 - The **tool name** and the **server** it belongs to.
 - The **input arguments** sent to the tool.

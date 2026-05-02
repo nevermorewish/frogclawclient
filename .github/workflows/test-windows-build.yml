@@ -1,4 +1,4 @@
-name: Test Windows Build
+﻿name: Test Windows Build
 
 on:
   push:
@@ -95,7 +95,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'AQBot Test ${{ github.ref_name }}'
+          releaseName: 'FrogClawClient Test ${{ github.ref_name }}'
           releaseDraft: true
           prerelease: true
           tauriScript: pnpm tauri
@@ -104,8 +104,8 @@ jobs:
       - name: Package Windows portable (zip)
         shell: pwsh
         run: |
-          $exe = "src-tauri/target/x86_64-pc-windows-msvc/release/AQBot.exe"
-          $zipName = "AQBot_${{ github.ref_name }}_windows-x64-portable.zip"
+          $exe = "src-tauri/target/x86_64-pc-windows-msvc/release/FrogClawClient.exe"
+          $zipName = "FrogClawClient_${{ github.ref_name }}_windows-x64-portable.zip"
           Compress-Archive -Path $exe -DestinationPath $zipName
 
       - name: Upload Windows portable to release
@@ -114,4 +114,4 @@ jobs:
           tag_name: ${{ github.ref_name }}
           draft: true
           token: ${{ secrets.GITHUB_TOKEN }}
-          files: AQBot_${{ github.ref_name }}_windows-x64-portable.zip
+          files: FrogClawClient_${{ github.ref_name }}_windows-x64-portable.zip

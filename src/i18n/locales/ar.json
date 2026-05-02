@@ -1,8 +1,9 @@
-{
+﻿{
   "app": {
-    "name": "AQBot"
+    "name": "FrogClawClient"
   },
   "nav": {
+    "home": "الرئيسية",
     "chat": "المحادثة",
     "knowledge": "قاعدة المعرفة",
     "memory": "الذاكرة",
@@ -931,7 +932,7 @@
     "maxCount": "الحد الأقصى للنسخ المحتفظ بها",
     "copies": "نسخ",
     "backupDir": "مجلد النسخ الاحتياطي",
-    "defaultDir": "مجلد النسخ الاحتياطي الافتراضي لـ AQBot",
+    "defaultDir": "مجلد النسخ الاحتياطي الافتراضي لـ FrogClawClient",
     "effectiveDir": "المجلد الفعلي",
     "formatSqliteDesc": "سريع، استعادة مباشرة",
     "formatJsonDesc": "قابل للقراءة، ملف أكبر",
@@ -1086,7 +1087,7 @@
     "reloadConfirmOk": "إعادة تحميل",
     "reloadConfirmCancel": "إلغاء",
     "closeConfirmTitle": "إغلاق التطبيق",
-    "closeConfirmContent": "هل أنت متأكد من رغبتك في إغلاق AQBot؟",
+    "closeConfirmContent": "هل أنت متأكد من رغبتك في إغلاق FrogClawClient؟",
     "closeConfirmOk": "إغلاق",
     "closeConfirmCancel": "إلغاء",
     "startMinimized": "تشغيل مصغّراً",
@@ -1196,7 +1197,7 @@
     "uninstallConfirm": "هل أنت متأكد من إلغاء تثبيت المهارة \"{{name}}\"؟",
     "detail": "تفاصيل المهارة",
     "source": {
-      "aqbot": "AQBot",
+      "frogclaw": "FrogClawClient",
       "claude": "Claude",
       "agents": "Agents",
       "builtin": "مدمج",

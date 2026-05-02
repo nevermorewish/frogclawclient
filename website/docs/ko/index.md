@@ -1,20 +1,20 @@
 ---
 layout: home
-title: AQBot — 오픈소스 AI 데스크톱 클라이언트 & 게이트웨이
+title: FrogClawClient — 오픈소스 AI 데스크톱 클라이언트 & 게이트웨이
 titleTemplate: false
 
 head:
   - - meta
     - name: description
-      content: AQBot은 AI 게이트웨이가 내장된 무료 오픈소스 AI 데스크톱 클라이언트입니다. OpenAI, Claude, Gemini, DeepSeek 등 멀티 모델 대화, MCP 서버, 지식 베이스, 개인정보 보호 우선.
+      content: FrogClawClient은 AI 게이트웨이가 내장된 무료 오픈소스 AI 데스크톱 클라이언트입니다. OpenAI, Claude, Gemini, DeepSeek 등 멀티 모델 대화, MCP 서버, 지식 베이스, 개인정보 보호 우선.
 
 hero:
-  name: AQBot
+  name: FrogClawClient
   text: 당신의 AI 데스크톱 어시스턴트
   tagline: 멀티 모델 채팅, MCP 도구, API 게이트웨이, 지식 베이스 — 모두 하나의 오픈소스 클라이언트에서
   image:
     src: /logo.png
-    alt: AQBot
+    alt: FrogClawClient
   actions:
     - theme: brand
       text: 시작하기
@@ -24,7 +24,7 @@ hero:
       link: /ko/download
     - theme: alt
       text: GitHub
-      link: https://github.com/AQBot-Desktop/AQBot
+      link: https://github.com/FrogClawClient-Desktop/FrogClawClient
 
 features:
   - icon: robot
@@ -35,7 +35,7 @@ features:
     details: Agent 모드로 자율적인 작업 수행. 파일 읽기/쓰기, 명령어 실행, 코드 분석——3단계 권한 제어 + 작업 디렉토리 샌드박스로 안전하게 제어.
   - icon: api
     title: MCP 도구 호출
-    details: Model Context Protocol 완전 구현. stdio, SSE, StreamableHTTP 지원. 원클릭으로 외부 도구 연결, @aqbot/fetch 등 내장 MCP 도구 제공.
+    details: Model Context Protocol 완전 구현. stdio, SSE, StreamableHTTP 지원. 원클릭으로 외부 도구 연결, @frogclaw/fetch 등 내장 MCP 도구 제공.
   - icon: cloud-server
     title: 내장 API 게이트웨이
     details: 로컬 OpenAI 호환 API 서버. Claude Code, Codex, Gemini CLI 등의 백엔드로 사용 가능. 키 관리, 속도 제한, SSL/TLS.

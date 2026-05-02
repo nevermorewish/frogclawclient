@@ -1,8 +1,9 @@
-{
+﻿{
   "app": {
-    "name": "AQBot"
+    "name": "FrogClawClient"
   },
   "nav": {
+    "home": "首页",
     "chat": "对话",
     "knowledge": "知识库",
     "memory": "记忆",
@@ -936,7 +937,7 @@
     "maxCount": "最大保留数量",
     "copies": "份",
     "backupDir": "备份目录",
-    "defaultDir": "AQBot 默认备份目录",
+    "defaultDir": "FrogClawClient 默认备份目录",
     "effectiveDir": "当前生效目录",
     "formatSqliteDesc": "快速，可直接恢复",
     "formatJsonDesc": "可读性好，体积较大",
@@ -1091,7 +1092,7 @@
     "reloadConfirmOk": "刷新",
     "reloadConfirmCancel": "取消",
     "closeConfirmTitle": "退出应用",
-    "closeConfirmContent": "确定要退出 AQBot 吗？",
+    "closeConfirmContent": "确定要退出 FrogClawClient 吗？",
     "closeConfirmOk": "退出",
     "closeConfirmCancel": "取消",
     "startMinimized": "启动时最小化",
@@ -1201,7 +1202,7 @@
     "uninstallConfirm": "确定要卸载技能「{{name}}」吗？",
     "detail": "技能详情",
     "source": {
-      "aqbot": "AQBot",
+      "frogclaw": "FrogClawClient",
       "claude": "Claude",
       "agents": "Agents",
       "builtin": "内置",

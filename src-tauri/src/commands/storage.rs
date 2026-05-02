@@ -1,5 +1,5 @@
-use aqbot_core::storage_inventory::{self, StorageInventory};
-use aqbot_core::storage_paths;
+use frogclaw_core::storage_inventory::{self, StorageInventory};
+use frogclaw_core::storage_paths;
 use crate::AppState;
 use serde::Serialize;
 use std::path::PathBuf;
@@ -48,7 +48,7 @@ pub async fn validate_documents_root(path: String) -> Result<ValidateResult, Str
     };
 
     // Test writability
-    let probe = target.join(".aqbot_write_probe");
+    let probe = target.join(".frogclaw_write_probe");
     let writable = std::fs::write(&probe, b"ok").is_ok();
     let _ = std::fs::remove_file(&probe);
 
@@ -160,11 +160,11 @@ pub async fn change_documents_root(
 
     // Persist the setting
     let db = &state.sea_db;
-    let mut settings = aqbot_core::repo::settings::get_settings(db)
+    let mut settings = frogclaw_core::repo::settings::get_settings(db)
         .await
         .map_err(|e| e.to_string())?;
     settings.documents_root_override = Some(new_path);
-    aqbot_core::repo::settings::save_settings(db, &settings)
+    frogclaw_core::repo::settings::save_settings(db, &settings)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -180,11 +180,11 @@ pub async fn reset_documents_root(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let db = &state.sea_db;
-    let mut settings = aqbot_core::repo::settings::get_settings(db)
+    let mut settings = frogclaw_core::repo::settings::get_settings(db)
         .await
         .map_err(|e| e.to_string())?;
     settings.documents_root_override = None;
-    aqbot_core::repo::settings::save_settings(db, &settings)
+    frogclaw_core::repo::settings::save_settings(db, &settings)
         .await
         .map_err(|e| e.to_string())?;
 

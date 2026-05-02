@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { OverlayScrollbars } from 'overlayscrollbars';
 import type { Message } from '@/types';
 import { CopyButton } from '@/components/common/CopyButton';
-import { stripAqbotTags } from '@/lib/chatMarkdown';
+import { stripFrogclawTags } from '@/lib/chatMarkdown';
 import { getLatestVersionsByModel } from '@/lib/chatMultiModel';
 import { useConversationStore } from '@/stores';
 
@@ -165,7 +165,7 @@ function MultiModelDisplayInner({
       { target: el, elements: { viewport: el } },
       {
         scrollbars: {
-          theme: 'os-theme-aqbot',
+          theme: 'os-theme-frogclaw',
           autoHide: 'never',
           clickScroll: true,
         },
@@ -215,7 +215,7 @@ function MultiModelDisplayInner({
         };
 
   return (
-    <div ref={scrollRef} style={containerStyle} className={mode === 'side-by-side' ? 'aqbot-multi-model-scroll' : undefined}>
+    <div ref={scrollRef} style={containerStyle} className={mode === 'side-by-side' ? 'frogclaw-multi-model-scroll' : undefined}>
       {latestByModel.map((vMsg) => {
         const isActive = vMsg.id === activeMessageId;
         const isVersionStreaming = isDisplayStreaming && (
@@ -264,7 +264,7 @@ function MultiModelDisplayInner({
                 )}
                 <Typography.Text style={{ fontSize: 13 }}>{modelName}</Typography.Text>
                 {isVersionStreaming && (
-                  <span className="aqbot-streaming-dots" aria-hidden="true" style={{ marginLeft: 4 }}>
+                  <span className="frogclaw-streaming-dots" aria-hidden="true" style={{ marginLeft: 4 }}>
                     <span /><span /><span />
                   </span>
                 )}
@@ -272,7 +272,7 @@ function MultiModelDisplayInner({
               {/* Card action buttons */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <CopyButton
-                  text={() => stripAqbotTags(vMsg.content ?? '')}
+                  text={() => stripFrogclawTags(vMsg.content ?? '')}
                   size={13}
                   timeout={3000}
                 />

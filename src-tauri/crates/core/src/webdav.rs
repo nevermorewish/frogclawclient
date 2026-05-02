@@ -6,7 +6,7 @@ use std::io::{Read, Write};
 use std::path::Path;
 use zip::write::SimpleFileOptions;
 
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 
 // === Types ===
 
@@ -50,7 +50,7 @@ impl WebDavClient {
             .danger_accept_invalid_certs(config.accept_invalid_certs)
             .timeout(std::time::Duration::from_secs(300))
             .build()
-            .map_err(|e| AQBotError::Gateway(format!("Failed to create HTTP client: {}", e)))?;
+            .map_err(|e| FrogClawClientError::Gateway(format!("Failed to create HTTP client: {}", e)))?;
         Ok(Self { client, config })
     }
 
@@ -72,7 +72,7 @@ impl WebDavClient {
     pub async fn check_connection(&self) -> Result<bool> {
         let url = self.base_url();
         let method = Method::from_bytes(b"PROPFIND")
-            .map_err(|e| AQBotError::Gateway(format!("Invalid method: {}", e)))?;
+            .map_err(|e| FrogClawClientError::Gateway(format!("Invalid method: {}", e)))?;
 
         let response = self
             .client
@@ -81,7 +81,7 @@ impl WebDavClient {
             .header("Depth", "0")
             .send()
             .await
-            .map_err(|e| AQBotError::Gateway(format!("WebDAV connection failed: {}", e)))?;
+            .map_err(|e| FrogClawClientError::Gateway(format!("WebDAV connection failed: {}", e)))?;
 
         match response.status() {
             StatusCode::MULTI_STATUS | StatusCode::OK => Ok(true),
@@ -89,10 +89,10 @@ impl WebDavClient {
                 self.mkdir().await?;
                 Ok(true)
             }
-            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => Err(AQBotError::Gateway(
+            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => Err(FrogClawClientError::Gateway(
                 "WebDAV authentication failed".to_string(),
             )),
-            status => Err(AQBotError::Gateway(format!(
+            status => Err(FrogClawClientError::Gateway(format!(
                 "WebDAV error: HTTP {}",
                 status
             ))),
@@ -119,7 +119,7 @@ impl WebDavClient {
 
             let url = format!("{}/{}/", host, current);
             let method = Method::from_bytes(b"MKCOL")
-                .map_err(|e| AQBotError::Gateway(format!("Invalid method: {}", e)))?;
+                .map_err(|e| FrogClawClientError::Gateway(format!("Invalid method: {}", e)))?;
 
             let response = self
                 .client
@@ -127,13 +127,13 @@ impl WebDavClient {
                 .basic_auth(&self.config.username, Some(&self.config.password))
                 .send()
                 .await
-                .map_err(|e| AQBotError::Gateway(format!("WebDAV MKCOL failed: {}", e)))?;
+                .map_err(|e| FrogClawClientError::Gateway(format!("WebDAV MKCOL failed: {}", e)))?;
 
             // CREATED=success, METHOD_NOT_ALLOWED=already exists
             match response.status() {
                 StatusCode::CREATED | StatusCode::OK | StatusCode::METHOD_NOT_ALLOWED => {}
                 status => {
-                    return Err(AQBotError::Gateway(format!(
+                    return Err(FrogClawClientError::Gateway(format!(
                         "WebDAV mkdir failed for '{}': HTTP {}",
                         current, status
                     )));
@@ -143,14 +143,14 @@ impl WebDavClient {
         Ok(())
     }
 
-    /// List aqbot backup .zip files in the remote directory.
+    /// List frogclaw backup .zip files in the remote directory.
     pub async fn list_files(&self) -> Result<Vec<WebDavFileInfo>> {
         run_after_directory_ready(
             || self.check_connection(),
             || async {
                 let url = self.base_url();
                 let method = Method::from_bytes(b"PROPFIND")
-                    .map_err(|e| AQBotError::Gateway(format!("Invalid method: {}", e)))?;
+                    .map_err(|e| FrogClawClientError::Gateway(format!("Invalid method: {}", e)))?;
 
                 let body = r#"<?xml version="1.0" encoding="utf-8"?>
 <D:propfind xmlns:D="DAV:">
@@ -170,11 +170,11 @@ impl WebDavClient {
                     .body(body)
                     .send()
                     .await
-                    .map_err(|e| AQBotError::Gateway(format!("WebDAV PROPFIND failed: {}", e)))?;
+                    .map_err(|e| FrogClawClientError::Gateway(format!("WebDAV PROPFIND failed: {}", e)))?;
 
                 if response.status() != StatusCode::MULTI_STATUS && !response.status().is_success()
                 {
-                    return Err(AQBotError::Gateway(format!(
+                    return Err(FrogClawClientError::Gateway(format!(
                         "WebDAV list failed: HTTP {}",
                         response.status()
                     )));
@@ -183,7 +183,7 @@ impl WebDavClient {
                 let text = response
                     .text()
                     .await
-                    .map_err(|e| AQBotError::Gateway(format!("Failed to read response: {}", e)))?;
+                    .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read response: {}", e)))?;
 
                 parse_propfind_response(&text)
             },
@@ -197,7 +197,7 @@ impl WebDavClient {
             || self.check_connection(),
             || async {
                 let data = std::fs::read(local_path)
-                    .map_err(|e| AQBotError::Gateway(format!("Failed to read file: {}", e)))?;
+                    .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read file: {}", e)))?;
                 let url = self.file_url(filename);
 
                 let response = self
@@ -208,11 +208,11 @@ impl WebDavClient {
                     .body(data)
                     .send()
                     .await
-                    .map_err(|e| AQBotError::Gateway(format!("WebDAV upload failed: {}", e)))?;
+                    .map_err(|e| FrogClawClientError::Gateway(format!("WebDAV upload failed: {}", e)))?;
 
                 match response.status() {
                     StatusCode::CREATED | StatusCode::OK | StatusCode::NO_CONTENT => Ok(()),
-                    status => Err(AQBotError::Gateway(format!(
+                    status => Err(FrogClawClientError::Gateway(format!(
                         "WebDAV upload failed: HTTP {}",
                         status
                     ))),
@@ -232,10 +232,10 @@ impl WebDavClient {
             .basic_auth(&self.config.username, Some(&self.config.password))
             .send()
             .await
-            .map_err(|e| AQBotError::Gateway(format!("WebDAV download failed: {}", e)))?;
+            .map_err(|e| FrogClawClientError::Gateway(format!("WebDAV download failed: {}", e)))?;
 
         if !response.status().is_success() {
-            return Err(AQBotError::Gateway(format!(
+            return Err(FrogClawClientError::Gateway(format!(
                 "WebDAV download failed: HTTP {}",
                 response.status()
             )));
@@ -244,10 +244,10 @@ impl WebDavClient {
         let data = response
             .bytes()
             .await
-            .map_err(|e| AQBotError::Gateway(format!("Failed to read download: {}", e)))?;
+            .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read download: {}", e)))?;
 
         std::fs::write(local_path, &data)
-            .map_err(|e| AQBotError::Gateway(format!("Failed to write file: {}", e)))?;
+            .map_err(|e| FrogClawClientError::Gateway(format!("Failed to write file: {}", e)))?;
         Ok(())
     }
 
@@ -261,11 +261,11 @@ impl WebDavClient {
             .basic_auth(&self.config.username, Some(&self.config.password))
             .send()
             .await
-            .map_err(|e| AQBotError::Gateway(format!("WebDAV delete failed: {}", e)))?;
+            .map_err(|e| FrogClawClientError::Gateway(format!("WebDAV delete failed: {}", e)))?;
 
         match response.status() {
             StatusCode::OK | StatusCode::NO_CONTENT | StatusCode::NOT_FOUND => Ok(()),
-            status => Err(AQBotError::Gateway(format!(
+            status => Err(FrogClawClientError::Gateway(format!(
                 "WebDAV delete failed: HTTP {}",
                 status
             ))),
@@ -286,19 +286,19 @@ pub fn create_backup_zip(
     object_counts_json: &str,
 ) -> Result<()> {
     let file = std::fs::File::create(dest_zip)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to create ZIP file: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to create ZIP file: {}", e)))?;
     let mut zip = zip::ZipWriter::new(file);
     let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
-    // aqbot.db
+    // frogclaw.db
     let db_data = std::fs::read(db_path)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to read database: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read database: {}", e)))?;
     let db_checksum = format!("{:x}", Sha256::digest(&db_data));
 
-    zip.start_file("aqbot.db", options)
-        .map_err(|e| AQBotError::Gateway(format!("ZIP error: {}", e)))?;
+    zip.start_file("frogclaw.db", options)
+        .map_err(|e| FrogClawClientError::Gateway(format!("ZIP error: {}", e)))?;
     zip.write_all(&db_data)
-        .map_err(|e| AQBotError::Gateway(format!("ZIP write error: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("ZIP write error: {}", e)))?;
 
     // metadata.json
     let metadata = serde_json::json!({
@@ -314,22 +314,22 @@ pub fn create_backup_zip(
         "object_counts": object_counts_json,
     });
     let metadata_json = serde_json::to_string_pretty(&metadata)
-        .map_err(|e| AQBotError::Gateway(format!("JSON error: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("JSON error: {}", e)))?;
 
     zip.start_file("metadata.json", SimpleFileOptions::default())
-        .map_err(|e| AQBotError::Gateway(format!("ZIP error: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("ZIP error: {}", e)))?;
     zip.write_all(metadata_json.as_bytes())
-        .map_err(|e| AQBotError::Gateway(format!("ZIP write error: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("ZIP write error: {}", e)))?;
 
     // Optional: master.key for cross-device restore
     if let Some(key_path) = master_key_path {
         if key_path.exists() {
             let key_data = std::fs::read(key_path)
-                .map_err(|e| AQBotError::Gateway(format!("Failed to read master.key: {}", e)))?;
+                .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read master.key: {}", e)))?;
             zip.start_file("master.key", options)
-                .map_err(|e| AQBotError::Gateway(format!("ZIP error: {}", e)))?;
+                .map_err(|e| FrogClawClientError::Gateway(format!("ZIP error: {}", e)))?;
             zip.write_all(&key_data)
-                .map_err(|e| AQBotError::Gateway(format!("ZIP write error: {}", e)))?;
+                .map_err(|e| FrogClawClientError::Gateway(format!("ZIP write error: {}", e)))?;
         }
     }
 
@@ -348,19 +348,19 @@ pub fn create_backup_zip(
     }
 
     zip.finish()
-        .map_err(|e| AQBotError::Gateway(format!("ZIP finalize error: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("ZIP finalize error: {}", e)))?;
     Ok(())
 }
 
 /// Extract a backup ZIP and return its contents.
 pub fn extract_backup_zip(zip_path: &Path, dest_dir: &Path) -> Result<BackupZipContents> {
     let file = std::fs::File::open(zip_path)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to open ZIP: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to open ZIP: {}", e)))?;
     let mut archive = zip::ZipArchive::new(file)
-        .map_err(|e| AQBotError::Gateway(format!("Invalid ZIP file: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Invalid ZIP file: {}", e)))?;
 
     std::fs::create_dir_all(dest_dir)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to create temp dir: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to create temp dir: {}", e)))?;
 
     let mut db_path = None;
     let mut metadata = None;
@@ -371,35 +371,35 @@ pub fn extract_backup_zip(zip_path: &Path, dest_dir: &Path) -> Result<BackupZipC
     for i in 0..archive.len() {
         let mut entry = archive
             .by_index(i)
-            .map_err(|e| AQBotError::Gateway(format!("ZIP read error: {}", e)))?;
+            .map_err(|e| FrogClawClientError::Gateway(format!("ZIP read error: {}", e)))?;
         let name = entry.name().to_string();
 
         if name.contains("..") {
             continue; // path traversal protection
         }
 
-        if name == "aqbot.db" {
-            let path = dest_dir.join("aqbot.db");
+        if name == "frogclaw.db" {
+            let path = dest_dir.join("frogclaw.db");
             let mut outfile = std::fs::File::create(&path)
-                .map_err(|e| AQBotError::Gateway(format!("Failed to extract db: {}", e)))?;
+                .map_err(|e| FrogClawClientError::Gateway(format!("Failed to extract db: {}", e)))?;
             std::io::copy(&mut entry, &mut outfile)
-                .map_err(|e| AQBotError::Gateway(format!("Failed to extract db: {}", e)))?;
+                .map_err(|e| FrogClawClientError::Gateway(format!("Failed to extract db: {}", e)))?;
             db_path = Some(path);
         } else if name == "metadata.json" {
             let mut contents = String::new();
             entry
                 .read_to_string(&mut contents)
-                .map_err(|e| AQBotError::Gateway(format!("Failed to read metadata: {}", e)))?;
+                .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read metadata: {}", e)))?;
             metadata = Some(
                 serde_json::from_str::<serde_json::Value>(&contents)
-                    .map_err(|e| AQBotError::Gateway(format!("Invalid metadata JSON: {}", e)))?,
+                    .map_err(|e| FrogClawClientError::Gateway(format!("Invalid metadata JSON: {}", e)))?,
             );
         } else if name == "master.key" {
             let path = dest_dir.join("master.key");
             let mut outfile = std::fs::File::create(&path)
-                .map_err(|e| AQBotError::Gateway(format!("Failed to extract master.key: {}", e)))?;
+                .map_err(|e| FrogClawClientError::Gateway(format!("Failed to extract master.key: {}", e)))?;
             std::io::copy(&mut entry, &mut outfile)
-                .map_err(|e| AQBotError::Gateway(format!("Failed to extract master.key: {}", e)))?;
+                .map_err(|e| FrogClawClientError::Gateway(format!("Failed to extract master.key: {}", e)))?;
             master_key_path = Some(path);
         } else if name.starts_with("documents/") && !entry.is_dir() {
             has_documents = true;
@@ -408,9 +408,9 @@ pub fn extract_backup_zip(zip_path: &Path, dest_dir: &Path) -> Result<BackupZipC
                 std::fs::create_dir_all(parent).ok();
             }
             let mut outfile = std::fs::File::create(&path)
-                .map_err(|e| AQBotError::Gateway(format!("Failed to extract file: {}", e)))?;
+                .map_err(|e| FrogClawClientError::Gateway(format!("Failed to extract file: {}", e)))?;
             std::io::copy(&mut entry, &mut outfile)
-                .map_err(|e| AQBotError::Gateway(format!("Failed to extract file: {}", e)))?;
+                .map_err(|e| FrogClawClientError::Gateway(format!("Failed to extract file: {}", e)))?;
         } else if name.starts_with("workspace/") && !entry.is_dir() {
             has_workspace = true;
             let path = dest_dir.join(&name);
@@ -418,16 +418,16 @@ pub fn extract_backup_zip(zip_path: &Path, dest_dir: &Path) -> Result<BackupZipC
                 std::fs::create_dir_all(parent).ok();
             }
             let mut outfile = std::fs::File::create(&path)
-                .map_err(|e| AQBotError::Gateway(format!("Failed to extract file: {}", e)))?;
+                .map_err(|e| FrogClawClientError::Gateway(format!("Failed to extract file: {}", e)))?;
             std::io::copy(&mut entry, &mut outfile)
-                .map_err(|e| AQBotError::Gateway(format!("Failed to extract file: {}", e)))?;
+                .map_err(|e| FrogClawClientError::Gateway(format!("Failed to extract file: {}", e)))?;
         }
     }
 
     Ok(BackupZipContents {
-        db_path: db_path.ok_or_else(|| AQBotError::Gateway("No aqbot.db in backup ZIP".into()))?,
+        db_path: db_path.ok_or_else(|| FrogClawClientError::Gateway("No frogclaw.db in backup ZIP".into()))?,
         metadata: metadata
-            .ok_or_else(|| AQBotError::Gateway("No metadata.json in backup ZIP".into()))?,
+            .ok_or_else(|| FrogClawClientError::Gateway("No metadata.json in backup ZIP".into()))?,
         has_documents,
         has_workspace,
         master_key_path,
@@ -437,7 +437,7 @@ pub fn extract_backup_zip(zip_path: &Path, dest_dir: &Path) -> Result<BackupZipC
 /// Verify the checksum of an extracted database against metadata.
 pub fn verify_db_checksum(db_path: &Path, expected_checksum: &str) -> Result<bool> {
     let data = std::fs::read(db_path)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to read db for checksum: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read db for checksum: {}", e)))?;
     let actual = format!("{:x}", Sha256::digest(&data));
     Ok(actual == expected_checksum)
 }
@@ -446,14 +446,14 @@ pub fn verify_db_checksum(db_path: &Path, expected_checksum: &str) -> Result<boo
 pub fn generate_backup_filename() -> String {
     let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
     let hostname = get_hostname();
-    format!("aqbot-backup-{}.{}.zip", timestamp, hostname)
+    format!("frogclaw-backup-{}.{}.zip", timestamp, hostname)
 }
 
 /// Parse hostname from a backup filename.
 pub fn parse_hostname_from_filename(filename: &str) -> String {
-    // Format: aqbot-backup-YYYYMMDD_HHMMSS.hostname.zip
+    // Format: frogclaw-backup-YYYYMMDD_HHMMSS.hostname.zip
     let name = filename.trim_end_matches(".zip");
-    if let Some(rest) = name.strip_prefix("aqbot-backup-") {
+    if let Some(rest) = name.strip_prefix("frogclaw-backup-") {
         // rest = "YYYYMMDD_HHMMSS.hostname"
         if let Some(dot_pos) = rest.find('.') {
             return rest[dot_pos + 1..].to_string();
@@ -508,15 +508,15 @@ fn add_directory_to_zip<W: Write + std::io::Seek>(
     for file_path in files {
         let rel = file_path
             .strip_prefix(dir)
-            .map_err(|e| AQBotError::Gateway(format!("Path error: {}", e)))?;
+            .map_err(|e| FrogClawClientError::Gateway(format!("Path error: {}", e)))?;
         let zip_path = format!("{}/{}", prefix, rel.to_string_lossy());
 
         zip.start_file(&zip_path, options)
-            .map_err(|e| AQBotError::Gateway(format!("ZIP error: {}", e)))?;
+            .map_err(|e| FrogClawClientError::Gateway(format!("ZIP error: {}", e)))?;
         let data = std::fs::read(&file_path)
-            .map_err(|e| AQBotError::Gateway(format!("Read error: {}", e)))?;
+            .map_err(|e| FrogClawClientError::Gateway(format!("Read error: {}", e)))?;
         zip.write_all(&data)
-            .map_err(|e| AQBotError::Gateway(format!("ZIP write error: {}", e)))?;
+            .map_err(|e| FrogClawClientError::Gateway(format!("ZIP write error: {}", e)))?;
     }
     Ok(())
 }
@@ -526,9 +526,9 @@ fn collect_files(dir: &Path, files: &mut Vec<std::path::PathBuf>) -> Result<()> 
         return Ok(());
     }
     for entry in std::fs::read_dir(dir)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to read directory: {}", e)))?
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read directory: {}", e)))?
     {
-        let entry = entry.map_err(|e| AQBotError::Gateway(format!("Dir entry error: {}", e)))?;
+        let entry = entry.map_err(|e| FrogClawClientError::Gateway(format!("Dir entry error: {}", e)))?;
         let path = entry.path();
         if path.is_dir() {
             collect_files(&path, files)?;
@@ -561,7 +561,7 @@ fn parse_propfind_response(xml: &str) -> Result<Vec<WebDavFileInfo>> {
             continue;
         }
 
-        if !file_name.starts_with("aqbot-backup-") {
+        if !file_name.starts_with("frogclaw-backup-") {
             continue;
         }
 
@@ -678,7 +678,7 @@ mod tests {
             },
             move || async move {
                 action_events.lock().unwrap().push("action");
-                Ok::<_, AQBotError>("done")
+                Ok::<_, FrogClawClientError>("done")
             },
         )
         .await;
@@ -696,7 +696,7 @@ mod tests {
         let result: Result<&'static str> = run_after_directory_ready(
             move || async move {
                 check_events.lock().unwrap().push("check");
-                Err(AQBotError::Gateway("probe failed".into()))
+                Err(FrogClawClientError::Gateway("probe failed".into()))
             },
             move || async move {
                 action_events.lock().unwrap().push("action");

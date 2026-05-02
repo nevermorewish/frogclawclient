@@ -2,11 +2,11 @@
 
 ## Что такое API-шлюз?
 
-AQBot включает встроенный локальный API-сервер, который предоставляет настроенных провайдеров как **OpenAI-совместимые**, **нативные Claude** и **нативные Gemini** endpoints. Любой инструмент или клиент, использующий один из этих протоколов, может использовать AQBot в качестве бэкенда — без отдельных ключей API или ретрансляционных сервисов.
+FrogClawClient включает встроенный локальный API-сервер, который предоставляет настроенных провайдеров как **OpenAI-совместимые**, **нативные Claude** и **нативные Gemini** endpoints. Любой инструмент или клиент, использующий один из этих протоколов, может использовать FrogClawClient в качестве бэкенда — без отдельных ключей API или ретрансляционных сервисов.
 
 Сценарии использования:
 
-- Запускайте **Claude Code CLI**, **OpenAI Codex CLI**, **Gemini CLI** или **OpenCode** через AQBot.
+- Запускайте **Claude Code CLI**, **OpenAI Codex CLI**, **Gemini CLI** или **OpenCode** через FrogClawClient.
 - Подключайте расширения IDE к единому локально управляемому endpoint.
 - Делитесь набором ключей провайдера между множеством инструментов с ограничением частоты запросов на ключ.
 
@@ -19,7 +19,7 @@ AQBot включает встроенный локальный API-сервер,
 3. По умолчанию сервер слушает на `127.0.0.1:8080` (HTTP).
 
 ::: tip
-Включите **Автозапуск** в настройках шлюза, чтобы сервер запускался автоматически при старте AQBot.
+Включите **Автозапуск** в настройках шлюза, чтобы сервер запускался автоматически при старте FrogClawClient.
 :::
 
 ---
@@ -39,14 +39,14 @@ AQBot включает встроенный локальный API-сервер,
 
 ```bash
 claude config set --global apiUrl http://127.0.0.1:8080
-claude config set --global apiKey aqbot-xxxx
+claude config set --global apiKey frogclaw-xxxx
 ```
 
 ### OpenAI Codex CLI
 
 ```bash
 export OPENAI_BASE_URL=http://127.0.0.1:8080/v1
-export OPENAI_API_KEY=aqbot-xxxx
+export OPENAI_API_KEY=frogclaw-xxxx
 codex
 ```
 
@@ -54,7 +54,7 @@ codex
 
 ```bash
 export GEMINI_API_BASE=http://127.0.0.1:8080
-export GEMINI_API_KEY=aqbot-xxxx
+export GEMINI_API_KEY=frogclaw-xxxx
 gemini
 ```
 
@@ -62,7 +62,7 @@ gemini
 
 ```
 Base URL:   http://127.0.0.1:8080/v1
-Ключ API:   aqbot-xxxx
+Ключ API:   frogclaw-xxxx
 ```
 
 ---

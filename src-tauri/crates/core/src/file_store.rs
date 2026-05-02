@@ -16,7 +16,7 @@ pub struct SavedFile {
 }
 
 impl FileStore {
-    /// Creates a FileStore rooted at `~/Documents/aqbot/`.
+    /// Creates a FileStore rooted at `~/Documents/frogclaw/`.
     pub fn new() -> Self {
         Self {
             base_dir: crate::storage_paths::documents_root(),
@@ -62,7 +62,7 @@ impl FileStore {
     pub fn read_file(&self, storage_path: &str) -> Result<Vec<u8>> {
         let path = self.resolve_path(storage_path);
         if !path.exists() {
-            return Err(crate::error::AQBotError::NotFound(format!(
+            return Err(crate::error::FrogClawClientError::NotFound(format!(
                 "File not found: {}",
                 storage_path
             )));

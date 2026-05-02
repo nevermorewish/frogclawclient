@@ -125,7 +125,7 @@ export default function BackupCenter() {
 
   const columns = [
     {
-      title: t('gateway.created'),
+      title: t('chat.inspector.created', 'Created'),
       dataIndex: 'createdAt',
       key: 'createdAt',
       width: 180,

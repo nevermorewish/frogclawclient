@@ -37,7 +37,7 @@ const screenshots = [
     >
       <SwiperSlide v-for="(src, idx) in screenshots" :key="idx">
         <div class="slide-wrapper">
-          <img :src="src" :alt="`AQBot Screenshot ${idx + 1}`" loading="lazy" />
+          <img :src="src" :alt="`FrogClawClient Screenshot ${idx + 1}`" loading="lazy" />
         </div>
       </SwiperSlide>
     </Swiper>

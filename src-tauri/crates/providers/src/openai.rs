@@ -1,5 +1,5 @@
-use aqbot_core::error::{AQBotError, Result};
-use aqbot_core::types::*;
+use frogclaw_core::error::{FrogClawClientError, Result};
+use frogclaw_core::types::*;
 use async_trait::async_trait;
 use futures::Stream;
 use futures::StreamExt;
@@ -588,12 +588,12 @@ impl ProviderAdapter for OpenAIAdapter {
         )
         .send()
         .await
-        .map_err(|e| AQBotError::Provider(format!("Request failed: {e}")))?;
+        .map_err(|e| FrogClawClientError::Provider(format!("Request failed: {e}")))?;
 
         if !resp.status().is_success() {
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
-            return Err(AQBotError::Provider(format!(
+            return Err(FrogClawClientError::Provider(format!(
                 "OpenAI API error {status}: {text}"
             )));
         }
@@ -601,16 +601,16 @@ impl ProviderAdapter for OpenAIAdapter {
         let oai: OpenAIResponse = resp
             .json()
             .await
-            .map_err(|e| AQBotError::Provider(format!("Parse error: {e}")))?;
+            .map_err(|e| FrogClawClientError::Provider(format!("Parse error: {e}")))?;
 
         let choice = oai
             .choices
             .first()
-            .ok_or_else(|| AQBotError::Provider("No choices in response".into()))?;
+            .ok_or_else(|| FrogClawClientError::Provider("No choices in response".into()))?;
         let msg = choice
             .message
             .as_ref()
-            .ok_or_else(|| AQBotError::Provider("No message in choice".into()))?;
+            .ok_or_else(|| FrogClawClientError::Provider("No message in choice".into()))?;
 
         let usage = oai
             .usage
@@ -627,10 +627,10 @@ impl ProviderAdapter for OpenAIAdapter {
 
         let tool_calls = msg.tool_calls.as_ref().map(|tcs| {
             tcs.iter()
-                .map(|tc| aqbot_core::types::ToolCall {
+                .map(|tc| frogclaw_core::types::ToolCall {
                     id: tc.id.clone().unwrap_or_default(),
                     call_type: tc.call_type.clone().unwrap_or_else(|| "function".into()),
-                    function: aqbot_core::types::ToolCallFunction {
+                    function: frogclaw_core::types::ToolCallFunction {
                         name: tc
                             .function
                             .as_ref()
@@ -688,14 +688,14 @@ impl ProviderAdapter for OpenAIAdapter {
                 Ok(r) => {
                     let s = r.status();
                     let t = r.text().await.unwrap_or_default();
-                    let _ = tx.unbounded_send(Err(AQBotError::Provider(format!(
+                    let _ = tx.unbounded_send(Err(FrogClawClientError::Provider(format!(
                         "OpenAI API error {s}: {t}"
                     ))));
                     return;
                 }
                 Err(e) => {
                     let _ = tx
-                        .unbounded_send(Err(AQBotError::Provider(format!("Request failed: {e}"))));
+                        .unbounded_send(Err(FrogClawClientError::Provider(format!("Request failed: {e}"))));
                     return;
                 }
             };
@@ -714,10 +714,10 @@ impl ProviderAdapter for OpenAIAdapter {
                         Some(
                             pending_tool_calls
                                 .iter()
-                                .map(|(id, ct, name, args)| aqbot_core::types::ToolCall {
+                                .map(|(id, ct, name, args)| frogclaw_core::types::ToolCall {
                                     id: id.clone(),
                                     call_type: ct.clone(),
-                                    function: aqbot_core::types::ToolCallFunction {
+                                    function: frogclaw_core::types::ToolCallFunction {
                                         name: name.clone(),
                                         arguments: args.clone(),
                                     },
@@ -881,7 +881,7 @@ impl ProviderAdapter for OpenAIAdapter {
                         }
                     }
                     Err(e) => {
-                        let _ = tx.unbounded_send(Err(AQBotError::Provider(format!(
+                        let _ = tx.unbounded_send(Err(FrogClawClientError::Provider(format!(
                             "Stream error: {e}"
                         ))));
                         return;
@@ -928,18 +928,18 @@ impl ProviderAdapter for OpenAIAdapter {
         )
         .send()
         .await
-        .map_err(|e| AQBotError::Provider(format!("Request failed: {e}")))?;
+        .map_err(|e| FrogClawClientError::Provider(format!("Request failed: {e}")))?;
 
         if !resp.status().is_success() {
             let s = resp.status();
             let t = resp.text().await.unwrap_or_default();
-            return Err(AQBotError::Provider(format!("OpenAI API error {s}: {t}")));
+            return Err(FrogClawClientError::Provider(format!("OpenAI API error {s}: {t}")));
         }
 
         let body = resp
             .text()
             .await
-            .map_err(|e| AQBotError::Provider(format!("Read error: {e}")))?;
+            .map_err(|e| FrogClawClientError::Provider(format!("Read error: {e}")))?;
 
         let convert = |models: Vec<OpenAIModel>| -> Vec<Model> {
             models
@@ -997,7 +997,7 @@ impl ProviderAdapter for OpenAIAdapter {
             return Ok(convert(models));
         }
 
-        Err(AQBotError::Provider(format!(
+        Err(FrogClawClientError::Provider(format!(
             "Unsupported models response format (body: {})",
             if body.len() > 200 {
                 &body[..200]
@@ -1022,7 +1022,7 @@ impl ProviderAdapter for OpenAIAdapter {
         )
         .send()
         .await
-        .map_err(|e| AQBotError::Provider(format!("Request failed: {e}")))?;
+        .map_err(|e| FrogClawClientError::Provider(format!("Request failed: {e}")))?;
         let status = resp.status().as_u16();
         Ok(status != 401 && status != 403)
     }
@@ -1048,12 +1048,12 @@ impl ProviderAdapter for OpenAIAdapter {
         )
         .send()
         .await
-        .map_err(|e| AQBotError::Provider(format!("Embed request failed: {e}")))?;
+        .map_err(|e| FrogClawClientError::Provider(format!("Embed request failed: {e}")))?;
 
         if !resp.status().is_success() {
             let s = resp.status();
             let t = resp.text().await.unwrap_or_default();
-            return Err(AQBotError::Provider(format!(
+            return Err(FrogClawClientError::Provider(format!(
                 "OpenAI embed API error {s}: {t}"
             )));
         }
@@ -1061,7 +1061,7 @@ impl ProviderAdapter for OpenAIAdapter {
         let result: OpenAIEmbedResponse = resp
             .json()
             .await
-            .map_err(|e| AQBotError::Provider(format!("Embed parse error: {e}")))?;
+            .map_err(|e| FrogClawClientError::Provider(format!("Embed parse error: {e}")))?;
 
         let dimensions = result.data.first().map(|d| d.embedding.len()).unwrap_or(0);
         let embeddings: Vec<Vec<f32>> = result.data.into_iter().map(|d| d.embedding).collect();

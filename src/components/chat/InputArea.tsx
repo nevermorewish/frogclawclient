@@ -1,9 +1,9 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Button, Tooltip, App, theme, Dropdown, Tag, Popover, Checkbox, Badge, Popconfirm } from 'antd';
 import type { MenuProps } from 'antd';
-import { Paperclip, Trash2, Mic, Eraser, Scissors, Globe, Brain, Atom, Plug, SlidersHorizontal, ArrowUp, Square, Check, Zap, ZapOff, Shrink, Upload, GitCompareArrows, X, BookOpen, GripHorizontal, CircleOff, SignalLow, SignalMedium, SignalHigh, Signal, Bot, MessageSquare, Shield, ShieldCheck, ShieldAlert, FolderOpen, ExternalLink } from 'lucide-react';
+import { Paperclip, Trash2, Mic, Eraser, Scissors, Globe, Brain, Atom, Plug, SlidersHorizontal, ArrowUp, Square, Check, Zap, ZapOff, Shrink, Upload, GitCompareArrows, X, GripHorizontal, CircleOff, SignalLow, SignalMedium, SignalHigh, Signal, Bot, MessageSquare, Shield, ShieldCheck, ShieldAlert, FolderOpen, ExternalLink } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useConversationStore, useProviderStore, useSettingsStore, useSearchStore, useMcpStore, useMemoryStore, useKnowledgeStore } from '@/stores';
+import { useConversationStore, useProviderStore, useSettingsStore, useSearchStore, useMcpStore, useMemoryStore } from '@/stores';
 import { useUIStore } from '@/stores/uiStore';
 import { findModelByIds, supportsReasoning, modelHasCapability } from '@/lib/modelCapabilities';
 import {
@@ -14,7 +14,6 @@ import {
 import { estimateMessageTokens, estimateTokens } from '@/lib/tokenEstimator';
 import { McpServerIcon } from '@/components/shared/McpServerIcon';
 import { NamespaceIcon } from '@/components/shared/NamespaceIcon';
-import { KnowledgeBaseIcon } from '@/components/shared/KnowledgeBaseIcon';
 import { getShortcutBinding, formatShortcutForDisplay, matchesShortcutEvent } from '@/lib/shortcuts';
 import type { ShortcutAction } from '@/lib/shortcuts';
 import { VoiceCall } from './VoiceCall';
@@ -143,13 +142,6 @@ export function InputArea() {
   // Agent working directory state
   const [agentCwd, setAgentCwd] = useState<string | null>(null);
 
-  // Knowledge base state
-  const knowledgeBases = useKnowledgeStore((s) => s.bases);
-  const loadKnowledgeBases = useKnowledgeStore((s) => s.loadBases);
-  const enabledKnowledgeBaseIds = useConversationStore((s) => s.enabledKnowledgeBaseIds);
-  const toggleKnowledgeBase = useConversationStore((s) => s.toggleKnowledgeBase);
-  const [kbPopoverOpen, setKbPopoverOpen] = useState(false);
-
   // Memory state
   const memoryNamespaces = useMemoryStore((s) => s.namespaces);
   const loadMemoryNamespaces = useMemoryStore((s) => s.loadNamespaces);
@@ -178,11 +170,6 @@ export function InputArea() {
   useEffect(() => {
     if (mcpServers.length === 0) loadMcpServers();
   }, [mcpServers.length, loadMcpServers]);
-
-  // Load knowledge bases on mount
-  useEffect(() => {
-    if (knowledgeBases.length === 0) loadKnowledgeBases();
-  }, [knowledgeBases.length, loadKnowledgeBases]);
 
   // Load memory namespaces on mount
   useEffect(() => {
@@ -226,7 +213,7 @@ export function InputArea() {
   }, []);
 
   // Persist companion models per conversation in localStorage
-  const companionStorageKey = activeConversationId ? `aqbot:companion-models:${activeConversationId}` : null;
+  const companionStorageKey = activeConversationId ? `frogclaw:companion-models:${activeConversationId}` : null;
 
   // Load companion models when conversation changes
   useEffect(() => {
@@ -457,47 +444,6 @@ export function InputArea() {
       console.warn('Failed to select working directory:', e);
     }
   }, [activeConversationId, t]);
-
-  // Knowledge base popover content
-  const kbPopoverContent = useMemo(() => {
-    if (knowledgeBases.length === 0) {
-      return (
-        <div style={{ padding: '8px 0', minWidth: 180 }}>
-          <div style={{ color: token.colorTextSecondary, fontSize: 12, marginBottom: 8 }}>
-            {t('chat.knowledge.empty')}
-          </div>
-          <Button
-            type="link"
-            size="small"
-            style={{ padding: 0, fontSize: 12 }}
-            onClick={() => {
-              setKbPopoverOpen(false);
-              setActivePage('knowledge');
-            }}
-          >
-            {t('chat.mcp.goConfig')}
-          </Button>
-        </div>
-      );
-    }
-    return (
-      <div style={{ minWidth: 180, maxHeight: 300, overflowY: 'auto' }}>
-        {knowledgeBases.map((kb) => (
-          <div key={kb.id} style={{ padding: '3px 0' }}>
-            <Checkbox
-              checked={enabledKnowledgeBaseIds.includes(kb.id)}
-              onChange={() => toggleKnowledgeBase(kb.id)}
-            >
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-                <KnowledgeBaseIcon kb={kb} size={14} />
-                {kb.name}
-              </span>
-            </Checkbox>
-          </div>
-        ))}
-      </div>
-    );
-  }, [knowledgeBases, enabledKnowledgeBaseIds, toggleKnowledgeBase, token, t, setActivePage]);
 
   // Memory namespace popover content
   const memoryPopoverContent = useMemo(() => {
@@ -1012,8 +958,8 @@ export function InputArea() {
   // Listen for Escape to close voice overlay
   React.useEffect(() => {
     const onEscape = () => setVoiceCallVisible(false);
-    window.addEventListener('aqbot:escape', onEscape);
-    return () => window.removeEventListener('aqbot:escape', onEscape);
+    window.addEventListener('frogclaw:escape', onEscape);
+    return () => window.removeEventListener('frogclaw:escape', onEscape);
   }, []);
 
   React.useEffect(() => {
@@ -1037,13 +983,13 @@ export function InputArea() {
       });
     };
 
-    window.addEventListener('aqbot:fill-last-message', onFillLast);
-    window.addEventListener('aqbot:clear-context', onClearContext);
-    window.addEventListener('aqbot:clear-conversation-messages', onClearConversation);
+    window.addEventListener('frogclaw:fill-last-message', onFillLast);
+    window.addEventListener('frogclaw:clear-context', onClearContext);
+    window.addEventListener('frogclaw:clear-conversation-messages', onClearConversation);
     return () => {
-      window.removeEventListener('aqbot:fill-last-message', onFillLast);
-      window.removeEventListener('aqbot:clear-context', onClearContext);
-      window.removeEventListener('aqbot:clear-conversation-messages', onClearConversation);
+      window.removeEventListener('frogclaw:fill-last-message', onFillLast);
+      window.removeEventListener('frogclaw:clear-context', onClearContext);
+      window.removeEventListener('frogclaw:clear-conversation-messages', onClearConversation);
     };
   }, [
     activeConversationId,
@@ -1073,8 +1019,8 @@ export function InputArea() {
         textarea.style.height = Math.min(desired, ABSOLUTE_MAX_HEIGHT) + 'px';
       });
     };
-    window.addEventListener('aqbot:fill-input', onFillInput);
-    return () => window.removeEventListener('aqbot:fill-input', onFillInput);
+    window.addEventListener('frogclaw:fill-input', onFillInput);
+    return () => window.removeEventListener('frogclaw:fill-input', onFillInput);
   }, []);
 
   // Listen for mode toggle shortcut
@@ -1083,8 +1029,8 @@ export function InputArea() {
       const nextMode = currentMode === 'chat' ? 'agent' : 'chat';
       handleModeSwitch(nextMode);
     };
-    window.addEventListener('aqbot:toggle-mode', onToggleMode);
-    return () => window.removeEventListener('aqbot:toggle-mode', onToggleMode);
+    window.addEventListener('frogclaw:toggle-mode', onToggleMode);
+    return () => window.removeEventListener('frogclaw:toggle-mode', onToggleMode);
   }, [currentMode, handleModeSwitch]);
 
   return (
@@ -1198,7 +1144,7 @@ export function InputArea() {
 
         {/* Textarea */}
         <textarea
-          className="aqbot-input-textarea"
+          className="frogclaw-input-textarea"
           ref={textareaRef}
           value={value}
           onChange={handleInput}
@@ -1314,25 +1260,6 @@ export function InputArea() {
                   size="small"
                   icon={<Plug size={14} />}
                   style={enabledMcpServerIds.some((id) => mcpServers.some((s) => s.id === id && s.enabled)) ? { color: token.colorPrimary } : undefined}
-                />
-                </Badge>
-              </Tooltip>
-            </Popover>
-            <Popover
-              trigger="click"
-              placement="topLeft"
-              content={kbPopoverContent}
-              arrow={false}
-              open={kbPopoverOpen}
-              onOpenChange={setKbPopoverOpen}
-            >
-              <Tooltip title={t('chat.knowledge.title')} open={kbPopoverOpen ? false : undefined}>
-                <Badge count={enabledKnowledgeBaseIds.length} size="small" offset={[-4, 4]} color={token.colorPrimary}>
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<BookOpen size={14} />}
-                  style={enabledKnowledgeBaseIds.length > 0 ? { color: token.colorPrimary } : undefined}
                 />
                 </Badge>
               </Tooltip>

@@ -3,7 +3,7 @@ use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 
 use crate::entity::backup_manifests;
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 use crate::types::BackupManifest;
 use crate::utils::gen_id;
 
@@ -21,7 +21,7 @@ fn model_to_manifest(m: backup_manifests::Model) -> BackupManifest {
     }
 }
 
-/// Get the backup directory, using the configured path or defaulting to the AQBot home backups dir.
+/// Get the backup directory, using the configured path or defaulting to the FrogClawClient home backups dir.
 pub fn resolve_backup_dir(backup_dir_setting: Option<&str>, app_data_dir: &Path) -> PathBuf {
     if let Some(dir) = backup_dir_setting {
         if !dir.is_empty() {
@@ -34,7 +34,7 @@ pub fn resolve_backup_dir(backup_dir_setting: Option<&str>, app_data_dir: &Path)
 /// Ensure the backup directory exists
 pub fn ensure_backup_dir(dir: &Path) -> Result<()> {
     std::fs::create_dir_all(dir)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to create backup directory: {}", e)))
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to create backup directory: {}", e)))
 }
 
 /// Create a real backup file (SQLite copy or JSON export)
@@ -51,7 +51,7 @@ pub async fn create_backup(
         "sqlite" => "db",
         _ => "json",
     };
-    let filename = format!("aqbot-backup-{}.{}", timestamp, extension);
+    let filename = format!("frogclaw-backup-{}.{}", timestamp, extension);
     let file_path = backup_dir.join(&filename);
 
     match format {
@@ -94,7 +94,7 @@ async fn create_sqlite_backup(db: &DatabaseConnection, dest: &Path) -> Result<()
     // Remove existing file if present (VACUUM INTO fails otherwise)
     if dest.exists() {
         std::fs::remove_file(dest).map_err(|e| {
-            AQBotError::Gateway(format!("Failed to remove existing backup file: {}", e))
+            FrogClawClientError::Gateway(format!("Failed to remove existing backup file: {}", e))
         })?;
     }
     db.execute(Statement::from_string(
@@ -102,7 +102,7 @@ async fn create_sqlite_backup(db: &DatabaseConnection, dest: &Path) -> Result<()
         format!("VACUUM INTO '{}'", dest_str.replace('\'', "''")),
     ))
     .await
-    .map_err(|e| AQBotError::Gateway(format!("VACUUM INTO failed: {}", e)))?;
+    .map_err(|e| FrogClawClientError::Gateway(format!("VACUUM INTO failed: {}", e)))?;
     Ok(())
 }
 
@@ -133,15 +133,15 @@ async fn create_json_backup(db: &DatabaseConnection, dest: &Path) -> Result<()> 
     });
 
     let json_str = serde_json::to_string_pretty(&data)
-        .map_err(|e| AQBotError::Gateway(format!("JSON serialization failed: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("JSON serialization failed: {}", e)))?;
     std::fs::write(dest, json_str)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to write backup file: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to write backup file: {}", e)))?;
     Ok(())
 }
 
 fn compute_file_checksum(path: &Path) -> Result<String> {
     let data = std::fs::read(path)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to read file for checksum: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read file for checksum: {}", e)))?;
     let hash = Sha256::digest(&data);
     Ok(format!("{:x}", hash))
 }
@@ -174,7 +174,7 @@ pub async fn get_backup(db: &DatabaseConnection, id: &str) -> Result<BackupManif
     let model = backup_manifests::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("BackupManifest {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("BackupManifest {}", id)))?;
 
     Ok(model_to_manifest(model))
 }
@@ -193,7 +193,7 @@ pub async fn delete_backup(db: &DatabaseConnection, id: &str) -> Result<()> {
     let result = backup_manifests::Entity::delete_by_id(id).exec(db).await?;
 
     if result.rows_affected == 0 {
-        return Err(AQBotError::NotFound(format!("BackupManifest {}", id)));
+        return Err(FrogClawClientError::NotFound(format!("BackupManifest {}", id)));
     }
     Ok(())
 }
@@ -209,13 +209,13 @@ pub async fn batch_delete_backups(db: &DatabaseConnection, ids: &[String]) -> Re
 pub async fn restore_sqlite_backup(backup_path: &str, current_db_path: &str) -> Result<()> {
     let src = Path::new(backup_path);
     if !src.exists() {
-        return Err(AQBotError::NotFound(format!(
+        return Err(FrogClawClientError::NotFound(format!(
             "Backup file not found: {}",
             backup_path
         )));
     }
     std::fs::copy(src, current_db_path)
-        .map_err(|e| AQBotError::Gateway(format!("Failed to restore backup: {}", e)))?;
+        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to restore backup: {}", e)))?;
     Ok(())
 }
 
@@ -241,26 +241,26 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    fn resolve_backup_dir_defaults_to_aqbot_backups_subdir() {
-        let aqbot_home = PathBuf::from("/Users/test/.aqbot");
+    fn resolve_backup_dir_defaults_to_frogclaw_backups_subdir() {
+        let frogclaw_home = PathBuf::from("/Users/test/.frogclaw");
 
         assert_eq!(
-            resolve_backup_dir(None, &aqbot_home),
-            aqbot_home.join("backups")
+            resolve_backup_dir(None, &frogclaw_home),
+            frogclaw_home.join("backups")
         );
         assert_eq!(
-            resolve_backup_dir(Some(""), &aqbot_home),
-            aqbot_home.join("backups")
+            resolve_backup_dir(Some(""), &frogclaw_home),
+            frogclaw_home.join("backups")
         );
     }
 
     #[test]
     fn resolve_backup_dir_honors_explicit_absolute_override() {
-        let aqbot_home = PathBuf::from("/Users/test/.aqbot");
-        let override_dir = PathBuf::from("/Volumes/external/aqbot-backups");
+        let frogclaw_home = PathBuf::from("/Users/test/.frogclaw");
+        let override_dir = PathBuf::from("/Volumes/external/frogclaw-backups");
 
         assert_eq!(
-            resolve_backup_dir(Some(override_dir.to_str().unwrap()), &aqbot_home),
+            resolve_backup_dir(Some(override_dir.to_str().unwrap()), &frogclaw_home),
             override_dir
         );
     }

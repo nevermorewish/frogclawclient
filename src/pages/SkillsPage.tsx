@@ -15,7 +15,7 @@ import type { Skill, MarketplaceSkill } from '@/types';
 import { CopyButton } from '@/components/common/CopyButton';
 
 const INSTALL_TARGETS = [
-  { key: 'aqbot', label: '~/.aqbot/skills/', desc: 'AQBot', icon: <Sparkles size={14} /> },
+  { key: 'frogclaw', label: '~/.frogclaw/skills/', desc: 'FrogClawClient', icon: <Sparkles size={14} /> },
   { key: 'claude', label: '~/.claude/skills/', desc: 'Claude', icon: <FolderOpen size={14} /> },
   { key: 'agents', label: '~/.agents/skills/', desc: 'Agents', icon: <FolderOpen size={14} /> },
 ] as const;
@@ -31,7 +31,7 @@ const { Text, Paragraph } = Typography;
 
 
 const SOURCE_ICONS: Record<string, React.ReactNode> = {
-  aqbot: <img src={appLogo} alt="" style={{ width: 14, height: 14, verticalAlign: 'middle' }} />,
+  frogclaw: <img src={appLogo} alt="" style={{ width: 14, height: 14, verticalAlign: 'middle' }} />,
   claude: <Claude.Color size={14} />,
   agents: <Radio size={14} />,
 };
@@ -236,7 +236,7 @@ export function SkillsPage() {
   const [marketplaceDetailOpen, setMarketplaceDetailOpen] = useState(false);
   const [marketplaceDetailContent, setMarketplaceDetailContent] = useState<{ name: string; repo: string; content: string } | null>(null);
   const [marketplaceDetailLoading, setMarketplaceDetailLoading] = useState(false);
-  const [sourceFilter, setSourceFilter] = useState<'all' | 'aqbot' | 'claude' | 'agents'>('all');
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'frogclaw' | 'claude' | 'agents'>('all');
 
   useEffect(() => {
     loadSkills();
@@ -384,7 +384,7 @@ export function SkillsPage() {
             placeholder={t('skills.installUrlPlaceholder')}
             value={installUrl}
             onChange={(e) => setInstallUrl(e.target.value)}
-            onPressEnter={() => handleInstallFromUrl('aqbot')}
+            onPressEnter={() => handleInstallFromUrl('frogclaw')}
           />
           <Dropdown
             menu={{
@@ -414,10 +414,10 @@ export function SkillsPage() {
         <Tabs
           size="small"
           activeKey={sourceFilter}
-          onChange={(k) => setSourceFilter(k as 'all' | 'aqbot' | 'claude' | 'agents')}
+          onChange={(k) => setSourceFilter(k as 'all' | 'frogclaw' | 'claude' | 'agents')}
           items={[
             { key: 'all', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>{ALL_SOURCE_ICON}{t('skills.sourceAll')}</span> },
-            { key: 'aqbot', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>{SOURCE_ICONS.aqbot}AQBot</span> },
+            { key: 'frogclaw', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>{SOURCE_ICONS.frogclaw}FrogClawClient</span> },
             { key: 'claude', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>{SOURCE_ICONS.claude}Claude</span> },
             { key: 'agents', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>{SOURCE_ICONS.agents}Agents</span> },
           ]}

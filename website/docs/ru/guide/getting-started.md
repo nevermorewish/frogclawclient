@@ -2,23 +2,23 @@
 
 ## Установка
 
-Скачайте последний установщик со [страницы загрузки](/ru/download) или [GitHub Releases](https://github.com/AQBot-Desktop/AQBot/releases).
+Скачайте последний установщик со [страницы загрузки](/ru/download) или [GitHub Releases](https://github.com/FrogClawClient-Desktop/FrogClawClient/releases).
 
 ### macOS
 
 | Чип | Файл |
 |-----|------|
-| Apple Silicon (M1 / M2 / M3 / M4) | `AQBot_x.x.x_aarch64.dmg` |
-| Intel | `AQBot_x.x.x_x64.dmg` |
+| Apple Silicon (M1 / M2 / M3 / M4) | `FrogClawClient_x.x.x_aarch64.dmg` |
+| Intel | `FrogClawClient_x.x.x_x64.dmg` |
 
-1. Откройте `.dmg` и перетащите **AQBot** в папку **«Программы»**.
-2. Запустите AQBot. Если macOS блокирует приложение, перейдите в **Системные настройки → Конфиденциальность и безопасность** и нажмите **Всё равно открыть**.
+1. Откройте `.dmg` и перетащите **FrogClawClient** в папку **«Программы»**.
+2. Запустите FrogClawClient. Если macOS блокирует приложение, перейдите в **Системные настройки → Конфиденциальность и безопасность** и нажмите **Всё равно открыть**.
 
 ::: warning macOS: «Приложение повреждено» или «Разработчик не верифицирован»
 Если вы видите одно из этих сообщений, откройте Терминал и выполните:
 
 ```bash
-xattr -c /Applications/AQBot.app
+xattr -c /Applications/FrogClawClient.app
 ```
 
 Затем снова запустите приложение. Это удаляет флаг карантина, который macOS применяет к неподписанным загрузкам.
@@ -28,32 +28,32 @@ xattr -c /Applications/AQBot.app
 
 | Архитектура | Файл |
 |------------|------|
-| x64 (большинство ПК) | `AQBot_x.x.x_x64-setup.exe` |
-| ARM64 | `AQBot_x.x.x_arm64-setup.exe` |
+| x64 (большинство ПК) | `FrogClawClient_x.x.x_x64-setup.exe` |
+| ARM64 | `FrogClawClient_x.x.x_arm64-setup.exe` |
 
-Запустите установщик и следуйте мастеру. Запустите AQBot из меню «Пуск» или ярлыка на рабочем столе.
+Запустите установщик и следуйте мастеру. Запустите FrogClawClient из меню «Пуск» или ярлыка на рабочем столе.
 
 ### Linux
 
 | Формат | Архитектура | Файл |
 |--------|------------|------|
-| Debian / Ubuntu | x64 | `AQBot_x.x.x_amd64.deb` |
-| Debian / Ubuntu | ARM64 | `AQBot_x.x.x_arm64.deb` |
-| Fedora / openSUSE | x64 | `AQBot_x.x.x_x86_64.rpm` |
-| Fedora / openSUSE | ARM64 | `AQBot_x.x.x_aarch64.rpm` |
-| Любой дистрибутив | x64 | `AQBot_x.x.x_amd64.AppImage` |
-| Любой дистрибутив | ARM64 | `AQBot_x.x.x_aarch64.AppImage` |
+| Debian / Ubuntu | x64 | `FrogClawClient_x.x.x_amd64.deb` |
+| Debian / Ubuntu | ARM64 | `FrogClawClient_x.x.x_arm64.deb` |
+| Fedora / openSUSE | x64 | `FrogClawClient_x.x.x_x86_64.rpm` |
+| Fedora / openSUSE | ARM64 | `FrogClawClient_x.x.x_aarch64.rpm` |
+| Любой дистрибутив | x64 | `FrogClawClient_x.x.x_amd64.AppImage` |
+| Любой дистрибутив | ARM64 | `FrogClawClient_x.x.x_aarch64.AppImage` |
 
 ```bash
 # Debian / Ubuntu
-sudo dpkg -i AQBot_x.x.x_amd64.deb
+sudo dpkg -i FrogClawClient_x.x.x_amd64.deb
 
 # Fedora / openSUSE
-sudo rpm -i AQBot_x.x.x_x86_64.rpm
+sudo rpm -i FrogClawClient_x.x.x_x86_64.rpm
 
 # AppImage (любой дистрибутив)
-chmod +x AQBot_x.x.x_amd64.AppImage
-./AQBot_x.x.x_amd64.AppImage
+chmod +x FrogClawClient_x.x.x_amd64.AppImage
+./FrogClawClient_x.x.x_amd64.AppImage
 ```
 
 ---
@@ -62,7 +62,7 @@ chmod +x AQBot_x.x.x_amd64.AppImage
 
 ### 1. Открыть настройки
 
-Запустите AQBot и нажмите на **значок шестерёнки** внизу боковой панели, или нажмите <kbd>Cmd/Ctrl</kbd>+<kbd>,</kbd>.
+Запустите FrogClawClient и нажмите на **значок шестерёнки** внизу боковой панели, или нажмите <kbd>Cmd/Ctrl</kbd>+<kbd>,</kbd>.
 
 ### 2. Добавить провайдера
 
@@ -92,7 +92,7 @@ chmod +x AQBot_x.x.x_amd64.AppImage
 1. Нажмите **Новый чат** в боковой панели (или нажмите <kbd>Cmd/Ctrl</kbd>+<kbd>N</kbd>).
 2. Выберите модель из селектора моделей вверху чата.
 3. Введите сообщение и нажмите <kbd>Enter</kbd>.
-4. AQBot транслирует ответ в реальном времени. Модели с поддержкой блоков размышлений (например, Claude, DeepSeek R1) отображают процесс рассуждений в сворачиваемом разделе.
+4. FrogClawClient транслирует ответ в реальном времени. Модели с поддержкой блоков размышлений (например, Claude, DeepSeek R1) отображают процесс рассуждений в сворачиваемом разделе.
 
 ---
 
@@ -116,8 +116,8 @@ chmod +x AQBot_x.x.x_amd64.AppImage
 
 | Путь | Содержимое |
 |------|-----------|
-| `~/.aqbot/` | Состояние приложения — база данных, ключи шифрования, векторная БД, SSL-сертификаты |
-| `~/Documents/aqbot/` | Файлы пользователя — изображения, документы, резервные копии |
+| `~/.frogclaw/` | Состояние приложения — база данных, ключи шифрования, векторная БД, SSL-сертификаты |
+| `~/Documents/frogclaw/` | Файлы пользователя — изображения, документы, резервные копии |
 
 ---
 

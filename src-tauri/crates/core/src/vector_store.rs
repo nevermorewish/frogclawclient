@@ -1,6 +1,6 @@
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, DbErr, Statement};
 
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 
 /// Register the sqlite-vec extension globally.
 ///
@@ -112,7 +112,7 @@ impl VectorStore {
 
         for (i, record) in records.iter().enumerate() {
             if record.embedding.len() != dimensions {
-                return Err(AQBotError::Provider(format!(
+                return Err(FrogClawClientError::Provider(format!(
                     "Embedding dimension mismatch at record {}: got {} but expected {}",
                     i,
                     record.embedding.len(),
@@ -209,7 +209,7 @@ impl VectorStore {
         let meta_table = format!("{name}_meta");
 
         if !self.table_exists(&meta_table).await? {
-            return Err(AQBotError::NotFound("Collection not found".into()));
+            return Err(FrogClawClientError::NotFound("Collection not found".into()));
         }
 
         // Determine next chunk_index for this document
@@ -582,7 +582,7 @@ impl VectorStore {
         let meta_table = format!("{name}_meta");
 
         if !self.table_exists(&meta_table).await? {
-            return Err(AQBotError::NotFound("Collection not found".into()));
+            return Err(FrogClawClientError::NotFound("Collection not found".into()));
         }
 
         self.db
@@ -608,7 +608,7 @@ impl VectorStore {
         let meta_table = format!("{name}_meta");
 
         if !self.table_exists(&meta_table).await? {
-            return Err(AQBotError::NotFound("Collection not found".into()));
+            return Err(FrogClawClientError::NotFound("Collection not found".into()));
         }
 
         // Get the rowid from _meta
@@ -621,7 +621,7 @@ impl VectorStore {
             ))
             .await
             .map_err(Self::wrap)?
-            .ok_or_else(|| AQBotError::NotFound(format!("Chunk {} not found", chunk_id)))?;
+            .ok_or_else(|| FrogClawClientError::NotFound(format!("Chunk {} not found", chunk_id)))?;
 
         let rid: i64 = row.try_get("", "rowid").map_err(Self::wrap)?;
         let vec_json = Self::embedding_to_json(embedding);
@@ -769,7 +769,7 @@ impl VectorStore {
         Ok(())
     }
 
-    fn wrap(e: DbErr) -> AQBotError {
-        AQBotError::Provider(format!("Vector store error: {e}"))
+    fn wrap(e: DbErr) -> FrogClawClientError {
+        FrogClawClientError::Provider(format!("Vector store error: {e}"))
     }
 }

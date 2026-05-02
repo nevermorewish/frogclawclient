@@ -1,9 +1,9 @@
 [简体中文](./README.md) | [繁體中文](./README-ZH-TW.md) | [English](./README-EN.md) | [日本語](./README-JA.md) | [한국어](./README-KO.md) | [Français](./README-FR.md) | [Deutsch](./README-DE.md) | [Español](./README-ES.md) | [Русский](./README-RU.md) | **हिन्दी** | [العربية](./README-AR.md)
 
-[![AQBot](https://socialify.git.ci/AQBot-Desktop/AQBot/image?description=1&font=JetBrains+Mono&forks=1&issues=1&logo=https%3A%2F%2Fgithub.com%2FAQBot-Desktop%2FAQBot%2Fblob%2Fmain%2Fsrc%2Fassets%2Fimage%2Flogo.png%3Fraw%3Dtrue&name=1&owner=1&pattern=Floating+Cogs&pulls=1&stargazers=1&theme=Auto)](https://github.com/AQBot-Desktop/AQBot)
+[![FrogClawClient](https://socialify.git.ci/FrogClawClient-Desktop/FrogClawClient/image?description=1&font=JetBrains+Mono&forks=1&issues=1&logo=https%3A%2F%2Fgithub.com%2FFrogClawClient-Desktop%2FFrogClawClient%2Fblob%2Fmain%2Fsrc%2Fassets%2Fimage%2Flogo.png%3Fraw%3Dtrue&name=1&owner=1&pattern=Floating+Cogs&pulls=1&stargazers=1&theme=Auto)](https://github.com/FrogClawClient-Desktop/FrogClawClient)
 
 <p align="center">
-    <a href="https://www.producthunt.com/products/aqbot?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-aqbot" target="_blank" rel="noopener noreferrer"><img alt="AQBot - Lightweight, high-perf cross-platform AI desktop client | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1118403&amp;theme=light&amp;t=1775627359538"></a>
+    <a href="https://www.producthunt.com/products/frogclaw?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-frogclaw" target="_blank" rel="noopener noreferrer"><img alt="FrogClawClient - Lightweight, high-perf cross-platform AI desktop client | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1118403&amp;theme=light&amp;t=1775627359538"></a>
 </p>
 
 ## स्क्रीनशॉट
@@ -68,7 +68,7 @@
 ### टूल और एक्सटेंशन
 
 - **MCP प्रोटोकॉल** — stdio और HTTP दोनों ट्रांसपोर्ट का समर्थन करने वाला पूर्ण Model Context Protocol कार्यान्वयन
-- **इनबिल्ट टूल** — `@aqbot/fetch` जैसे तुरंत उपयोग के लिए तैयार इनबिल्ट MCP टूल
+- **इनबिल्ट टूल** — `@frogclaw/fetch` जैसे तुरंत उपयोग के लिए तैयार इनबिल्ट MCP टूल
 - **टूल एग्जीक्यूशन पैनल** — टूल कॉल अनुरोधों और वापसी परिणामों का दृश्य प्रदर्शन
 
 ### API गेटवे
@@ -83,7 +83,7 @@
 ### डेटा और सुरक्षा
 
 - **AES-256 एन्क्रिप्शन** — API कुंजियाँ और संवेदनशील डेटा AES-256 के साथ स्थानीय रूप से एन्क्रिप्ट किए गए; मास्टर कुंजी 0600 अनुमतियों के साथ संग्रहीत
-- **अलग डेटा डायरेक्टरी** — `~/.aqbot/` में एप्लिकेशन स्थिति; `~/Documents/aqbot/` में उपयोगकर्ता फाइलें
+- **अलग डेटा डायरेक्टरी** — `~/.frogclaw/` में एप्लिकेशन स्थिति; `~/Documents/frogclaw/` में उपयोगकर्ता फाइलें
 - **ऑटो बैकअप** — स्थानीय डायरेक्टरी या WebDAV स्टोरेज में अनुसूचित स्वचालित बैकअप
 - **बैकअप पुनर्स्थापना** — ऐतिहासिक बैकअप से वन-क्लिक पुनर्स्थापना
 - **वार्तालाप निर्यात** — बातचीत को PNG स्क्रीनशॉट, Markdown, सादे पाठ या JSON के रूप में निर्यात करें
@@ -109,7 +109,7 @@
 
 ## शुरू करना
 
-[Releases](https://github.com/AQBot-Desktop/AQBot/releases) पेज पर जाएँ और अपने प्लेटफॉर्म के लिए इंस्टॉलर डाउनलोड करें।
+[Releases](https://github.com/FrogClawClient-Desktop/FrogClawClient/releases) पेज पर जाएँ और अपने प्लेटफॉर्म के लिए इंस्टॉलर डाउनलोड करें।
 
 ## अक्सर पूछे जाने वाले प्रश्न
 
@@ -117,8 +117,8 @@
 
 चूँकि एप्लिकेशन Apple द्वारा साइन नहीं किया गया है, macOS निम्नलिखित में से एक संकेत दिखा सकता है:
 
-- "AQBot" क्षतिग्रस्त है और इसे नहीं खोला जा सकता
-- "AQBot" को नहीं खोला जा सकता क्योंकि Apple इसे दुर्भावनापूर्ण सॉफ़्टवेयर के लिए जाँच नहीं कर सकता
+- "FrogClawClient" क्षतिग्रस्त है और इसे नहीं खोला जा सकता
+- "FrogClawClient" को नहीं खोला जा सकता क्योंकि Apple इसे दुर्भावनापूर्ण सॉफ़्टवेयर के लिए जाँच नहीं कर सकता
 
 **समाधान के चरण:**
 
@@ -133,7 +133,7 @@ sudo spctl --master-disable
 **2. क्वारंटाइन विशेषता हटाएँ**
 
 ```bash
-sudo xattr -dr com.apple.quarantine /Applications/AQBot.app
+sudo xattr -dr com.apple.quarantine /Applications/FrogClawClient.app
 ```
 
 > टिप: आप `sudo xattr -dr com.apple.quarantine ` टाइप करने के बाद टर्मिनल पर ऐप आइकन खींच सकते हैं।

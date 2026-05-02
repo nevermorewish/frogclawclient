@@ -2,13 +2,13 @@
 
 ## ¿Qué es MCP?
 
-El [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) es un estándar abierto que permite a los modelos de IA interactuar con herramientas y fuentes de datos externas. AQBot actúa como cliente MCP — añades servidores MCP y la IA puede llamar a las herramientas que exponen durante una conversación.
+El [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) es un estándar abierto que permite a los modelos de IA interactuar con herramientas y fuentes de datos externas. FrogClawClient actúa como cliente MCP — añades servidores MCP y la IA puede llamar a las herramientas que exponen durante una conversación.
 
 ---
 
 ## Protocolos de transporte
 
-AQBot soporta tres protocolos de transporte para comunicarse con servidores MCP:
+FrogClawClient soporta tres protocolos de transporte para comunicarse con servidores MCP:
 
 | Protocolo | Conexión | Caso de uso | Configuración |
 |-----------|---------|------------|---------------|
@@ -49,8 +49,8 @@ Haz clic en **Importar JSON** y pega un objeto de configuración:
 
 | Herramienta | Descripción |
 |------------|-------------|
-| **@aqbot/fetch** | Obtener páginas web y recursos HTTP |
-| **@aqbot/search-file** | Buscar archivos en tu sistema de archivos local |
+| **@frogclaw/fetch** | Obtener páginas web y recursos HTTP |
+| **@frogclaw/search-file** | Buscar archivos en tu sistema de archivos local |
 
 ---
 

@@ -1,7 +1,7 @@
 use sea_orm::*;
 
 use crate::entity::context_sources;
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 use crate::types::{ContextSource, CreateContextSourceInput};
 use crate::utils::gen_id;
 
@@ -34,7 +34,7 @@ pub async fn get_context_source(db: &DatabaseConnection, id: &str) -> Result<Con
     let model = context_sources::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("ContextSource {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("ContextSource {}", id)))?;
 
     Ok(model_to_context_source(model))
 }
@@ -65,7 +65,7 @@ pub async fn remove_context_source(db: &DatabaseConnection, id: &str) -> Result<
     let result = context_sources::Entity::delete_by_id(id).exec(db).await?;
 
     if result.rows_affected == 0 {
-        return Err(AQBotError::NotFound(format!("ContextSource {}", id)));
+        return Err(FrogClawClientError::NotFound(format!("ContextSource {}", id)));
     }
     Ok(())
 }
@@ -74,7 +74,7 @@ pub async fn toggle_context_source(db: &DatabaseConnection, id: &str) -> Result<
     let model = context_sources::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("ContextSource {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("ContextSource {}", id)))?;
 
     let new_enabled = if model.enabled != 0 { 0 } else { 1 };
     let mut am: context_sources::ActiveModel = model.into();

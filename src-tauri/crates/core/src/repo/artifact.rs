@@ -1,7 +1,7 @@
 use sea_orm::*;
 
 use crate::entity::artifacts;
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 use crate::types::{Artifact, CreateArtifactInput, UpdateArtifactInput};
 use crate::utils::gen_id;
 
@@ -39,7 +39,7 @@ pub async fn get_artifact(db: &DatabaseConnection, id: &str) -> Result<Artifact>
     let model = artifacts::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("Artifact {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("Artifact {}", id)))?;
 
     Ok(model_to_artifact(model))
 }
@@ -74,7 +74,7 @@ pub async fn update_artifact(
     let model = artifacts::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("Artifact {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("Artifact {}", id)))?;
 
     let existing = model_to_artifact(model.clone());
 
@@ -97,7 +97,7 @@ pub async fn delete_artifact(db: &DatabaseConnection, id: &str) -> Result<()> {
     let result = artifacts::Entity::delete_by_id(id).exec(db).await?;
 
     if result.rows_affected == 0 {
-        return Err(AQBotError::NotFound(format!("Artifact {}", id)));
+        return Err(FrogClawClientError::NotFound(format!("Artifact {}", id)));
     }
     Ok(())
 }

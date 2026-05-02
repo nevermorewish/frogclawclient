@@ -245,7 +245,7 @@ function DrawingImagePlaceholder() {
       <div
         className="absolute inset-0"
         style={{
-          animation: 'aqbot-drawing-shimmer 1.35s linear infinite',
+          animation: 'frogclaw-drawing-shimmer 1.35s linear infinite',
           background: `linear-gradient(110deg, ${token.colorFillAlter} 8%, ${token.colorFillSecondary} 18%, ${token.colorFillAlter} 33%)`,
           backgroundSize: '220% 100%',
         }}

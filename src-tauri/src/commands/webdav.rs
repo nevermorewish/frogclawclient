@@ -1,7 +1,7 @@
 use crate::AppState;
-use aqbot_core::crypto::{decrypt_key, encrypt_key};
-use aqbot_core::repo::{backup, settings as settings_repo};
-use aqbot_core::webdav::{self, WebDavClient, WebDavConfig, WebDavFileInfo};
+use frogclaw_core::crypto::{decrypt_key, encrypt_key};
+use frogclaw_core::repo::{backup, settings as settings_repo};
+use frogclaw_core::webdav::{self, WebDavClient, WebDavConfig, WebDavFileInfo};
 use sea_orm::{ConnectionTrait, DatabaseConnection, EntityTrait, PaginatorTrait, Statement};
 use std::path::Path;
 use std::path::PathBuf;
@@ -115,7 +115,7 @@ pub async fn webdav_restore(
         .await
         .map_err(|e| e.to_string())?;
 
-    let decoded_backup_dir = aqbot_core::path_vars::decode_path_opt(&settings.backup_dir);
+    let decoded_backup_dir = frogclaw_core::path_vars::decode_path_opt(&settings.backup_dir);
     let backup_dir =
         backup::resolve_backup_dir(decoded_backup_dir.as_deref(), &state.app_data_dir);
     backup::ensure_backup_dir(&backup_dir).map_err(|e| e.to_string())?;
@@ -296,7 +296,7 @@ pub(crate) async fn get_webdav_config_from_db(
         password,
         path: settings
             .webdav_path
-            .unwrap_or_else(|| "/aqbot/".to_string()),
+            .unwrap_or_else(|| "/frogclaw/".to_string()),
         accept_invalid_certs: settings.webdav_accept_invalid_certs,
     })
 }
@@ -328,7 +328,7 @@ async fn do_webdav_backup_once(
         .map_err(|e| e.to_string())?;
 
     // 2. Create local SQLite snapshot via VACUUM INTO
-    let decoded_backup_dir = aqbot_core::path_vars::decode_path_opt(&settings.backup_dir);
+    let decoded_backup_dir = frogclaw_core::path_vars::decode_path_opt(&settings.backup_dir);
     let backup_dir = backup::resolve_backup_dir(decoded_backup_dir.as_deref(), app_data_dir);
     backup::ensure_backup_dir(&backup_dir).map_err(|e| e.to_string())?;
 
@@ -407,7 +407,7 @@ async fn do_webdav_backup_once(
 }
 
 async fn count_objects_json(db: &DatabaseConnection) -> String {
-    use aqbot_core::entity::*;
+    use frogclaw_core::entity::*;
 
     let conv_count = conversations::Entity::find().count(db).await.unwrap_or(0);
     let msg_count = messages::Entity::find().count(db).await.unwrap_or(0);
@@ -494,8 +494,8 @@ mod tests {
     #[test]
     fn restore_cleanup_removes_tracked_safety_key_files() {
         let temp_root = std::env::temp_dir().join(format!(
-            "aqbot-webdav-restore-cleanup-{}",
-            aqbot_core::utils::gen_id()
+            "frogclaw-webdav-restore-cleanup-{}",
+            frogclaw_core::utils::gen_id()
         ));
         std::fs::create_dir_all(&temp_root).expect("create temp root");
         let safety_key = temp_root.join("_pre_webdav_restore_safety.key");
@@ -519,8 +519,8 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
 
         let temp_root = std::env::temp_dir().join(format!(
-            "aqbot-webdav-restore-perms-{}",
-            aqbot_core::utils::gen_id()
+            "frogclaw-webdav-restore-perms-{}",
+            frogclaw_core::utils::gen_id()
         ));
         std::fs::create_dir_all(&temp_root).expect("create temp root");
         let safety_key = temp_root.join("_pre_webdav_restore_safety.key");

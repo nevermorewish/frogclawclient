@@ -2,7 +2,7 @@ use sea_orm::sea_query::Expr;
 use sea_orm::*;
 
 use crate::entity::{knowledge_bases, knowledge_documents};
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 use crate::types::{
     CreateKnowledgeBaseInput, KnowledgeBase, KnowledgeDocument, UpdateKnowledgeBaseInput,
 };
@@ -57,7 +57,7 @@ pub async fn get_knowledge_base(db: &DatabaseConnection, id: &str) -> Result<Kno
     let model = knowledge_bases::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("KnowledgeBase {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("KnowledgeBase {}", id)))?;
 
     Ok(model_to_kb(model))
 }
@@ -100,7 +100,7 @@ pub async fn update_knowledge_base(
     let model = knowledge_bases::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("KnowledgeBase {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("KnowledgeBase {}", id)))?;
 
     let existing = model_to_kb(model.clone());
 
@@ -161,7 +161,7 @@ pub async fn delete_knowledge_base(db: &DatabaseConnection, id: &str) -> Result<
     let result = knowledge_bases::Entity::delete_by_id(id).exec(db).await?;
 
     if result.rows_affected == 0 {
-        return Err(AQBotError::NotFound(format!("KnowledgeBase {}", id)));
+        return Err(FrogClawClientError::NotFound(format!("KnowledgeBase {}", id)));
     }
     Ok(())
 }
@@ -210,7 +210,7 @@ pub async fn add_document(
     let model = knowledge_documents::Entity::find_by_id(&id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("KnowledgeDocument {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("KnowledgeDocument {}", id)))?;
 
     Ok(model_to_doc(model))
 }
@@ -228,7 +228,7 @@ pub async fn update_document_status_with_error(
     let mut am: knowledge_documents::ActiveModel = knowledge_documents::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("KnowledgeDocument {}", id)))?
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("KnowledgeDocument {}", id)))?
         .into();
 
     am.indexing_status = Set(status.to_string());
@@ -243,7 +243,7 @@ pub async fn delete_document(db: &DatabaseConnection, id: &str) -> Result<()> {
         .await?;
 
     if result.rows_affected == 0 {
-        return Err(AQBotError::NotFound(format!("KnowledgeDocument {}", id)));
+        return Err(FrogClawClientError::NotFound(format!("KnowledgeDocument {}", id)));
     }
     Ok(())
 }

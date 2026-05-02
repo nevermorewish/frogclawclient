@@ -11,7 +11,6 @@ export function formatTokenCount(value: number): string {
   return value.toLocaleString();
 }
 
-/** Format milliseconds into human-readable duration: 100ms, 1.1s, 1m2s */
 export function formatDuration(ms: number): string {
   if (ms < 1000) return `${Math.round(ms)}ms`;
   if (ms < 60_000) {
@@ -23,7 +22,6 @@ export function formatDuration(ms: number): string {
   return s > 0 ? `${m}m${s}s` : `${m}m`;
 }
 
-/** Format tokens per second: 28.5 tok/s */
 export function formatSpeed(tps: number): string {
   return `${tps < 10 ? tps.toFixed(1) : Math.round(tps)} tok/s`;
 }

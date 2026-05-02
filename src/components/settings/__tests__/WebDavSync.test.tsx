@@ -50,7 +50,7 @@ describe('WebDavSync', () => {
             host: '',
             username: '',
             password: '',
-            path: '/aqbot/',
+            path: '/frogclaw/',
             acceptInvalidCerts: false,
           };
         case 'get_webdav_sync_status':
@@ -102,7 +102,7 @@ describe('WebDavSync', () => {
         expect.objectContaining({
           webdav_host: 'https://dav.example.com',
           webdav_username: 'alice',
-          webdav_path: '/aqbot/',
+          webdav_path: '/frogclaw/',
           webdav_accept_invalid_certs: false,
           webdav_sync_enabled: false,
           webdav_sync_interval_minutes: 60,

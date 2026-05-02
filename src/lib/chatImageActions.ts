@@ -71,7 +71,7 @@ function sanitizeFilenamePart(value: string) {
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
-  return normalized || 'aqbot-image';
+  return normalized || 'frogclaw-image';
 }
 
 function ensureImageExtension(filename: string, src: string, mimeType?: string | null) {
@@ -144,7 +144,7 @@ async function blobToBytes(blob: Blob) {
 }
 
 export function getDefaultImageFilename(src: string, alt?: string | null) {
-  const base = sanitizeFilenamePart(alt || 'aqbot-image');
+  const base = sanitizeFilenamePart(alt || 'frogclaw-image');
   return ensureImageExtension(base, src, getMimeTypeFromDataUrl(src));
 }
 

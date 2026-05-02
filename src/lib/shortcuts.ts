@@ -11,7 +11,6 @@ export type ShortcutAction =
   | 'fillLastMessage'
   | 'clearContext'
   | 'clearConversationMessages'
-  | 'toggleGateway'
   | 'toggleMode';
 
 export interface ShortcutDescriptor {
@@ -30,7 +29,6 @@ export const SHORTCUT_ACTIONS: ShortcutAction[] = [
   'fillLastMessage',
   'clearContext',
   'clearConversationMessages',
-  'toggleGateway',
   'toggleMode',
 ];
 
@@ -50,7 +48,6 @@ export const SHORTCUT_DESCRIPTORS: ShortcutDescriptor[] = [
   { action: 'fillLastMessage', labelKey: 'settings.shortcutAction.fillLastMessage', supportsGlobal: false },
   { action: 'clearContext', labelKey: 'settings.shortcutAction.clearContext', supportsGlobal: false },
   { action: 'clearConversationMessages', labelKey: 'settings.shortcutAction.clearConversationMessages', supportsGlobal: false },
-  { action: 'toggleGateway', labelKey: 'settings.shortcutAction.toggleGateway', supportsGlobal: false },
   { action: 'toggleMode', labelKey: 'settings.shortcutAction.toggleMode', supportsGlobal: false },
 ];
 
@@ -65,7 +62,6 @@ export const SHORTCUT_ACTION_LABEL_KEYS: Record<ShortcutAction, string> = {
   fillLastMessage: 'settings.shortcutAction.fillLastMessage',
   clearContext: 'settings.shortcutAction.clearContext',
   clearConversationMessages: 'settings.shortcutAction.clearConversationMessages',
-  toggleGateway: 'settings.shortcutAction.toggleGateway',
   toggleMode: 'settings.shortcutAction.toggleMode',
 };
 
@@ -92,7 +88,6 @@ export const SHORTCUT_SETTING_KEYS = {
   fillLastMessage: 'shortcut_fill_last_message',
   clearContext: 'shortcut_clear_context',
   clearConversationMessages: 'shortcut_clear_conversation_messages',
-  toggleGateway: 'shortcut_toggle_gateway',
   toggleMode: 'shortcut_toggle_mode',
 } as const satisfies Record<ShortcutAction, keyof AppSettings>;
 
@@ -109,7 +104,6 @@ export const DEFAULT_SHORTCUT_BINDINGS: Record<ShortcutAction, string> = {
   fillLastMessage: 'CmdOrCtrl+Shift+ArrowUp',
   clearContext: 'CmdOrCtrl+Shift+K',
   clearConversationMessages: 'CmdOrCtrl+Shift+Backspace',
-  toggleGateway: 'CmdOrCtrl+Shift+G',
   toggleMode: 'Shift+Tab',
 };
 
@@ -281,7 +275,7 @@ export function detectShortcutConflicts(bindings: Partial<Record<ShortcutAction,
 }
 
 /**
- * Known external app shortcuts that commonly conflict with AQBot.
+ * Known external app shortcuts that commonly conflict with FrogClawClient.
  * Each entry maps a canonical accelerator (lowercase) to a list of
  * app names that use the same shortcut.
  */

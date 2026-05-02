@@ -40,7 +40,7 @@ export function parseProviderDeepLink(rawUrl: string): ProviderDeepLinkPayload |
     return null;
   }
 
-  if (url.protocol !== 'aqbot:') return null;
+  if (url.protocol !== 'frogclawclient:') return null;
   if (getDeepLinkTarget(url) !== 'providers') return null;
 
   const name = readRequiredParam(url.searchParams, 'name');

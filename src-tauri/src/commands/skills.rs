@@ -1,6 +1,6 @@
-use crate::paths::aqbot_home;
+use crate::paths::frogclaw_home;
 use crate::AppState;
-use aqbot_core::types::*;
+use frogclaw_core::types::*;
 use std::path::{Path, PathBuf};
 use tauri::State;
 
@@ -9,14 +9,14 @@ fn home_dir() -> PathBuf {
 }
 
 fn skills_dir() -> PathBuf {
-    aqbot_home().join("skills")
+    frogclaw_home().join("skills")
 }
 
 #[tauri::command]
 pub async fn list_skills(state: State<'_, AppState>) -> Result<Vec<SkillInfo>, String> {
     let home = home_dir();
     let skills = open_agent_sdk::skills::load_all_global(&home);
-    let disabled = aqbot_core::repo::skill::get_disabled_skills(&state.sea_db)
+    let disabled = frogclaw_core::repo::skill::get_disabled_skills(&state.sea_db)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -65,7 +65,7 @@ pub async fn get_skill(state: State<'_, AppState>, name: String) -> Result<Skill
         .find(|s| s.name == name)
         .ok_or_else(|| format!("Skill '{}' not found", name))?;
 
-    let disabled = aqbot_core::repo::skill::get_disabled_skills(&state.sea_db)
+    let disabled = frogclaw_core::repo::skill::get_disabled_skills(&state.sea_db)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -128,7 +128,7 @@ pub async fn toggle_skill(
     name: String,
     enabled: bool,
 ) -> Result<(), String> {
-    aqbot_core::repo::skill::set_skill_enabled(&state.sea_db, &name, enabled)
+    frogclaw_core::repo::skill::set_skill_enabled(&state.sea_db, &name, enabled)
         .await
         .map_err(|e| e.to_string())
 }
@@ -186,7 +186,7 @@ async fn install_from_github(
     let client = reqwest::Client::new();
     let response = client
         .get(&url)
-        .header("User-Agent", "AQBot")
+        .header("User-Agent", "FrogClawClient")
         .header("Accept", "application/vnd.github+json")
         .send()
         .await
@@ -303,7 +303,7 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
 pub async fn uninstall_skill(name: String) -> Result<(), String> {
     let skill_dir = skills_dir().join(&name);
     if !skill_dir.exists() {
-        return Err(format!("Skill '{}' not found in ~/.aqbot/skills/", name));
+        return Err(format!("Skill '{}' not found in ~/.frogclaw/skills/", name));
     }
     std::fs::remove_dir_all(&skill_dir).map_err(|e| e.to_string())?;
     Ok(())
@@ -314,7 +314,7 @@ pub async fn uninstall_skill_group(group: String) -> Result<(), String> {
     // Search all skill roots for a directory matching the group name
     let home = home_dir();
     let search_dirs = [
-        home.join(".aqbot").join("skills"),
+        home.join(".frogclaw").join("skills"),
         home.join(".claude").join("skills"),
         home.join(".agents").join("skills"),
     ];
@@ -358,7 +358,7 @@ pub async fn open_skill_dir(path: String) -> Result<(), String> {
 fn installed_source_refs() -> std::collections::HashSet<String> {
     let home = home_dir();
     let dirs = [
-        home.join(".aqbot").join("skills"),
+        home.join(".frogclaw").join("skills"),
         home.join(".claude").join("skills"),
         home.join(".agents").join("skills"),
     ];
@@ -423,7 +423,7 @@ pub async fn search_marketplace(
             let client = reqwest::Client::new();
             let response = client
                 .get(&url)
-                .header("User-Agent", "AQBot")
+                .header("User-Agent", "FrogClawClient")
                 .header("Accept", "application/vnd.github.v3+json")
                 .send()
                 .await
@@ -472,7 +472,7 @@ pub async fn search_marketplace(
             let client = reqwest::Client::new();
             let response = client
                 .get(&url)
-                .header("User-Agent", "AQBot")
+                .header("User-Agent", "FrogClawClient")
                 .send()
                 .await
                 .map_err(|e| format!("Search failed: {}", e))?;
@@ -557,7 +557,7 @@ pub async fn check_skill_updates() -> Result<Vec<SkillUpdateInfo>, String> {
         let client = reqwest::Client::new();
         let response = client
             .get(&url)
-            .header("User-Agent", "AQBot")
+            .header("User-Agent", "FrogClawClient")
             .header("Accept", "application/vnd.github.v3+json")
             .send()
             .await;

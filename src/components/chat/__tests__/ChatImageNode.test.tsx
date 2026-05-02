@@ -7,7 +7,7 @@ import { ChatImageNode } from '../ChatImageNode';
 const imageActions = vi.hoisted(() => ({
   copyChatImage: vi.fn(async (_src: string) => undefined),
   saveChatImage: vi.fn(async (_src: string, _defaultName?: string) => true),
-  getDefaultImageFilename: vi.fn((_src: string, _alt?: string | null) => 'aqbot-image.png'),
+  getDefaultImageFilename: vi.fn((_src: string, _alt?: string | null) => 'frogclaw-image.png'),
 }));
 
 vi.mock('react-i18next', () => ({
@@ -99,6 +99,6 @@ describe('ChatImageNode', () => {
     await waitFor(() => expect(imageActions.copyChatImage).toHaveBeenCalledWith(src));
 
     await user.click(screen.getByRole('button', { name: '保存图片' }));
-    await waitFor(() => expect(imageActions.saveChatImage).toHaveBeenCalledWith(src, 'aqbot-image.png'));
+    await waitFor(() => expect(imageActions.saveChatImage).toHaveBeenCalledWith(src, 'frogclaw-image.png'));
   });
 });

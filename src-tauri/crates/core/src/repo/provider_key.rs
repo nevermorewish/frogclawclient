@@ -1,7 +1,7 @@
 use sea_orm::*;
 
 use crate::entity::provider_keys;
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 use crate::types::ProviderKey;
 use crate::utils::{gen_id, now_ts};
 
@@ -65,7 +65,7 @@ pub async fn add_provider_key(
     let row = provider_keys::Entity::find_by_id(&id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("ProviderKey {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("ProviderKey {}", id)))?;
     Ok(key_from_entity(row))
 }
 
@@ -73,7 +73,7 @@ pub async fn delete_provider_key(db: &DatabaseConnection, key_id: &str) -> Resul
     let result = provider_keys::Entity::delete_by_id(key_id).exec(db).await?;
 
     if result.rows_affected == 0 {
-        return Err(AQBotError::NotFound(format!("ProviderKey {}", key_id)));
+        return Err(FrogClawClientError::NotFound(format!("ProviderKey {}", key_id)));
     }
     Ok(())
 }
@@ -83,7 +83,7 @@ pub async fn toggle_provider_key(db: &DatabaseConnection, key_id: &str) -> Resul
     let row = provider_keys::Entity::find_by_id(key_id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("ProviderKey {}", key_id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("ProviderKey {}", key_id)))?;
 
     let new_enabled = if row.enabled != 0 { 0 } else { 1 };
     let mut am: provider_keys::ActiveModel = row.into();
@@ -93,7 +93,7 @@ pub async fn toggle_provider_key(db: &DatabaseConnection, key_id: &str) -> Resul
     let row = provider_keys::Entity::find_by_id(key_id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("ProviderKey {}", key_id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("ProviderKey {}", key_id)))?;
     Ok(key_from_entity(row))
 }
 

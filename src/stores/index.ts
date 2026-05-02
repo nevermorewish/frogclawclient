@@ -3,7 +3,6 @@ export { useProviderStore } from './providerStore';
 export { useConversationStore } from './conversationStore';
 export { useCategoryStore } from './categoryStore';
 export { useSettingsStore } from './settingsStore';
-export { useGatewayStore } from './gatewayStore';
 export { useChatWorkspaceStore } from './chatWorkspaceStore';
 export { useArtifactStore } from './artifactStore';
 export { useSearchStore } from './searchStore';

@@ -339,11 +339,26 @@ export function ChatSidebar() {
     const onShortcutNewConversation = () => {
       void handleNewConversation();
     };
-    window.addEventListener('aqbot:new-conversation', onShortcutNewConversation);
+    window.addEventListener('frogclaw:new-conversation', onShortcutNewConversation);
     return () => {
-      window.removeEventListener('aqbot:new-conversation', onShortcutNewConversation);
+      window.removeEventListener('frogclaw:new-conversation', onShortcutNewConversation);
     };
   }, [handleNewConversation]);
+
+  useEffect(() => {
+    const onFocusConversationSearch = () => {
+      setShowArchived(false);
+      setMultiSelectMode(false);
+      setSearchVisible(true);
+      window.setTimeout(() => {
+        document.querySelector<HTMLInputElement>('.chat-sidebar-search input')?.focus();
+      }, 50);
+    };
+    window.addEventListener('frogclaw:focus-conversation-search', onFocusConversationSearch);
+    return () => {
+      window.removeEventListener('frogclaw:focus-conversation-search', onFocusConversationSearch);
+    };
+  }, []);
 
   const handleSearch = useCallback(
     (value: string) => {
@@ -1039,7 +1054,7 @@ export function ChatSidebar() {
                 danger
                 size="small"
                 aria-label={t('chat.delete')}
-                className="ant-conversations-menu-icon aqbot-chat-conversation-menu-delete"
+                className="ant-conversations-menu-icon frogclaw-chat-conversation-menu-delete"
                 icon={<Trash2 size={14} />}
                 onClick={(event) => {
                   event.preventDefault()
@@ -1390,7 +1405,7 @@ export function ChatSidebar() {
                 .ant-conversations .ant-conversations-item-active .ant-conversations-label {
                   color: ${token.colorPrimary} !important;
                 }
-                .aqbot-chat-conversation-menu-delete {
+                .frogclaw-chat-conversation-menu-delete {
                   width: 22px;
                   height: 22px;
                   min-width: 22px;
@@ -1399,14 +1414,14 @@ export function ChatSidebar() {
                   align-items: center;
                   justify-content: center;
                 }
-                .ant-conversations .ant-conversations-item-active .aqbot-chat-conversation-menu-delete {
+                .ant-conversations .ant-conversations-item-active .frogclaw-chat-conversation-menu-delete {
                   opacity: 0;
                 }
-                .ant-conversations .ant-conversations-item:hover .aqbot-chat-conversation-menu-delete,
-                .aqbot-chat-conversation-menu-delete:focus-visible {
+                .ant-conversations .ant-conversations-item:hover .frogclaw-chat-conversation-menu-delete,
+                .frogclaw-chat-conversation-menu-delete:focus-visible {
                   opacity: 0.85;
                 }
-                .aqbot-chat-conversation-menu-delete:hover {
+                .frogclaw-chat-conversation-menu-delete:hover {
                   opacity: 1 !important;
                 }
                 .ant-conversations .ant-conversations-group-label {

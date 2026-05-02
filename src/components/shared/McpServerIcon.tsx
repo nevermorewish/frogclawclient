@@ -6,14 +6,14 @@ import type { McpServer } from '@/types';
 
 /** Icons for builtin MCP servers, keyed by server name. Returns icon at given size. */
 const BUILTIN_ICON_FACTORY: Record<string, (size: number) => React.ReactNode> = {
-  '@aqbot/fetch': (s) => <Globe size={s} />,
-  '@aqbot/search-file': (s) => <FileSearch size={s} />,
+  '@frogclaw/fetch': (s) => <Globe size={s} />,
+  '@frogclaw/search-file': (s) => <FileSearch size={s} />,
 };
 
 /** Static 16px icons for external use. */
 export const BUILTIN_ICONS: Record<string, React.ReactNode> = {
-  '@aqbot/fetch': <Globe size={16} />,
-  '@aqbot/search-file': <FileSearch size={16} />,
+  '@frogclaw/fetch': <Globe size={16} />,
+  '@frogclaw/search-file': <FileSearch size={16} />,
 };
 
 /**

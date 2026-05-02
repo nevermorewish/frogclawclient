@@ -1,9 +1,9 @@
 [简体中文](./README.md) | [繁體中文](./README-ZH-TW.md) | [English](./README-EN.md) | **日本語** | [한국어](./README-KO.md) | [Français](./README-FR.md) | [Deutsch](./README-DE.md) | [Español](./README-ES.md) | [Русский](./README-RU.md) | [हिन्दी](./README-HI.md) | [العربية](./README-AR.md)
 
-[![AQBot](https://socialify.git.ci/AQBot-Desktop/AQBot/image?description=1&font=JetBrains+Mono&forks=1&issues=1&logo=https%3A%2F%2Fgithub.com%2FAQBot-Desktop%2FAQBot%2Fblob%2Fmain%2Fsrc%2Fassets%2Fimage%2Flogo.png%3Fraw%3Dtrue&name=1&owner=1&pattern=Floating+Cogs&pulls=1&stargazers=1&theme=Auto)](https://github.com/AQBot-Desktop/AQBot)
+[![FrogClawClient](https://socialify.git.ci/FrogClawClient-Desktop/FrogClawClient/image?description=1&font=JetBrains+Mono&forks=1&issues=1&logo=https%3A%2F%2Fgithub.com%2FFrogClawClient-Desktop%2FFrogClawClient%2Fblob%2Fmain%2Fsrc%2Fassets%2Fimage%2Flogo.png%3Fraw%3Dtrue&name=1&owner=1&pattern=Floating+Cogs&pulls=1&stargazers=1&theme=Auto)](https://github.com/FrogClawClient-Desktop/FrogClawClient)
 
 <p align="center">
-    <a href="https://www.producthunt.com/products/aqbot?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-aqbot" target="_blank" rel="noopener noreferrer"><img alt="AQBot - Lightweight, high-perf cross-platform AI desktop client | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1118403&amp;theme=light&amp;t=1775627359538"></a>
+    <a href="https://www.producthunt.com/products/frogclaw?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-frogclaw" target="_blank" rel="noopener noreferrer"><img alt="FrogClawClient - Lightweight, high-perf cross-platform AI desktop client | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1118403&amp;theme=light&amp;t=1775627359538"></a>
 </p>
 
 ## スクリーンショット
@@ -68,7 +68,7 @@
 ### ツールと拡張機能
 
 - **MCP プロトコル** — stdio と HTTP トランスポートの両方をサポートする完全な Model Context Protocol 実装
-- **組み込みツール** — `@aqbot/fetch` など、すぐに使える組み込み MCP ツールを提供
+- **組み込みツール** — `@frogclaw/fetch` など、すぐに使える組み込み MCP ツールを提供
 - **ツール実行パネル** — ツール呼び出しリクエストと返り値の結果をビジュアル表示
 
 ### API ゲートウェイ
@@ -83,7 +83,7 @@
 ### データとセキュリティ
 
 - **AES-256 暗号化** — API キーなどの機密データは AES-256 でローカルに暗号化、マスターキーは 0600 権限で保存
-- **データディレクトリ分離** — アプリケーション状態は `~/.aqbot/`、ユーザーファイルは `~/Documents/aqbot/` に保存
+- **データディレクトリ分離** — アプリケーション状態は `~/.frogclaw/`、ユーザーファイルは `~/Documents/frogclaw/` に保存
 - **自動バックアップ** — ローカルディレクトリまたは WebDAV ストレージへの定期自動バックアップ
 - **バックアップ復元** — 過去のバックアップからワンクリックで完全復元
 - **会話エクスポート** — PNG スクリーンショット、Markdown、プレーンテキスト、JSON 形式で会話をエクスポート
@@ -109,7 +109,7 @@
 
 ## はじめに
 
-[Releases](https://github.com/AQBot-Desktop/AQBot/releases) ページにアクセスして、お使いのプラットフォーム向けのインストーラーをダウンロードしてください。
+[Releases](https://github.com/FrogClawClient-Desktop/FrogClawClient/releases) ページにアクセスして、お使いのプラットフォーム向けのインストーラーをダウンロードしてください。
 
 ## よくある質問
 
@@ -117,8 +117,8 @@
 
 アプリケーションが Apple によって署名されていないため、macOS は次のいずれかのプロンプトを表示する場合があります：
 
-- 「AQBot」は壊れているため開けません
-- 悪意のあるソフトウェアがないか確認できないため、「AQBot」を開けません
+- 「FrogClawClient」は壊れているため開けません
+- 悪意のあるソフトウェアがないか確認できないため、「FrogClawClient」を開けません
 
 **解決手順：**
 
@@ -133,7 +133,7 @@ sudo spctl --master-disable
 **2. 検疫属性を削除する**
 
 ```bash
-sudo xattr -dr com.apple.quarantine /Applications/AQBot.app
+sudo xattr -dr com.apple.quarantine /Applications/FrogClawClient.app
 ```
 
 > ヒント：ターミナルに `sudo xattr -dr com.apple.quarantine ` と入力した後、アプリアイコンをドラッグ＆ドロップできます。

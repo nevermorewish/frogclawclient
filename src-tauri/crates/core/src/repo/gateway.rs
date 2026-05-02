@@ -2,7 +2,7 @@ use sea_orm::*;
 
 use crate::crypto;
 use crate::entity::{gateway_keys, gateway_usage};
-use crate::error::{AQBotError, Result};
+use crate::error::{FrogClawClientError, Result};
 use crate::types::*;
 use crate::utils::now_ts;
 
@@ -42,7 +42,7 @@ pub async fn delete_gateway_key(db: &DatabaseConnection, id: &str) -> Result<()>
     let result = gateway_keys::Entity::delete_by_id(id).exec(db).await?;
 
     if result.rows_affected == 0 {
-        return Err(AQBotError::NotFound(format!("GatewayKey {}", id)));
+        return Err(FrogClawClientError::NotFound(format!("GatewayKey {}", id)));
     }
     Ok(())
 }
@@ -51,7 +51,7 @@ pub async fn toggle_gateway_key(db: &DatabaseConnection, id: &str, enabled: bool
     let row = gateway_keys::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound(format!("GatewayKey {}", id)))?;
+        .ok_or_else(|| FrogClawClientError::NotFound(format!("GatewayKey {}", id)))?;
 
     let mut am: gateway_keys::ActiveModel = row.into();
     am.enabled = Set(if enabled { 1 } else { 0 });
@@ -69,7 +69,7 @@ pub async fn verify_key(db: &DatabaseConnection, plain_key: &str) -> Result<Gate
         .filter(gateway_keys::Column::Enabled.eq(1))
         .one(db)
         .await?
-        .ok_or_else(|| AQBotError::NotFound("Invalid or disabled gateway key".to_string()))?;
+        .ok_or_else(|| FrogClawClientError::NotFound("Invalid or disabled gateway key".to_string()))?;
 
     Ok(key_from_entity(row))
 }

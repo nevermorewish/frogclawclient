@@ -142,7 +142,7 @@ describe('conversationStore pagination', () => {
     };
     const dbMessage = {
       ...localMessage,
-      content: '<knowledge-retrieval status="done" data-aqbot="1">\n[{"source_type":"knowledge","container_id":"kb-1","items":[{"content":"hit","score":0.2,"document_id":"doc-1","id":"chunk-1"}]}]\n</knowledge-retrieval>\n\nstale db answer',
+      content: '<knowledge-retrieval status="done" data-frogclaw="1">\n[{"source_type":"knowledge","container_id":"kb-1","items":[{"content":"hit","score":0.2,"document_id":"doc-1","id":"chunk-1"}]}]\n</knowledge-retrieval>\n\nstale db answer',
       token_count: 123,
     };
 
@@ -156,7 +156,7 @@ describe('conversationStore pagination', () => {
     await useConversationStore.getState().fetchMessages('conv-1', ['assistant-rag']);
 
     const merged = useConversationStore.getState().messages.find((message) => message.id === 'assistant-rag');
-    expect(merged?.content).toContain('<knowledge-retrieval status="done" data-aqbot="1">');
+    expect(merged?.content).toContain('<knowledge-retrieval status="done" data-frogclaw="1">');
     expect(merged?.content).toContain('fresh streamed answer');
     expect(merged?.content).not.toContain('stale db answer');
     expect(merged?.token_count).toBe(123);
@@ -217,7 +217,7 @@ describe('conversationStore pagination', () => {
       return () => {};
     });
     const { useConversationStore } = await import('../conversationStore');
-    const searching = '<knowledge-retrieval status="searching" data-aqbot="1"></knowledge-retrieval>';
+    const searching = '<knowledge-retrieval status="searching" data-frogclaw="1"></knowledge-retrieval>';
 
     useConversationStore.setState({
       activeConversationId: 'conv-1',
@@ -278,7 +278,7 @@ describe('conversationStore pagination', () => {
     const displayById = useConversationStore.getState().ragDisplayByMessageId;
     expect(message?.id).toBe('assistant-1');
     expect(message?.content).toBe('answer');
-    expect(displayById['assistant-1']).toContain('<knowledge-retrieval status="done" data-aqbot="1">');
+    expect(displayById['assistant-1']).toContain('<knowledge-retrieval status="done" data-frogclaw="1">');
     expect(displayById['assistant-1']).toContain('"content":"hit"');
     vi.useRealTimers();
   });
@@ -297,7 +297,7 @@ describe('conversationStore pagination', () => {
       streamingMessageId: 'temp-assistant-1',
       streamingConversationId: 'conv-1',
       ragDisplayByMessageId: {
-        'temp-assistant-1': '<knowledge-retrieval status="searching" data-aqbot="1"></knowledge-retrieval>',
+        'temp-assistant-1': '<knowledge-retrieval status="searching" data-frogclaw="1"></knowledge-retrieval>',
       },
       messages: [
         {
@@ -337,7 +337,7 @@ describe('conversationStore pagination', () => {
     const displayById = useConversationStore.getState().ragDisplayByMessageId;
     expect(message?.id).toBe('temp-assistant-1');
     expect(message?.content).toBe('');
-    expect(displayById['temp-assistant-1']).toContain('<knowledge-retrieval status="done" data-aqbot="1">');
+    expect(displayById['temp-assistant-1']).toContain('<knowledge-retrieval status="done" data-frogclaw="1">');
     expect(displayById['assistant-1']).toContain('"content":"hit"');
   });
 

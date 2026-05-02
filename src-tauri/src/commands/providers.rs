@@ -1,11 +1,11 @@
 use crate::AppState;
-use aqbot_core::types::*;
+use frogclaw_core::types::*;
 use std::time::Instant;
 use tauri::State;
 
 #[tauri::command]
 pub async fn list_providers(state: State<'_, AppState>) -> Result<Vec<ProviderConfig>, String> {
-    aqbot_core::repo::provider::list_providers_merged(&state.sea_db)
+    frogclaw_core::repo::provider::list_providers_merged(&state.sea_db)
         .await
         .map_err(|e| e.to_string())
 }
@@ -15,7 +15,7 @@ pub async fn create_provider(
     state: State<'_, AppState>,
     input: CreateProviderInput,
 ) -> Result<ProviderConfig, String> {
-    aqbot_core::repo::provider::create_provider(&state.sea_db, input)
+    frogclaw_core::repo::provider::create_provider(&state.sea_db, input)
         .await
         .map_err(|e| e.to_string())
 }
@@ -25,7 +25,7 @@ pub async fn import_provider_from_deep_link(
     state: State<'_, AppState>,
     input: DeepLinkProviderImportInput,
 ) -> Result<DeepLinkProviderImportResult, String> {
-    aqbot_core::repo::provider::import_provider_from_deep_link(
+    frogclaw_core::repo::provider::import_provider_from_deep_link(
         &state.sea_db,
         &state.master_key,
         input,
@@ -40,10 +40,10 @@ pub async fn update_provider(
     id: String,
     input: UpdateProviderInput,
 ) -> Result<ProviderConfig, String> {
-    let real_id = aqbot_core::repo::provider::resolve_provider_id(&state.sea_db, &id)
+    let real_id = frogclaw_core::repo::provider::resolve_provider_id(&state.sea_db, &id)
         .await
         .map_err(|e| e.to_string())?;
-    aqbot_core::repo::provider::update_provider(&state.sea_db, &real_id, input)
+    frogclaw_core::repo::provider::update_provider(&state.sea_db, &real_id, input)
         .await
         .map_err(|e| e.to_string())
 }
@@ -54,7 +54,7 @@ pub async fn delete_provider(state: State<'_, AppState>, id: String) -> Result<(
     if id.starts_with("builtin_") {
         return Ok(());
     }
-    aqbot_core::repo::provider::delete_provider(&state.sea_db, &id)
+    frogclaw_core::repo::provider::delete_provider(&state.sea_db, &id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -65,10 +65,10 @@ pub async fn toggle_provider(
     id: String,
     enabled: bool,
 ) -> Result<(), String> {
-    let real_id = aqbot_core::repo::provider::resolve_provider_id(&state.sea_db, &id)
+    let real_id = frogclaw_core::repo::provider::resolve_provider_id(&state.sea_db, &id)
         .await
         .map_err(|e| e.to_string())?;
-    aqbot_core::repo::provider::toggle_provider(&state.sea_db, &real_id, enabled)
+    frogclaw_core::repo::provider::toggle_provider(&state.sea_db, &real_id, enabled)
         .await
         .map_err(|e| e.to_string())
 }
@@ -79,17 +79,17 @@ pub async fn add_provider_key(
     provider_id: String,
     raw_key: String,
 ) -> Result<ProviderKey, String> {
-    let real_id = aqbot_core::repo::provider::resolve_provider_id(&state.sea_db, &provider_id)
+    let real_id = frogclaw_core::repo::provider::resolve_provider_id(&state.sea_db, &provider_id)
         .await
         .map_err(|e| e.to_string())?;
     let encrypted =
-        aqbot_core::crypto::encrypt_key(&raw_key, &state.master_key).map_err(|e| e.to_string())?;
+        frogclaw_core::crypto::encrypt_key(&raw_key, &state.master_key).map_err(|e| e.to_string())?;
     let prefix = if raw_key.len() >= 8 {
         format!("{}...", &raw_key[..8])
     } else {
         raw_key.clone()
     };
-    aqbot_core::repo::provider::add_provider_key(&state.sea_db, &real_id, &encrypted, &prefix)
+    frogclaw_core::repo::provider::add_provider_key(&state.sea_db, &real_id, &encrypted, &prefix)
         .await
         .map_err(|e| e.to_string())
 }
@@ -101,20 +101,20 @@ pub async fn update_provider_key(
     raw_key: String,
 ) -> Result<ProviderKey, String> {
     let encrypted =
-        aqbot_core::crypto::encrypt_key(&raw_key, &state.master_key).map_err(|e| e.to_string())?;
+        frogclaw_core::crypto::encrypt_key(&raw_key, &state.master_key).map_err(|e| e.to_string())?;
     let prefix = if raw_key.len() >= 8 {
         format!("{}...", &raw_key[..8])
     } else {
         raw_key.clone()
     };
-    aqbot_core::repo::provider::update_provider_key(&state.sea_db, &key_id, &encrypted, &prefix)
+    frogclaw_core::repo::provider::update_provider_key(&state.sea_db, &key_id, &encrypted, &prefix)
         .await
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn delete_provider_key(state: State<'_, AppState>, key_id: String) -> Result<(), String> {
-    aqbot_core::repo::provider::delete_provider_key(&state.sea_db, &key_id)
+    frogclaw_core::repo::provider::delete_provider_key(&state.sea_db, &key_id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -125,7 +125,7 @@ pub async fn toggle_provider_key(
     key_id: String,
     enabled: bool,
 ) -> Result<(), String> {
-    aqbot_core::repo::provider::toggle_provider_key(&state.sea_db, &key_id, enabled)
+    frogclaw_core::repo::provider::toggle_provider_key(&state.sea_db, &key_id, enabled)
         .await
         .map_err(|e| e.to_string())
 }
@@ -135,10 +135,10 @@ pub async fn get_decrypted_provider_key(
     state: State<'_, AppState>,
     key_id: String,
 ) -> Result<String, String> {
-    let key_row = aqbot_core::repo::provider::get_provider_key(&state.sea_db, &key_id)
+    let key_row = frogclaw_core::repo::provider::get_provider_key(&state.sea_db, &key_id)
         .await
         .map_err(|e| e.to_string())?;
-    aqbot_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
+    frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
         .map_err(|e| e.to_string())
 }
 
@@ -147,16 +147,16 @@ pub async fn validate_provider_key(
     state: State<'_, AppState>,
     key_id: String,
 ) -> Result<bool, String> {
-    let key_row = aqbot_core::repo::provider::get_provider_key(&state.sea_db, &key_id)
+    let key_row = frogclaw_core::repo::provider::get_provider_key(&state.sea_db, &key_id)
         .await
         .map_err(|e| e.to_string())?;
-    let decrypted = aqbot_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
+    let decrypted = frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
         .map_err(|e| e.to_string())?;
-    let provider = aqbot_core::repo::provider::get_provider(&state.sea_db, &key_row.provider_id)
+    let provider = frogclaw_core::repo::provider::get_provider(&state.sea_db, &key_row.provider_id)
         .await
         .map_err(|e| e.to_string())?;
     // Use the registry to validate by listing models
-    let registry = aqbot_providers::registry::ProviderRegistry::create_default();
+    let registry = frogclaw_providers::registry::ProviderRegistry::create_default();
     let provider_type_str = match provider.provider_type {
         ProviderType::OpenAI => "openai",
         ProviderType::OpenAIResponses => "openai_responses",
@@ -170,16 +170,16 @@ pub async fn validate_provider_key(
     let adapter = registry
         .get(provider_type_str)
         .ok_or_else(|| format!("No adapter for provider type: {}", provider_type_str))?;
-    let global_settings = aqbot_core::repo::settings::get_settings(&state.sea_db)
+    let global_settings = frogclaw_core::repo::settings::get_settings(&state.sea_db)
         .await
         .unwrap_or_default();
     let resolved_proxy =
-        aqbot_core::types::ProviderProxyConfig::resolve(&provider.proxy_config, &global_settings);
-    let ctx = aqbot_providers::ProviderRequestContext {
+        frogclaw_core::types::ProviderProxyConfig::resolve(&provider.proxy_config, &global_settings);
+    let ctx = frogclaw_providers::ProviderRequestContext {
         api_key: decrypted,
         key_id: key_id.clone(),
         provider_id: provider.id.clone(),
-        base_url: Some(aqbot_providers::resolve_base_url_for_type(&provider.api_host, &provider.provider_type)),
+        base_url: Some(frogclaw_providers::resolve_base_url_for_type(&provider.api_host, &provider.provider_type)),
         api_path: provider.api_path.clone(),
         proxy_config: resolved_proxy,
         custom_headers: provider
@@ -192,12 +192,12 @@ pub async fn validate_provider_key(
         Err(e) => {
             tracing::warn!("Key validation failed for key {}: {}", key_id, e);
             // Update as invalid, then return the error
-            let _ = aqbot_core::repo::provider::update_key_validation(&state.sea_db, &key_id, false).await;
+            let _ = frogclaw_core::repo::provider::update_key_validation(&state.sea_db, &key_id, false).await;
             return Err(e.to_string());
         }
     };
     // Update validation timestamp
-    aqbot_core::repo::provider::update_key_validation(&state.sea_db, &key_id, valid)
+    frogclaw_core::repo::provider::update_key_validation(&state.sea_db, &key_id, valid)
         .await
         .map_err(|e| e.to_string())?;
     Ok(valid)
@@ -209,10 +209,10 @@ pub async fn save_models(
     provider_id: String,
     models: Vec<Model>,
 ) -> Result<(), String> {
-    let real_id = aqbot_core::repo::provider::resolve_provider_id(&state.sea_db, &provider_id)
+    let real_id = frogclaw_core::repo::provider::resolve_provider_id(&state.sea_db, &provider_id)
         .await
         .map_err(|e| e.to_string())?;
-    aqbot_core::repo::provider::save_models(&state.sea_db, &real_id, &models)
+    frogclaw_core::repo::provider::save_models(&state.sea_db, &real_id, &models)
         .await
         .map_err(|e| e.to_string())
 }
@@ -224,10 +224,10 @@ pub async fn toggle_model(
     model_id: String,
     enabled: bool,
 ) -> Result<Model, String> {
-    let real_id = aqbot_core::repo::provider::resolve_provider_id(&state.sea_db, &provider_id)
+    let real_id = frogclaw_core::repo::provider::resolve_provider_id(&state.sea_db, &provider_id)
         .await
         .map_err(|e| e.to_string())?;
-    aqbot_core::repo::provider::toggle_model(&state.sea_db, &real_id, &model_id, enabled)
+    frogclaw_core::repo::provider::toggle_model(&state.sea_db, &real_id, &model_id, enabled)
         .await
         .map_err(|e| e.to_string())
 }
@@ -239,10 +239,10 @@ pub async fn update_model_params(
     model_id: String,
     overrides: ModelParamOverrides,
 ) -> Result<Model, String> {
-    let real_id = aqbot_core::repo::provider::resolve_provider_id(&state.sea_db, &provider_id)
+    let real_id = frogclaw_core::repo::provider::resolve_provider_id(&state.sea_db, &provider_id)
         .await
         .map_err(|e| e.to_string())?;
-    aqbot_core::repo::provider::update_model_params(
+    frogclaw_core::repo::provider::update_model_params(
         &state.sea_db,
         &real_id,
         &model_id,
@@ -257,19 +257,19 @@ pub async fn fetch_remote_models(
     state: State<'_, AppState>,
     provider_id: String,
 ) -> Result<Vec<Model>, String> {
-    let real_id = aqbot_core::repo::provider::resolve_provider_id(&state.sea_db, &provider_id)
+    let real_id = frogclaw_core::repo::provider::resolve_provider_id(&state.sea_db, &provider_id)
         .await
         .map_err(|e| e.to_string())?;
-    let provider = aqbot_core::repo::provider::get_provider(&state.sea_db, &real_id)
+    let provider = frogclaw_core::repo::provider::get_provider(&state.sea_db, &real_id)
         .await
         .map_err(|e| e.to_string())?;
     // Get an enabled key for the provider
-    let key_row = aqbot_core::repo::provider::get_active_key(&state.sea_db, &real_id)
+    let key_row = frogclaw_core::repo::provider::get_active_key(&state.sea_db, &real_id)
         .await
         .map_err(|e| e.to_string())?;
-    let decrypted = aqbot_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
+    let decrypted = frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
         .map_err(|e| e.to_string())?;
-    let registry = aqbot_providers::registry::ProviderRegistry::create_default();
+    let registry = frogclaw_providers::registry::ProviderRegistry::create_default();
     let provider_type_str = match provider.provider_type {
         ProviderType::OpenAI => "openai",
         ProviderType::OpenAIResponses => "openai_responses",
@@ -283,16 +283,16 @@ pub async fn fetch_remote_models(
     let adapter = registry
         .get(provider_type_str)
         .ok_or_else(|| format!("No adapter for provider type: {}", provider_type_str))?;
-    let global_settings = aqbot_core::repo::settings::get_settings(&state.sea_db)
+    let global_settings = frogclaw_core::repo::settings::get_settings(&state.sea_db)
         .await
         .unwrap_or_default();
     let resolved_proxy =
-        aqbot_core::types::ProviderProxyConfig::resolve(&provider.proxy_config, &global_settings);
-    let ctx = aqbot_providers::ProviderRequestContext {
+        frogclaw_core::types::ProviderProxyConfig::resolve(&provider.proxy_config, &global_settings);
+    let ctx = frogclaw_providers::ProviderRequestContext {
         api_key: decrypted,
         key_id: key_row.id.clone(),
         provider_id: provider.id.clone(),
-        base_url: Some(aqbot_providers::resolve_base_url_for_type(&provider.api_host, &provider.provider_type)),
+        base_url: Some(frogclaw_providers::resolve_base_url_for_type(&provider.api_host, &provider.provider_type)),
         api_path: provider.api_path.clone(),
         proxy_config: resolved_proxy,
         custom_headers: provider
@@ -311,18 +311,18 @@ pub async fn test_model(
     provider_id: String,
     model_id: String,
 ) -> Result<u64, String> {
-    let real_id = aqbot_core::repo::provider::resolve_provider_id(&state.sea_db, &provider_id)
+    let real_id = frogclaw_core::repo::provider::resolve_provider_id(&state.sea_db, &provider_id)
         .await
         .map_err(|e| e.to_string())?;
-    let provider = aqbot_core::repo::provider::get_provider(&state.sea_db, &real_id)
+    let provider = frogclaw_core::repo::provider::get_provider(&state.sea_db, &real_id)
         .await
         .map_err(|e| e.to_string())?;
-    let key_row = aqbot_core::repo::provider::get_active_key(&state.sea_db, &real_id)
+    let key_row = frogclaw_core::repo::provider::get_active_key(&state.sea_db, &real_id)
         .await
         .map_err(|e| e.to_string())?;
-    let decrypted = aqbot_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
+    let decrypted = frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
         .map_err(|e| e.to_string())?;
-    let registry = aqbot_providers::registry::ProviderRegistry::create_default();
+    let registry = frogclaw_providers::registry::ProviderRegistry::create_default();
     let provider_type_str = match provider.provider_type {
         ProviderType::OpenAI => "openai",
         ProviderType::OpenAIResponses => "openai_responses",
@@ -336,16 +336,16 @@ pub async fn test_model(
     let adapter = registry
         .get(provider_type_str)
         .ok_or_else(|| format!("No adapter for provider type: {}", provider_type_str))?;
-    let global_settings = aqbot_core::repo::settings::get_settings(&state.sea_db)
+    let global_settings = frogclaw_core::repo::settings::get_settings(&state.sea_db)
         .await
         .unwrap_or_default();
     let resolved_proxy =
-        aqbot_core::types::ProviderProxyConfig::resolve(&provider.proxy_config, &global_settings);
-    let ctx = aqbot_providers::ProviderRequestContext {
+        frogclaw_core::types::ProviderProxyConfig::resolve(&provider.proxy_config, &global_settings);
+    let ctx = frogclaw_providers::ProviderRequestContext {
         api_key: decrypted,
         key_id: key_row.id.clone(),
         provider_id: provider.id.clone(),
-        base_url: Some(aqbot_providers::resolve_base_url_for_type(&provider.api_host, &provider.provider_type)),
+        base_url: Some(frogclaw_providers::resolve_base_url_for_type(&provider.api_host, &provider.provider_type)),
         api_path: provider.api_path.clone(),
         proxy_config: resolved_proxy,
         custom_headers: provider
@@ -408,12 +408,12 @@ pub async fn reorder_providers(
     // Materialize any virtual built-in providers so sort_order can be persisted
     let mut real_ids = Vec::with_capacity(provider_ids.len());
     for id in &provider_ids {
-        let real_id = aqbot_core::repo::provider::resolve_provider_id(&state.sea_db, id)
+        let real_id = frogclaw_core::repo::provider::resolve_provider_id(&state.sea_db, id)
             .await
             .map_err(|e| e.to_string())?;
         real_ids.push(real_id);
     }
-    aqbot_core::repo::provider::reorder_providers(&state.sea_db, &real_ids)
+    frogclaw_core::repo::provider::reorder_providers(&state.sea_db, &real_ids)
         .await
         .map_err(|e| e.to_string())
 }

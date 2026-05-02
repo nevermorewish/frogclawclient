@@ -1,12 +1,12 @@
 use crate::AppState;
-use aqbot_core::types::*;
+use frogclaw_core::types::*;
 use tauri::{AppHandle, Emitter, State};
 
 #[tauri::command]
 pub async fn list_knowledge_bases(
     state: State<'_, AppState>,
 ) -> Result<Vec<KnowledgeBase>, String> {
-    aqbot_core::repo::knowledge::list_knowledge_bases(&state.sea_db)
+    frogclaw_core::repo::knowledge::list_knowledge_bases(&state.sea_db)
         .await
         .map_err(|e| e.to_string())
 }
@@ -16,7 +16,7 @@ pub async fn create_knowledge_base(
     state: State<'_, AppState>,
     input: CreateKnowledgeBaseInput,
 ) -> Result<KnowledgeBase, String> {
-    aqbot_core::repo::knowledge::create_knowledge_base(&state.sea_db, input)
+    frogclaw_core::repo::knowledge::create_knowledge_base(&state.sea_db, input)
         .await
         .map_err(|e| e.to_string())
 }
@@ -27,14 +27,14 @@ pub async fn update_knowledge_base(
     id: String,
     input: UpdateKnowledgeBaseInput,
 ) -> Result<KnowledgeBase, String> {
-    aqbot_core::repo::knowledge::update_knowledge_base(&state.sea_db, &id, input)
+    frogclaw_core::repo::knowledge::update_knowledge_base(&state.sea_db, &id, input)
         .await
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn delete_knowledge_base(state: State<'_, AppState>, id: String) -> Result<(), String> {
-    aqbot_core::repo::knowledge::delete_knowledge_base(&state.sea_db, &id)
+    frogclaw_core::repo::knowledge::delete_knowledge_base(&state.sea_db, &id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -44,7 +44,7 @@ pub async fn reorder_knowledge_bases(
     state: State<'_, AppState>,
     base_ids: Vec<String>,
 ) -> Result<(), String> {
-    aqbot_core::repo::knowledge::reorder_knowledge_bases(&state.sea_db, &base_ids)
+    frogclaw_core::repo::knowledge::reorder_knowledge_bases(&state.sea_db, &base_ids)
         .await
         .map_err(|e| e.to_string())
 }
@@ -54,7 +54,7 @@ pub async fn list_knowledge_documents(
     state: State<'_, AppState>,
     base_id: String,
 ) -> Result<Vec<KnowledgeDocument>, String> {
-    aqbot_core::repo::knowledge::list_documents(&state.sea_db, &base_id)
+    frogclaw_core::repo::knowledge::list_documents(&state.sea_db, &base_id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -68,7 +68,7 @@ pub async fn add_knowledge_document(
     source_path: String,
     mime_type: String,
 ) -> Result<KnowledgeDocument, String> {
-    let doc = aqbot_core::repo::knowledge::add_document(
+    let doc = frogclaw_core::repo::knowledge::add_document(
         &state.sea_db,
         &base_id,
         &title,
@@ -80,7 +80,7 @@ pub async fn add_knowledge_document(
     .map_err(|e| e.to_string())?;
 
     // Spawn async indexing task
-    let kb = aqbot_core::repo::knowledge::get_knowledge_base(&state.sea_db, &base_id)
+    let kb = frogclaw_core::repo::knowledge::get_knowledge_base(&state.sea_db, &base_id)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -114,7 +114,7 @@ pub async fn add_knowledge_document(
             if let Err(e) = &result {
                 let err_msg = e.to_string();
                 tracing::error!("Indexing failed for doc {}: {}", doc_id, err_msg);
-                let _ = aqbot_core::repo::knowledge::update_document_status_with_error(
+                let _ = frogclaw_core::repo::knowledge::update_document_status_with_error(
                     &db, &doc_id, "failed", Some(&err_msg),
                 )
                 .await;
@@ -148,7 +148,7 @@ pub async fn delete_knowledge_document(
         .delete_document_embeddings(&collection_id, &id)
         .await;
 
-    aqbot_core::repo::knowledge::delete_document(&state.sea_db, &id)
+    frogclaw_core::repo::knowledge::delete_document(&state.sea_db, &id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -159,7 +159,7 @@ pub async fn search_knowledge_base(
     base_id: String,
     query: String,
     top_k: Option<usize>,
-) -> Result<Vec<aqbot_core::vector_store::VectorSearchResult>, String> {
+) -> Result<Vec<frogclaw_core::vector_store::VectorSearchResult>, String> {
     crate::indexing::search_knowledge(
         &state.sea_db,
         &state.master_key,
@@ -178,7 +178,7 @@ pub async fn rebuild_knowledge_index(
     state: State<'_, AppState>,
     base_id: String,
 ) -> Result<(), String> {
-    let kb = aqbot_core::repo::knowledge::get_knowledge_base(&state.sea_db, &base_id)
+    let kb = frogclaw_core::repo::knowledge::get_knowledge_base(&state.sea_db, &base_id)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -189,7 +189,7 @@ pub async fn rebuild_knowledge_index(
     let collection_id = format!("kb_{}", base_id);
 
     // Get all documents
-    let docs = aqbot_core::repo::knowledge::list_documents(&state.sea_db, &base_id)
+    let docs = frogclaw_core::repo::knowledge::list_documents(&state.sea_db, &base_id)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -204,7 +204,7 @@ pub async fn rebuild_knowledge_index(
     // Reset all document statuses to "indexing"
     for doc in &docs {
         let _ =
-            aqbot_core::repo::knowledge::update_document_status(&state.sea_db, &doc.id, "indexing")
+            frogclaw_core::repo::knowledge::update_document_status(&state.sea_db, &doc.id, "indexing")
                 .await;
     }
 
@@ -226,7 +226,7 @@ pub async fn rebuild_knowledge_index(
                 Ok(c) => c,
                 Err(e) => {
                     let err_msg = e.to_string();
-                    let _ = aqbot_core::repo::knowledge::update_document_status_with_error(
+                    let _ = frogclaw_core::repo::knowledge::update_document_status_with_error(
                         &db, &doc.id, "failed", Some(&err_msg),
                     )
                     .await;
@@ -243,7 +243,7 @@ pub async fn rebuild_knowledge_index(
             };
 
             if chunks.is_empty() {
-                let _ = aqbot_core::repo::knowledge::update_document_status_with_error(
+                let _ = frogclaw_core::repo::knowledge::update_document_status_with_error(
                     &db, &doc.id, "ready", None,
                 )
                 .await;
@@ -275,7 +275,7 @@ pub async fn rebuild_knowledge_index(
                             doc.id,
                             err_msg
                         );
-                        let _ = aqbot_core::repo::knowledge::update_document_status_with_error(
+                        let _ = frogclaw_core::repo::knowledge::update_document_status_with_error(
                             &db, &doc.id, "failed", Some(&err_msg),
                         )
                         .await;
@@ -288,7 +288,7 @@ pub async fn rebuild_knowledge_index(
                             }),
                         );
                     } else {
-                        let _ = aqbot_core::repo::knowledge::update_document_status_with_error(
+                        let _ = frogclaw_core::repo::knowledge::update_document_status_with_error(
                             &db, &doc.id, "ready", None,
                         )
                         .await;
@@ -308,7 +308,7 @@ pub async fn rebuild_knowledge_index(
                         doc.id,
                         err_msg
                     );
-                    let _ = aqbot_core::repo::knowledge::update_document_status_with_error(
+                    let _ = frogclaw_core::repo::knowledge::update_document_status_with_error(
                         &db, &doc.id, "failed", Some(&err_msg),
                     )
                     .await;
@@ -347,13 +347,13 @@ pub async fn clear_knowledge_index(
         .map_err(|e| e.to_string())?;
 
     // Reset all documents to "pending"
-    let docs = aqbot_core::repo::knowledge::list_documents(&state.sea_db, &base_id)
+    let docs = frogclaw_core::repo::knowledge::list_documents(&state.sea_db, &base_id)
         .await
         .map_err(|e| e.to_string())?;
 
     for doc in docs {
         let _ =
-            aqbot_core::repo::knowledge::update_document_status(&state.sea_db, &doc.id, "pending")
+            frogclaw_core::repo::knowledge::update_document_status(&state.sea_db, &doc.id, "pending")
                 .await;
     }
 
@@ -365,7 +365,7 @@ pub async fn list_knowledge_document_chunks(
     state: State<'_, AppState>,
     base_id: String,
     document_id: String,
-) -> Result<Vec<aqbot_core::vector_store::VectorSearchResult>, String> {
+) -> Result<Vec<frogclaw_core::vector_store::VectorSearchResult>, String> {
     let collection_id = format!("kb_{}", base_id);
     state
         .vector_store
@@ -411,7 +411,7 @@ pub async fn add_knowledge_chunk(
     document_id: String,
     content: String,
 ) -> Result<String, String> {
-    let kb = aqbot_core::repo::knowledge::get_knowledge_base(&state.sea_db, &base_id)
+    let kb = frogclaw_core::repo::knowledge::get_knowledge_base(&state.sea_db, &base_id)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -437,7 +437,7 @@ pub async fn add_knowledge_chunk(
         .await?;
 
         let embedding = embed_response.embeddings.into_iter().next()
-            .ok_or_else(|| aqbot_core::error::AQBotError::Provider("No embedding returned".to_string()))?;
+            .ok_or_else(|| frogclaw_core::error::FrogClawClientError::Provider("No embedding returned".to_string()))?;
 
         let chunk_id = vector_store
             .add_single_chunk(&collection_id, &doc_id, &chunk_content, &embedding)
@@ -452,7 +452,7 @@ pub async fn add_knowledge_chunk(
             }),
         );
 
-        Ok::<String, aqbot_core::error::AQBotError>(chunk_id)
+        Ok::<String, frogclaw_core::error::FrogClawClientError>(chunk_id)
     })
     .await
     .map_err(|e| e.to_string())?
@@ -468,7 +468,7 @@ pub async fn reindex_knowledge_chunk(
     base_id: String,
     chunk_id: String,
 ) -> Result<(), String> {
-    let kb = aqbot_core::repo::knowledge::get_knowledge_base(&state.sea_db, &base_id)
+    let kb = frogclaw_core::repo::knowledge::get_knowledge_base(&state.sea_db, &base_id)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -517,7 +517,7 @@ pub async fn reindex_knowledge_chunk(
                     .update_chunk_embedding(&collection_id, &cid, &embedding)
                     .await?;
             }
-            Ok::<_, aqbot_core::error::AQBotError>(())
+            Ok::<_, frogclaw_core::error::FrogClawClientError>(())
         }
         .await;
 
@@ -542,7 +542,7 @@ pub async fn rebuild_knowledge_document(
     base_id: String,
     document_id: String,
 ) -> Result<(), String> {
-    let kb = aqbot_core::repo::knowledge::get_knowledge_base(&state.sea_db, &base_id)
+    let kb = frogclaw_core::repo::knowledge::get_knowledge_base(&state.sea_db, &base_id)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -567,7 +567,7 @@ pub async fn rebuild_knowledge_document(
     }
 
     // Set document status to "indexing"
-    let _ = aqbot_core::repo::knowledge::update_document_status(
+    let _ = frogclaw_core::repo::knowledge::update_document_status(
         &state.sea_db, &document_id, "indexing",
     )
     .await;
@@ -597,7 +597,7 @@ pub async fn rebuild_knowledge_document(
                 {
                     let err_msg = e.to_string();
                     tracing::error!("Failed to upsert embeddings for doc {}: {}", doc_id, err_msg);
-                    let _ = aqbot_core::repo::knowledge::update_document_status_with_error(
+                    let _ = frogclaw_core::repo::knowledge::update_document_status_with_error(
                         &db, &doc_id, "failed", Some(&err_msg),
                     )
                     .await;
@@ -610,7 +610,7 @@ pub async fn rebuild_knowledge_document(
                         }),
                     );
                 } else {
-                    let _ = aqbot_core::repo::knowledge::update_document_status_with_error(
+                    let _ = frogclaw_core::repo::knowledge::update_document_status_with_error(
                         &db, &doc_id, "ready", None,
                     )
                     .await;
@@ -626,7 +626,7 @@ pub async fn rebuild_knowledge_document(
             Err(e) => {
                 let err_msg = e.to_string();
                 tracing::error!("Failed to embed doc {}: {}", doc_id, err_msg);
-                let _ = aqbot_core::repo::knowledge::update_document_status_with_error(
+                let _ = frogclaw_core::repo::knowledge::update_document_status_with_error(
                     &db, &doc_id, "failed", Some(&err_msg),
                 )
                 .await;

@@ -1,9 +1,9 @@
 use crate::AppState;
-use aqbot_agent::permission::{classify_tool_risk, decide_permission, PermissionAction};
-use aqbot_agent::security::check_path_safety;
-use aqbot_core::repo::{agent_session, conversation, message, provider, tool_execution};
-use aqbot_core::types::{AgentSession, MessageRole, ProviderProxyConfig, ProviderType};
-use aqbot_providers::{resolve_base_url_for_type, ProviderAdapter, ProviderRequestContext};
+use frogclaw_agent::permission::{classify_tool_risk, decide_permission, PermissionAction};
+use frogclaw_agent::security::check_path_safety;
+use frogclaw_core::repo::{agent_session, conversation, message, provider, tool_execution};
+use frogclaw_core::types::{AgentSession, MessageRole, ProviderProxyConfig, ProviderType};
+use frogclaw_providers::{resolve_base_url_for_type, ProviderAdapter, ProviderRequestContext};
 use open_agent_sdk::{
     Agent, AgentOptions, CanUseToolFn, ContentBlock, PermissionDecision, SDKMessage, Usage,
 };
@@ -277,14 +277,14 @@ fn provider_type_to_registry_key(pt: &ProviderType) -> &'static str {
 fn create_adapter_arc(pt: &ProviderType) -> Result<Arc<dyn ProviderAdapter>, String> {
     match pt {
         ProviderType::OpenAI | ProviderType::Custom => {
-            Ok(Arc::new(aqbot_providers::openai::OpenAIAdapter::new()))
+            Ok(Arc::new(frogclaw_providers::openai::OpenAIAdapter::new()))
         }
         ProviderType::Anthropic => {
-            Ok(Arc::new(aqbot_providers::anthropic::AnthropicAdapter::new()))
+            Ok(Arc::new(frogclaw_providers::anthropic::AnthropicAdapter::new()))
         }
-        ProviderType::Gemini => Ok(Arc::new(aqbot_providers::gemini::GeminiAdapter::new())),
+        ProviderType::Gemini => Ok(Arc::new(frogclaw_providers::gemini::GeminiAdapter::new())),
         ProviderType::OpenAIResponses => Ok(Arc::new(
-            aqbot_providers::openai_responses::OpenAIResponsesAdapter::new(),
+            frogclaw_providers::openai_responses::OpenAIResponsesAdapter::new(),
         )),
         ProviderType::Jina | ProviderType::Cohere | ProviderType::Voyage => Err(
             "Rerank-only providers cannot be used as agent chat providers".to_string(),
@@ -410,7 +410,7 @@ pub async fn agent_query(
         } else {
             let _ = app.emit(
                 "conversation-title-updated",
-                aqbot_core::types::ConversationTitleUpdatedEvent {
+                frogclaw_core::types::ConversationTitleUpdatedEvent {
                     conversation_id: conversation_id.clone(),
                     title: fallback_title,
                 },
@@ -425,11 +425,11 @@ pub async fn agent_query(
     let key_row = provider::get_active_key(&state.sea_db, &provider_id)
         .await
         .map_err(|e| e.to_string())?;
-    let decrypted_key = aqbot_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
+    let decrypted_key = frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
         .map_err(|e| e.to_string())?;
 
     // 6. Build ProviderRequestContext
-    let global_settings = aqbot_core::repo::settings::get_settings(&state.sea_db)
+    let global_settings = frogclaw_core::repo::settings::get_settings(&state.sea_db)
         .await
         .unwrap_or_default();
     let resolved_proxy = ProviderProxyConfig::resolve(&prov.proxy_config, &global_settings);
@@ -453,13 +453,13 @@ pub async fn agent_query(
     let title_ctx = ctx.clone();
     let adapter = create_adapter_arc(&prov.provider_type)?;
     let provider_type_str = provider_type_to_registry_key(&prov.provider_type);
-    let bridge = aqbot_agent::bridge::AQBotProviderBridge::new(adapter, ctx, provider_type_str)
+    let bridge = frogclaw_agent::bridge::FrogClawClientProviderBridge::new(adapter, ctx, provider_type_str)
         .map_err(|e| e.to_string())?
         .with_app(app.clone(), conversation_id.clone());
 
     // 8. Build permission callback (CanUseToolFn)
     let permission_mode =
-        aqbot_agent::permission::PermissionMode::from_str(&session.permission_mode);
+        frogclaw_agent::permission::PermissionMode::from_str(&session.permission_mode);
     let cwd_for_check = session.cwd.clone().unwrap_or_default();
     let cancel_token = open_agent_sdk::CancellationToken::new();
     let always_allowed_map = state.agent_always_allowed.clone();
@@ -491,7 +491,7 @@ pub async fn agent_query(
             }
 
             // 1. CWD safety check (hard deny, skipped in FullAccess mode)
-            if permission_mode != aqbot_agent::permission::PermissionMode::FullAccess
+            if permission_mode != frogclaw_agent::permission::PermissionMode::FullAccess
                 && !cwd.is_empty()
             {
                 if let Some(deny) = check_path_safety(&tool_name, &input, &cwd) {
@@ -516,7 +516,7 @@ pub async fn agent_query(
                 PermissionAction::RequireApproval => {
                     // Create oneshot channel
                     let (tx, rx) = tokio::sync::oneshot::channel();
-                    let perm_id = format!("perm_{}", aqbot_core::utils::gen_id());
+                    let perm_id = format!("perm_{}", frogclaw_core::utils::gen_id());
 
                     // Store sender
                     permission_senders.lock().await.insert(perm_id.clone(), tx);
@@ -539,9 +539,9 @@ pub async fn agent_query(
 
                     // Emit permission request event
                     let risk_str = match risk {
-                        aqbot_agent::permission::RiskLevel::ReadOnly => "read_only",
-                        aqbot_agent::permission::RiskLevel::Write => "write",
-                        aqbot_agent::permission::RiskLevel::Execute => "execute",
+                        frogclaw_agent::permission::RiskLevel::ReadOnly => "read_only",
+                        frogclaw_agent::permission::RiskLevel::Write => "write",
+                        frogclaw_agent::permission::RiskLevel::Execute => "execute",
                     };
                     let _ = app.emit(
                         "agent-permission-request",
@@ -617,7 +617,7 @@ pub async fn agent_query(
     // Load enabled skills, build context summary, and create SkillTool
     let home = dirs::home_dir().unwrap_or_default();
     let all_skills = open_agent_sdk::skills::load_all_global(&home);
-    let disabled = aqbot_core::repo::skill::get_disabled_skills(&state.sea_db)
+    let disabled = frogclaw_core::repo::skill::get_disabled_skills(&state.sea_db)
         .await
         .unwrap_or_default();
     let mut registry = open_agent_sdk::skills::SkillRegistry::new();
@@ -656,7 +656,7 @@ pub async fn agent_query(
             let cancel_token = cancel_token_for_ask.clone();
             Box::pin(async move {
                 let (tx, rx) = tokio::sync::oneshot::channel();
-                let ask_id = format!("ask_{}", aqbot_core::utils::gen_id());
+                let ask_id = format!("ask_{}", frogclaw_core::utils::gen_id());
 
                 ask_senders.lock().await.insert(ask_id.clone(), tx);
 
@@ -720,7 +720,7 @@ pub async fn agent_query(
     );
 
     // 10. Spawn background task — mark as running in-memory
-    let run_id = aqbot_core::utils::gen_id();
+    let run_id = frogclaw_core::utils::gen_id();
     {
         let mut running = RUNNING_AGENTS.lock().unwrap();
         running.insert(conversation_id.clone(), run_id.clone());
@@ -789,7 +789,7 @@ pub async fn agent_query(
                                         if !accumulated_text.is_empty() {
                                             accumulated_text.push_str("\n\n");
                                         }
-                                        accumulated_text.push_str("<think data-aqbot=\"1\">\n");
+                                        accumulated_text.push_str("<think data-frogclaw=\"1\">\n");
                                         in_thinking_block = true;
                                     }
                                     accumulated_text.push_str(thinking);
@@ -902,7 +902,7 @@ pub async fn agent_query(
                             let summary = get_tool_input_summary(&name, input);
                             let tag_id = exec_id.as_deref().unwrap_or(sdk_id);
                             let marker = format!(
-                                "\n\n<tool-call data-aqbot=\"1\" id=\"{}\" name=\"{}\">{}</tool-call>\n\n",
+                                "\n\n<tool-call data-frogclaw=\"1\" id=\"{}\" name=\"{}\">{}</tool-call>\n\n",
                                 tag_id, name, summary
                             );
                             accumulated_text.push_str(&marker);
@@ -1103,7 +1103,7 @@ pub async fn agent_query(
                         if !accumulated_text.is_empty() {
                             accumulated_text.push_str("\n\n");
                         }
-                        accumulated_text.push_str("<think data-aqbot=\"1\">\n");
+                        accumulated_text.push_str("<think data-frogclaw=\"1\">\n");
                         in_thinking_block = true;
                     }
                     accumulated_text.push_str(&thinking);
@@ -1269,7 +1269,7 @@ pub async fn agent_query(
         if is_first_message {
             let _ = app.emit(
                 "conversation-title-generating",
-                aqbot_core::types::ConversationTitleGeneratingEvent {
+                frogclaw_core::types::ConversationTitleGeneratingEvent {
                     conversation_id: conv_id.clone(),
                     generating: true,
                     error: None,
@@ -1296,7 +1296,7 @@ pub async fn agent_query(
                         tracing::error!("[agent] Failed to update AI title: {}", e);
                         let _ = app.emit(
                             "conversation-title-generating",
-                            aqbot_core::types::ConversationTitleGeneratingEvent {
+                            frogclaw_core::types::ConversationTitleGeneratingEvent {
                                 conversation_id: conv_id.clone(),
                                 generating: false,
                                 error: Some(format!("Failed to save title: {}", e)),
@@ -1305,14 +1305,14 @@ pub async fn agent_query(
                     } else {
                         let _ = app.emit(
                             "conversation-title-updated",
-                            aqbot_core::types::ConversationTitleUpdatedEvent {
+                            frogclaw_core::types::ConversationTitleUpdatedEvent {
                                 conversation_id: conv_id.clone(),
                                 title,
                             },
                         );
                         let _ = app.emit(
                             "conversation-title-generating",
-                            aqbot_core::types::ConversationTitleGeneratingEvent {
+                            frogclaw_core::types::ConversationTitleGeneratingEvent {
                                 conversation_id: conv_id.clone(),
                                 generating: false,
                                 error: None,
@@ -1324,7 +1324,7 @@ pub async fn agent_query(
                     tracing::warn!("[agent] Auto title generation failed: {}", err);
                     let _ = app.emit(
                         "conversation-title-generating",
-                        aqbot_core::types::ConversationTitleGeneratingEvent {
+                        frogclaw_core::types::ConversationTitleGeneratingEvent {
                             conversation_id: conv_id.clone(),
                             generating: false,
                             error: Some(err),
@@ -1472,7 +1472,7 @@ pub async fn agent_get_session(
 /// Create default workspace directory under config home and return its path.
 #[tauri::command]
 pub async fn agent_ensure_workspace(conversation_id: String) -> Result<String, String> {
-    let workspace_dir = crate::paths::aqbot_home()
+    let workspace_dir = crate::paths::frogclaw_home()
         .join("workspace")
         .join(&conversation_id);
     std::fs::create_dir_all(&workspace_dir)

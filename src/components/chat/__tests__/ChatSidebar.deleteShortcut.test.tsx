@@ -293,8 +293,8 @@ describe('ChatSidebar direct delete shortcut', () => {
       'utf8',
     );
 
-    expect(source).not.toContain('aqbot-chat-conversation-direct-delete');
-    expect(source).toContain('.ant-conversations .ant-conversations-item-active .aqbot-chat-conversation-menu-delete');
+    expect(source).not.toContain('frogclaw-chat-conversation-direct-delete');
+    expect(source).toContain('.ant-conversations .ant-conversations-item-active .frogclaw-chat-conversation-menu-delete');
     expect(source).toContain('opacity: 0;');
   });
 });

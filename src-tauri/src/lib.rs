@@ -1,4 +1,4 @@
-use aqbot_core::db;
+use frogclaw_core::db;
 use chrono;
 use sea_orm::DatabaseConnection;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -15,13 +15,12 @@ use tauri::{LogicalPosition, LogicalSize, Position, Size};
 pub struct AppState {
     pub sea_db: DatabaseConnection,
     pub master_key: [u8; 32],
-    pub gateway: Arc<Mutex<Option<aqbot_gateway::server::GatewayServer>>>,
     pub close_to_tray: Arc<AtomicBool>,
     pub app_data_dir: PathBuf,
     pub db_path: String,
     pub auto_backup_handle: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
     pub webdav_sync_handle: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
-    pub vector_store: Arc<aqbot_core::vector_store::VectorStore>,
+    pub vector_store: Arc<frogclaw_core::vector_store::VectorStore>,
     pub stream_cancel_flags: Arc<Mutex<std::collections::HashMap<String, Arc<AtomicBool>>>>,
     pub agent_cancel_tokens: Arc<Mutex<std::collections::HashMap<String, open_agent_sdk::CancellationToken>>>,
     pub agent_permission_senders: Arc<Mutex<std::collections::HashMap<String, tokio::sync::oneshot::Sender<String>>>>,
@@ -96,6 +95,11 @@ pub fn run() {
             commands::providers::fetch_remote_models,
             commands::providers::test_model,
             commands::providers::reorder_providers,
+            // home / FrogClaw account
+            commands::home_tools::check_tools_installed,
+            commands::home_tools::install_tool,
+            commands::frogclaw_account::fetch_and_configure_frogclaw,
+            commands::frogclaw_account::apply_openclaw_config,
             // drawing
             commands::drawing::list_drawing_generations,
             commands::drawing::upload_drawing_reference,
@@ -135,32 +139,6 @@ pub fn run() {
             // settings
             commands::settings::get_settings,
             commands::settings::save_settings,
-            // gateway
-            commands::gateway::list_gateway_keys,
-            commands::gateway::create_gateway_key,
-            commands::gateway::delete_gateway_key,
-            commands::gateway::toggle_gateway_key,
-            commands::gateway::decrypt_gateway_key,
-            commands::gateway::get_gateway_metrics,
-            commands::gateway::start_gateway,
-            commands::gateway::stop_gateway,
-            commands::gateway::get_gateway_status,
-            commands::gateway::get_gateway_usage_by_key,
-            commands::gateway::get_gateway_usage_by_provider,
-            commands::gateway::get_gateway_usage_by_day,
-            commands::gateway::get_connected_programs,
-            commands::gateway::get_gateway_diagnostics,
-            commands::gateway::get_program_policies,
-            commands::gateway::save_program_policy,
-            commands::gateway::delete_program_policy,
-            commands::gateway::list_gateway_templates,
-            commands::gateway::copy_gateway_template,
-            commands::gateway::list_gateway_request_logs,
-            commands::gateway::clear_gateway_request_logs,
-            commands::gateway::get_all_cli_tool_statuses,
-            commands::gateway::connect_cli_tool,
-            commands::gateway::disconnect_cli_tool,
-            commands::gateway::generate_self_signed_cert,
             // messages
             commands::messages::list_messages,
             commands::messages::list_messages_page,
@@ -337,19 +315,19 @@ pub fn run() {
                 }
             }
 
-            // Canonical AQBot home directory (~/.aqbot/ on macOS/Linux,
-            // %USERPROFILE%\.aqbot\ on Windows).
-            let app_dir = paths::aqbot_home();
-            std::fs::create_dir_all(&app_dir).expect("failed to create AQBot home dir");
+            // Canonical application home directory (~/.frogclaw/ on macOS/Linux,
+            // %USERPROFILE%\.frogclaw\ on Windows).
+            let app_dir = paths::frogclaw_home();
+            std::fs::create_dir_all(&app_dir).expect("failed to create FrogClawClient home dir");
 
-            // Ensure ~/Documents/aqbot/{images,files,backups}/ exist
-            aqbot_core::storage_paths::ensure_documents_dirs()
+            // Ensure ~/Documents/frogclaw/{images,files,backups}/ exist
+            frogclaw_core::storage_paths::ensure_documents_dirs()
                 .expect("failed to create documents storage dirs");
 
-            let db_path = format!("sqlite:{}/aqbot.db", app_dir.display());
+            let db_path = format!("sqlite:{}/frogclaw.db", app_dir.display());
 
             // Load or generate master key BEFORE opening the database.
-            // db::create_pool uses SQLite create mode, which would create aqbot.db
+            // db::create_pool uses SQLite create mode, which would create frogclaw.db
             // on first launch — causing the safety guard below to misfire if it ran
             // after the pool is opened.
             let key_path = app_dir.join("master.key");
@@ -372,21 +350,21 @@ pub fn run() {
                 // permanently unrecoverable.
                 // Note: we check for the DB file *before* create_pool so that a genuine
                 // fresh install (no db, no key) can proceed normally.
-                let db_file = app_dir.join("aqbot.db");
+                let db_file = app_dir.join("frogclaw.db");
                 if db_file.exists() {
                     panic!(
-                        "FATAL: aqbot.db exists at '{}' but master.key is missing from '{}'.\n\
+                        "FATAL: frogclaw.db exists at '{}' but master.key is missing from '{}'.\n\
                          Generating a new master key would render all encrypted database \
                          contents permanently unrecoverable.\n\n\
                          Options:\n\
                          • Restore master.key from a backup and restart.\n\
-                         • Remove aqbot.db (and aqbot.db-shm / aqbot.db-wal if present) \
+                         • Remove frogclaw.db (and frogclaw.db-shm / frogclaw.db-wal if present) \
                            to start fresh — ALL DATA WILL BE LOST.",
                         db_file.display(),
                         key_path.display()
                     );
                 }
-                let key = aqbot_core::crypto::generate_master_key();
+                let key = frogclaw_core::crypto::generate_master_key();
                 std::fs::write(&key_path, &key).expect("failed to write master key");
                 // Restrict file permissions to owner-only (Unix)
                 #[cfg(unix)]
@@ -399,7 +377,7 @@ pub fn run() {
             };
 
             // Register sqlite-vec extension before any DB connections
-            aqbot_core::vector_store::register_sqlite_vec_extension();
+            frogclaw_core::vector_store::register_sqlite_vec_extension();
 
             let rt = tokio::runtime::Runtime::new().unwrap();
             let db_handle = match rt.block_on(db::create_pool(&db_path)) {
@@ -408,7 +386,7 @@ pub fn run() {
                     let msg = format!(
                         "数据库初始化失败: {}\n\n\
                          如果您从新版本回退到旧版本，数据库结构可能不兼容。\n\
-                         请使用最新版本的 AQBot。",
+                         请使用最新版本的 FrogClawClient。",
                         e
                     );
                     tracing::error!("{}", msg);
@@ -418,14 +396,14 @@ pub fn run() {
                         let escaped = msg.replace('\"', "\\\"").replace('\n', "\\n");
                         let _ = std::process::Command::new("osascript")
                             .args(["-e", &format!(
-                                "display dialog \"{}\" with title \"AQBot\" buttons {{\"OK\"}} default button \"OK\" with icon stop",
+                                "display dialog \"{}\" with title \"FrogClawClient\" buttons {{\"OK\"}} default button \"OK\" with icon stop",
                                 escaped
                             )])
                             .output();
                     }
                     #[cfg(target_os = "windows")]
                     {
-                        windows_utils::show_error_dialog("AQBot", &msg);
+                        windows_utils::show_error_dialog("FrogClawClient", &msg);
                     }
                     std::process::exit(1);
                 }
@@ -433,23 +411,23 @@ pub fn run() {
 
             // Initialize vector store (shares the sea-orm SQLite connection)
             let vector_store =
-                aqbot_core::vector_store::VectorStore::new(db_handle.conn.clone());
+                frogclaw_core::vector_store::VectorStore::new(db_handle.conn.clone());
 
             // Migrate any hardcoded absolute paths in settings to dynamic variables
-            rt.block_on(aqbot_core::path_vars::migrate_hardcoded_paths(&db_handle.conn));
+            rt.block_on(frogclaw_core::path_vars::migrate_hardcoded_paths(&db_handle.conn));
 
             let app_settings = rt
-                .block_on(aqbot_core::repo::settings::get_settings(&db_handle.conn))
+                .block_on(frogclaw_core::repo::settings::get_settings(&db_handle.conn))
                 .unwrap_or_default();
 
             // Apply custom documents root (if configured) before anything
             // that reads documents_root().
-            aqbot_core::storage_paths::init_documents_root(
+            frogclaw_core::storage_paths::init_documents_root(
                 app_settings.documents_root_override.as_ref().map(PathBuf::from),
             );
 
             // Re-ensure documents dirs under the (possibly custom) root
-            aqbot_core::storage_paths::ensure_documents_dirs()
+            frogclaw_core::storage_paths::ensure_documents_dirs()
                 .expect("failed to create documents storage dirs (custom root)");
 
             let tray_language = app_settings.language.clone();
@@ -457,7 +435,6 @@ pub fn run() {
             app.manage(AppState {
                 sea_db: db_handle.conn,
                 master_key,
-                gateway: Arc::new(Mutex::new(None)),
                 close_to_tray: Arc::new(AtomicBool::new(false)),
                 app_data_dir: app_dir.clone(),
                 db_path: db_path,
@@ -474,7 +451,7 @@ pub fn run() {
             // Reset any agent sessions that were running when app crashed/closed
             {
                 let sea_db = app.state::<AppState>().sea_db.clone();
-                let _ = rt.block_on(aqbot_core::repo::agent_session::reset_running_sessions(&sea_db));
+                let _ = rt.block_on(frogclaw_core::repo::agent_session::reset_running_sessions(&sea_db));
             }
 
             if let Some(main_window) = app.get_webview_window("main") {
@@ -529,9 +506,9 @@ pub fn run() {
                 let app_data = app_dir.clone();
                 let handle = state.auto_backup_handle.clone();
                 tauri::async_runtime::spawn(async move {
-                    if let Ok(settings) = aqbot_core::repo::settings::get_settings(&db).await {
+                    if let Ok(settings) = frogclaw_core::repo::settings::get_settings(&db).await {
                         if settings.auto_backup_enabled && settings.auto_backup_interval_hours > 0 {
-                            let backup_dir_setting = aqbot_core::path_vars::decode_path_opt(&settings.backup_dir);
+                            let backup_dir_setting = frogclaw_core::path_vars::decode_path_opt(&settings.backup_dir);
                             let interval = settings.auto_backup_interval_hours;
                             let max_count = settings.auto_backup_max_count;
                             let interval_secs = interval as u64 * 3600;
@@ -539,7 +516,7 @@ pub fn run() {
                             let app_dir2 = app_data.clone();
 
                             // Calculate initial delay: catch up if overdue
-                            let initial_delay_secs = match aqbot_core::repo::backup::list_backups(&db).await {
+                            let initial_delay_secs = match frogclaw_core::repo::backup::list_backups(&db).await {
                                 Ok(backups) if !backups.is_empty() => {
                                     let last_ts = &backups[0].created_at;
                                     if let Ok(last_time) = chrono::NaiveDateTime::parse_from_str(last_ts, "%Y-%m-%d %H:%M:%S") {
@@ -561,17 +538,17 @@ pub fn run() {
                                 // Initial wait (may be shorter if overdue)
                                 tokio::time::sleep(std::time::Duration::from_secs(initial_delay_secs)).await;
                                 loop {
-                                    let backup_dir = aqbot_core::repo::backup::resolve_backup_dir(
+                                    let backup_dir = frogclaw_core::repo::backup::resolve_backup_dir(
                                         backup_dir_setting.as_deref(),
                                         &app_dir2,
                                     );
-                                    if let Err(e) = aqbot_core::repo::backup::create_backup(
+                                    if let Err(e) = frogclaw_core::repo::backup::create_backup(
                                         &db2, "sqlite", &backup_dir,
                                     ).await {
                                         tracing::warn!("Auto-backup failed: {}", e);
                                     } else {
                                         tracing::info!("Auto-backup created");
-                                        let _ = aqbot_core::repo::backup::cleanup_old_backups(
+                                        let _ = frogclaw_core::repo::backup::cleanup_old_backups(
                                             &db2, max_count,
                                         ).await;
                                     }
@@ -592,7 +569,7 @@ pub fn run() {
                 let app_data_dir = app_dir.clone();
                 let handle = state.webdav_sync_handle.clone();
                 tauri::async_runtime::spawn(async move {
-                    if let Ok(settings) = aqbot_core::repo::settings::get_settings(&db).await {
+                    if let Ok(settings) = frogclaw_core::repo::settings::get_settings(&db).await {
                         if settings.webdav_sync_enabled && settings.webdav_sync_interval_minutes > 0 {
                             let db2 = db.clone();
                             let dir2 = app_data_dir.clone();
@@ -600,7 +577,7 @@ pub fn run() {
                             let interval_secs = interval as u64 * 60;
 
                             // Calculate initial delay: catch up if overdue
-                            let initial_delay_secs = match aqbot_core::repo::settings::get_setting(&db, "webdav_last_sync_time").await {
+                            let initial_delay_secs = match frogclaw_core::repo::settings::get_setting(&db, "webdav_last_sync_time").await {
                                 Ok(Some(ts)) => {
                                     if let Ok(last_time) = chrono::DateTime::parse_from_rfc3339(&ts) {
                                         let elapsed = chrono::Utc::now()
@@ -699,9 +676,9 @@ pub fn run() {
                 let lower = error_msg.to_lowercase();
                 if lower.contains("webview2") || lower.contains("webview") || lower.contains("edge") {
                     let user_ok = windows_utils::show_warning_ok_cancel(
-                        "AQBot",
-                        "未检测到 Microsoft Edge WebView2 Runtime，AQBot 无法启动。\n\n\
-                         点击「确定」打开下载页面进行安装，安装完成后重新启动 AQBot。",
+                        "FrogClawClient",
+                        "未检测到 Microsoft Edge WebView2 Runtime，FrogClawClient 无法启动。\n\n\
+                         点击「确定」打开下载页面进行安装，安装完成后重新启动 FrogClawClient。",
                     );
                     if user_ok {
                         let _ = std::process::Command::new("cmd")
@@ -710,7 +687,7 @@ pub fn run() {
                     }
                 } else {
                     windows_utils::show_error_dialog(
-                        "AQBot",
+                        "FrogClawClient",
                         &format!("应用启动失败：{}", error_msg),
                     );
                 }

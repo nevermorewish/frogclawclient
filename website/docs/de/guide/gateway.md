@@ -2,11 +2,11 @@
 
 ## Was ist das API-Gateway?
 
-AQBot enthält einen integrierten lokalen API-Server, der Ihre konfigurierten Anbieter als **OpenAI-kompatible**, **Claude-native** und **Gemini-native** Endpoints exponiert. Jedes Tool oder jeder Client, der eines dieser Protokolle verwendet, kann AQBot als Backend verwenden — keine separaten API-Schlüssel oder Relay-Dienste erforderlich.
+FrogClawClient enthält einen integrierten lokalen API-Server, der Ihre konfigurierten Anbieter als **OpenAI-kompatible**, **Claude-native** und **Gemini-native** Endpoints exponiert. Jedes Tool oder jeder Client, der eines dieser Protokolle verwendet, kann FrogClawClient als Backend verwenden — keine separaten API-Schlüssel oder Relay-Dienste erforderlich.
 
 Anwendungsfälle:
 
-- Führen Sie **Claude Code CLI**, **OpenAI Codex CLI**, **Gemini CLI** oder **OpenCode** über AQBot aus.
+- Führen Sie **Claude Code CLI**, **OpenAI Codex CLI**, **Gemini CLI** oder **OpenCode** über FrogClawClient aus.
 - Verbinden Sie Ihre IDE-Erweiterungen mit einem einzigen, lokal verwalteten Endpoint.
 - Teilen Sie einen Satz von Anbieter-Schlüsseln über viele Tools mit schlüsselbasiertem Rate-Limiting.
 
@@ -19,7 +19,7 @@ Anwendungsfälle:
 3. Standardmäßig lauscht der Server auf `127.0.0.1:8080` (HTTP).
 
 ::: tip
-Aktivieren Sie **Auto-Start** in den Gateway-Einstellungen, um den Server automatisch beim Start von AQBot zu starten.
+Aktivieren Sie **Auto-Start** in den Gateway-Einstellungen, um den Server automatisch beim Start von FrogClawClient zu starten.
 :::
 
 ---
@@ -39,14 +39,14 @@ Aktivieren Sie **Auto-Start** in den Gateway-Einstellungen, um den Server automa
 
 ```bash
 claude config set --global apiUrl http://127.0.0.1:8080
-claude config set --global apiKey aqbot-xxxx
+claude config set --global apiKey frogclaw-xxxx
 ```
 
 ### OpenAI Codex CLI
 
 ```bash
 export OPENAI_BASE_URL=http://127.0.0.1:8080/v1
-export OPENAI_API_KEY=aqbot-xxxx
+export OPENAI_API_KEY=frogclaw-xxxx
 codex
 ```
 
@@ -54,7 +54,7 @@ codex
 
 ```bash
 export GEMINI_API_BASE=http://127.0.0.1:8080
-export GEMINI_API_KEY=aqbot-xxxx
+export GEMINI_API_KEY=frogclaw-xxxx
 gemini
 ```
 
@@ -62,7 +62,7 @@ gemini
 
 ```
 Base URL:  http://127.0.0.1:8080/v1
-API-Schlüssel: aqbot-xxxx
+API-Schlüssel: frogclaw-xxxx
 ```
 
 ---

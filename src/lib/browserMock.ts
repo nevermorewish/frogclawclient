@@ -1,7 +1,7 @@
 /**
  * Browser-mode mock backend using localStorage.
  * Activated when the app runs outside Tauri (e.g. `pnpm dev` in browser).
- * Provides CRUD operations for providers, conversations, apps, settings, and gateway.
+ * Provides CRUD operations for providers, conversations, apps, and settings.
  */
 
 function genId(): string {
@@ -14,7 +14,7 @@ function nowTs(): number {
 
 function getStore<T>(key: string, defaultValue: T): T {
   try {
-    const data = localStorage.getItem(`aqbot_${key}`);
+    const data = localStorage.getItem(`frogclaw_${key}`);
     return data ? JSON.parse(data) : defaultValue;
   } catch {
     return defaultValue;
@@ -22,13 +22,13 @@ function getStore<T>(key: string, defaultValue: T): T {
 }
 
 function setStore<T>(key: string, value: T): void {
-  localStorage.setItem(`aqbot_${key}`, JSON.stringify(value));
+  localStorage.setItem(`frogclaw_${key}`, JSON.stringify(value));
 }
 
 function generateBrowserResponse(userContent: string): string {
   const greeting = /^(你好|hi|hello|hey|嗨)/i.test(userContent.trim());
   if (greeting) {
-    return '你好！我是 AQBot 的浏览器预览模式。在此模式下，我无法连接真实的 AI 服务，但你可以体验完整的聊天界面交互。\n\n如需真实 AI 对话，请通过 `cargo tauri dev` 启动 Tauri 后端。';
+    return '你好！我是 FrogClawClient 的浏览器预览模式。在此模式下，我无法连接真实的 AI 服务，但你可以体验完整的聊天界面交互。\n\n如需真实 AI 对话，请通过 `cargo tauri dev` 启动 Tauri 后端。';
   }
   return `收到你的消息：「${userContent.length > 50 ? userContent.slice(0, 50) + '...' : userContent}」\n\n当前为浏览器预览模式，无法调用真实 AI 接口。此模式用于 UI 开发和体验测试。\n\n如需 AI 回复，请使用 \`cargo tauri dev\` 启动完整应用。`;
 }
@@ -229,7 +229,6 @@ const DEFAULT_SETTINGS = {
   shortcut_fill_last_message: 'CmdOrCtrl+Shift+ArrowUp',
   shortcut_clear_context: 'CmdOrCtrl+Shift+K',
   shortcut_clear_conversation_messages: 'CmdOrCtrl+Shift+Backspace',
-  shortcut_toggle_gateway: 'CmdOrCtrl+Shift+G',
   shortcut_toggle_mode: 'Shift+Tab',
   global_shortcuts_enabled: true,
   shortcut_registration_logs_enabled: false,
@@ -709,69 +708,6 @@ export async function handleCommand<T>(cmd: string, args?: Record<string, unknow
     }
 
     // ── Gateway ───────────────────────────────────────────────────────
-    case 'list_gateway_keys':
-      return getStore('gateway_keys', []) as T;
-    case 'create_gateway_key': {
-      const { input } = args as any;
-      const key = {
-        id: genId(),
-        ...input,
-        key: `gk-${genId().substring(0, 16)}`,
-        created_at: nowTs(),
-        last_used_at: null,
-        total_requests: 0,
-      };
-      const keys = getStore<any[]>('gateway_keys', []);
-      keys.push(key);
-      setStore('gateway_keys', keys);
-      return { gateway_key: key, plain_key: `sk-mock-plain-key-${genId().substring(0, 8)}` } as T;
-    }
-    case 'delete_gateway_key': {
-      const { id } = args as any;
-      const keys = getStore<any[]>('gateway_keys', []).filter((k: any) => k.id !== id);
-      setStore('gateway_keys', keys);
-      return undefined as T;
-    }
-    case 'toggle_gateway_key': {
-      const { id, enabled } = args as any;
-      const keys = getStore<any[]>('gateway_keys', []);
-      const idx = keys.findIndex((k: any) => k.id === id);
-      if (idx !== -1) {
-        keys[idx].enabled = enabled;
-        setStore('gateway_keys', keys);
-      }
-      return undefined as T;
-    }
-    case 'get_gateway_metrics':
-      return {
-        total_requests: 0,
-        successful_requests: 0,
-        failed_requests: 0,
-        avg_latency_ms: 0,
-        requests_per_minute: 0,
-        active_keys: 0,
-        uptime_seconds: 0,
-      } as T;
-    case 'get_gateway_usage_by_key':
-    case 'get_gateway_usage_by_provider':
-    case 'get_gateway_usage_by_day':
-      return [] as T;
-    case 'get_gateway_status':
-      return {
-        is_running: false,
-        listen_address: '127.0.0.1',
-        port: 3000,
-        ssl_enabled: false,
-        started_at: null,
-        https_port: null,
-        force_ssl: false,
-      } as T;
-    case 'get_connected_programs':
-      return [] as T;
-    case 'start_gateway':
-    case 'stop_gateway':
-      return undefined as T;
-
     // ── Data management ───────────────────────────────────────────────
     case 'export_data':
       return { path: 'export.json' } as T;
@@ -1050,7 +986,7 @@ export async function handleCommand<T>(cmd: string, args?: Record<string, unknow
         checksum: 'mock-checksum',
         objectCountsJson: '{}',
         sourceAppVersion: '0.1.0',
-        filePath: '/mock/path/aqbot-backup.json',
+        filePath: '/mock/path/frogclaw-backup.json',
         fileSize: 1024,
       };
       bkps.push(bkp);
@@ -1210,7 +1146,7 @@ export async function handleCommand<T>(cmd: string, args?: Record<string, unknow
       const filePath = (args as any)?.filePath || '';
       const file = getStore<any[]>('drawing_files', []).find((item: any) => item.storage_path === filePath);
       if (file?.data) return `data:${file.mime_type};base64,${file.data}` as T;
-      return svgDataUrl(filePath.split('/').pop() || 'AQBot') as T;
+      return svgDataUrl(filePath.split('/').pop() || 'FrogClawClient') as T;
     }
     case 'check_attachment_exists':
       return true as T;
@@ -1268,38 +1204,31 @@ export async function handleCommand<T>(cmd: string, args?: Record<string, unknow
     }
 
     // ── Phase 2: Gateway Diagnostics & Templates ──────────────────────
-    case 'get_gateway_diagnostics':
-      return [
-        { id: '1', category: 'port', status: 'ok', message: 'Gateway port is available', createdAt: nowTs() },
-        { id: '2', category: 'auth', status: 'ok', message: 'Authentication configured', createdAt: nowTs() },
-        { id: '3', category: 'proxy', status: 'ok', message: 'Proxy settings valid', createdAt: nowTs() },
-        { id: '4', category: 'provider_latency', status: 'warning', message: 'No providers configured', createdAt: nowTs() },
-      ] as T;
-    case 'list_gateway_templates':
-      return getStore('gateway_templates', [
+    case '__removed_templates':
+      return getStore('removed_templates', [
         { id: 'tpl-cursor', name: 'Cursor IDE', target: 'cursor', format: 'json', content: '{\n  "openai.apiKey": "{{key}}",\n  "openai.apiBaseUrl": "http://localhost:{{port}}/v1"\n}', copyHint: '添加到 Cursor User settings.json', created_at: nowTs(), updated_at: nowTs() },
         { id: 'tpl-vscode', name: 'VS Code Continue', target: 'vscode', format: 'json', content: '{\n  "models": [{\n    "provider": "openai",\n    "apiBase": "http://localhost:{{port}}/v1",\n    "apiKey": "{{key}}"\n  }]\n}', copyHint: '添加到 .continue/config.json 的 models 数组', created_at: nowTs(), updated_at: nowTs() },
         { id: 'tpl-claude', name: 'Claude Code CLI', target: 'claude_code', format: 'text', content: 'ANTHROPIC_BASE_URL=http://localhost:{{port}}/v1\nANTHROPIC_AUTH_TOKEN={{key}}', copyHint: '添加到环境变量或 .env 文件', created_at: nowTs(), updated_at: nowTs() },
         { id: 'tpl-openai', name: 'OpenAI Compatible', target: 'openai_compatible', format: 'text', content: 'API Base: http://localhost:{{port}}/v1\nAPI Key: {{key}}', copyHint: '适用于任何支持 OpenAI API 的客户端', created_at: nowTs(), updated_at: nowTs() },
       ]) as T;
-    case 'create_gateway_template': {
-      const gts = getStore<any[]>('gateway_templates', []);
+    case '__create_removed_template': {
+      const gts = getStore<any[]>('removed_templates', []);
       const gt = { id: genId(), ...(args as any), created_at: nowTs(), updated_at: nowTs() };
       gts.push(gt);
-      setStore('gateway_templates', gts);
+      setStore('removed_templates', gts);
       return gt as T;
     }
-    case 'delete_gateway_template': {
-      const gts2 = getStore<any[]>('gateway_templates', []);
-      setStore('gateway_templates', gts2.filter(g => g.id !== (args as any)?.id));
+    case '__delete_removed_template': {
+      const gts2 = getStore<any[]>('removed_templates', []);
+      setStore('removed_templates', gts2.filter(g => g.id !== (args as any)?.id));
       return undefined as T;
     }
-    case 'copy_gateway_template': {
-      const cgtList = getStore<any[]>('gateway_templates', []);
+    case '__copy_removed_template': {
+      const cgtList = getStore<any[]>('removed_templates', []);
       const cgtMatch = cgtList.find(t => t.id === (args as any)?.templateId);
-      return (cgtMatch?.content ?? '# Gateway Template Configuration\n\nNo template found.') as T;
+      return (cgtMatch?.content ?? '# Template configuration\n\nNo template found.') as T;
     }
-    case 'apply_gateway_template':
+    case '__apply_removed_template':
       return { success: true, applied_at: nowTs() } as T;
 
     // ── Phase 2: Desktop Integration ──────────────────────────────────
@@ -1315,7 +1244,7 @@ export async function handleCommand<T>(cmd: string, args?: Record<string, unknow
       return { width: globalThis.innerWidth ?? 1280, height: globalThis.innerHeight ?? 800, focused: true, fullscreen: false } as T;
     case 'send_desktop_notification': {
       if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-        new Notification((args as any)?.title ?? 'AQBot', { body: (args as any)?.body ?? '' });
+        new Notification((args as any)?.title ?? 'FrogClawClient', { body: (args as any)?.body ?? '' });
       }
       return undefined as T;
     }
@@ -1332,6 +1261,30 @@ export async function handleCommand<T>(cmd: string, args?: Record<string, unknow
       return undefined as T;
     case 'handle_protocol_launch':
       return undefined as T;
+
+    case 'check_tools_installed':
+      return {
+        tools: [
+          { id: 'node', name: 'Node.js', installed: true, version: 'browser preview', path: null, installable: true, needs_upgrade: false },
+          { id: 'git', name: 'Git', installed: true, version: 'browser preview', path: null, installable: true, needs_upgrade: false },
+          { id: 'claude', name: 'Claude Code', installed: false, version: null, path: null, installable: true, needs_upgrade: false },
+          { id: 'codex', name: 'Codex', installed: false, version: null, path: null, installable: true, needs_upgrade: false },
+          { id: 'gemini', name: 'Gemini CLI', installed: false, version: null, path: null, installable: true, needs_upgrade: false },
+          { id: 'openclaw', name: 'OpenClaw', installed: false, version: null, path: null, installable: true, needs_upgrade: false },
+        ],
+      } as T;
+
+    case 'install_tool':
+      return {
+        success: false,
+        stdout: '',
+        stderr: '',
+        message: '浏览器预览模式不能安装本机工具，请在 Tauri 应用中使用。',
+        log_file: null,
+      } as T;
+
+    case 'fetch_and_configure_frogclaw':
+      throw new Error('浏览器预览模式不能登录 frogclaw.com，请在 Tauri 应用中使用。');
 
     // ── Phase 2: Workspace Snapshot ────────────────────────────────────
     case 'get_workspace_snapshot':
@@ -1356,7 +1309,7 @@ export async function handleCommand<T>(cmd: string, args?: Record<string, unknow
         info: {
           name: (args as any)?.name || 'example',
           description: 'Example skill',
-          source: 'aqbot',
+          source: 'frogclaw',
           sourcePath: '/mock/path',
           enabled: true,
           hasUpdate: false,

@@ -1,8 +1,9 @@
-{
+﻿{
   "app": {
-    "name": "AQBot"
+    "name": "FrogClawClient"
   },
   "nav": {
+    "home": "Inicio",
     "chat": "Chat",
     "knowledge": "Base de conocimientos",
     "memory": "Memoria",
@@ -931,7 +932,7 @@
     "maxCount": "Máximo de copias de seguridad a conservar",
     "copies": "copias",
     "backupDir": "Directorio de copias de seguridad",
-    "defaultDir": "Directorio de copias de seguridad predeterminado de AQBot",
+    "defaultDir": "Directorio de copias de seguridad predeterminado de FrogClawClient",
     "effectiveDir": "Directorio efectivo",
     "formatSqliteDesc": "Restauración rápida y directa",
     "formatJsonDesc": "Legible, archivo más grande",
@@ -1086,7 +1087,7 @@
     "reloadConfirmOk": "Recargar",
     "reloadConfirmCancel": "Cancelar",
     "closeConfirmTitle": "Cerrar aplicación",
-    "closeConfirmContent": "¿Está seguro de que desea cerrar AQBot?",
+    "closeConfirmContent": "¿Está seguro de que desea cerrar FrogClawClient?",
     "closeConfirmOk": "Cerrar",
     "closeConfirmCancel": "Cancelar",
     "startMinimized": "Iniciar minimizado",
@@ -1196,7 +1197,7 @@
     "uninstallConfirm": "¿Estás seguro de que quieres desinstalar la habilidad \"{{name}}\"?",
     "detail": "Detalles de la habilidad",
     "source": {
-      "aqbot": "AQBot",
+      "frogclaw": "FrogClawClient",
       "claude": "Claude",
       "agents": "Agents",
       "builtin": "Integrado",

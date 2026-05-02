@@ -15,21 +15,21 @@ pub struct PersistedWindowState {
     pub y: Option<f64>,
 }
 
-pub fn window_state_path(aqbot_home: &Path) -> PathBuf {
-    aqbot_home.join("window-state.json")
+pub fn window_state_path(frogclaw_home: &Path) -> PathBuf {
+    frogclaw_home.join("window-state.json")
 }
 
-pub fn load_window_state(aqbot_home: &Path) -> Option<PersistedWindowState> {
-    let path = window_state_path(aqbot_home);
+pub fn load_window_state(frogclaw_home: &Path) -> Option<PersistedWindowState> {
+    let path = window_state_path(frogclaw_home);
     let json = std::fs::read_to_string(path).ok()?;
     serde_json::from_str(&json).ok()
 }
 
-pub fn save_window_state(aqbot_home: &Path, state: PersistedWindowState) -> io::Result<()> {
-    std::fs::create_dir_all(aqbot_home)?;
+pub fn save_window_state(frogclaw_home: &Path, state: PersistedWindowState) -> io::Result<()> {
+    std::fs::create_dir_all(frogclaw_home)?;
     let json = serde_json::to_vec_pretty(&state)
         .map_err(|error| io::Error::new(io::ErrorKind::Other, error))?;
-    std::fs::write(window_state_path(aqbot_home), json)
+    std::fs::write(window_state_path(frogclaw_home), json)
 }
 
 pub fn clamp_window_state_to_monitor(
@@ -56,9 +56,9 @@ mod tests {
     };
 
     #[test]
-    fn round_trips_window_state_in_aqbot_home() {
+    fn round_trips_window_state_in_frogclaw_home() {
         let test_dir = std::env::temp_dir().join(format!(
-            "aqbot-window-state-{}",
+            "frogclaw-window-state-{}",
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .expect("system time before unix epoch")
@@ -86,7 +86,7 @@ mod tests {
     #[test]
     fn loads_legacy_state_without_new_fields() {
         let test_dir = std::env::temp_dir().join(format!(
-            "aqbot-window-state-legacy-{}",
+            "frogclaw-window-state-legacy-{}",
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .expect("system time before unix epoch")

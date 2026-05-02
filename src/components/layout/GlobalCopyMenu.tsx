@@ -163,7 +163,7 @@ export function GlobalCopyMenu() {
   const handleFillInput = useCallback(() => {
     const text = selectedTextRef.current;
     if (text) {
-      window.dispatchEvent(new CustomEvent('aqbot:fill-input', { detail: text }));
+      window.dispatchEvent(new CustomEvent('frogclaw:fill-input', { detail: text }));
     }
     setMenuPos(null);
   }, []);

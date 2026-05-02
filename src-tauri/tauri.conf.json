@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "AQBot",
+  "productName": "FrogClawClient",
   "version": "0.0.61",
-  "identifier": "top.aqbot.app",
+  "identifier": "com.frogclaw.client",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "AQBot",
+        "title": "FrogClawClient",
         "width": 1200,
         "height": 800,
         "minWidth": 800,
@@ -49,14 +49,14 @@
     "deep-link": {
       "desktop": {
         "schemes": [
-          "aqbot"
+          "frogclawclient"
         ]
       }
     },
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFGOEI0QkFDRTE4RTI4MTEKUldRUktJN2hyRXVMcjNaMTJJa3hxbkpBTGpIUWVMcUdWOXpMMXdnMU5aaTdvM2c2QnNCbHh5SXUK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI2ODczREI3REY1QzZDODgKUldTSWJGemZ0ejJIdHQzb0drbENZUFRIUXYvemVxSnNReGxMb0dmTXN4a0h5U2ZJMGsyR0ZnWm0K",
       "endpoints": [
-        "https://github.com/AQBot-Desktop/AQBot/releases/latest/download/latest.json"
+        "https://github.com/frogclaw/FrogClawClient/releases/latest/download/latest.json"
       ]
     }
   }

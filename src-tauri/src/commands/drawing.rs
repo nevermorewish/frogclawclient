@@ -1,14 +1,14 @@
 use crate::AppState;
-use aqbot_core::file_store::FileStore;
-use aqbot_core::repo::drawing::{
+use frogclaw_core::file_store::FileStore;
+use frogclaw_core::repo::drawing::{
     DrawingGeneration, DrawingImage, NewDrawingGeneration, NewDrawingImage,
 };
-use aqbot_core::repo::stored_file::StoredFile;
-use aqbot_core::types::{ProviderConfig, ProviderProxyConfig, ProviderType};
-use aqbot_providers::openai_images::{
+use frogclaw_core::repo::stored_file::StoredFile;
+use frogclaw_core::types::{ProviderConfig, ProviderProxyConfig, ProviderType};
+use frogclaw_providers::openai_images::{
     ImageEditRequest, ImageGenerateRequest, ImageUpload, OpenAIImagesClient,
 };
-use aqbot_providers::{resolve_base_url_for_type, ProviderRequestContext};
+use frogclaw_providers::{resolve_base_url_for_type, ProviderRequestContext};
 use base64::Engine;
 use image::GenericImageView;
 use serde::{Deserialize, Serialize};
@@ -105,7 +105,7 @@ pub async fn list_drawing_generations(
     cursor: Option<String>,
 ) -> Result<Vec<DrawingGeneration>, String> {
     let parsed_cursor = cursor.and_then(|value| value.parse::<i64>().ok());
-    aqbot_core::repo::drawing::list_generations(&state.sea_db, limit.unwrap_or(30), parsed_cursor)
+    frogclaw_core::repo::drawing::list_generations(&state.sea_db, limit.unwrap_or(30), parsed_cursor)
         .await
         .map_err(|e| e.to_string())
 }
@@ -120,7 +120,7 @@ pub async fn upload_drawing_reference(
         .map_err(|e| format!("Invalid base64: {}", e))?;
     validate_upload_image(&bytes, &input.mime_type)?;
 
-    aqbot_core::storage_paths::ensure_documents_dirs()
+    frogclaw_core::storage_paths::ensure_documents_dirs()
         .map_err(|e| format!("Failed to ensure documents dirs: {}", e))?;
     save_drawing_reference_file(&state, &bytes, &input.file_name, &input.mime_type).await
 }
@@ -217,7 +217,7 @@ pub async fn edit_drawing_image(
         &input.size,
     )?;
     let (ctx, provider, key_id) = build_image_context(&state, &input.provider_id).await?;
-    let source = aqbot_core::repo::drawing::get_image(&state.sea_db, &input.source_image_id)
+    let source = frogclaw_core::repo::drawing::get_image(&state.sea_db, &input.source_image_id)
         .await
         .map_err(|e| e.to_string())?;
     let generation = create_running_generation(
@@ -273,15 +273,15 @@ pub async fn edit_drawing_image_with_mask(
         &input.size,
     )?;
     let (ctx, provider, key_id) = build_image_context(&state, &input.provider_id).await?;
-    let source = aqbot_core::repo::drawing::get_image(&state.sea_db, &input.source_image_id)
+    let source = frogclaw_core::repo::drawing::get_image(&state.sea_db, &input.source_image_id)
         .await
         .map_err(|e| e.to_string())?;
     let source_file =
-        aqbot_core::repo::stored_file::get_stored_file(&state.sea_db, &source.stored_file_id)
+        frogclaw_core::repo::stored_file::get_stored_file(&state.sea_db, &source.stored_file_id)
             .await
             .map_err(|e| e.to_string())?;
     let mask_file =
-        aqbot_core::repo::stored_file::get_stored_file(&state.sea_db, &input.mask_file_id)
+        frogclaw_core::repo::stored_file::get_stored_file(&state.sea_db, &input.mask_file_id)
             .await
             .map_err(|e| e.to_string())?;
     validate_mask_file(&source_file, &mask_file)?;
@@ -331,7 +331,7 @@ pub async fn delete_drawing_generation(
     delete_resources: Option<bool>,
 ) -> Result<(), String> {
     if delete_resources.unwrap_or(false) {
-        let generation = aqbot_core::repo::drawing::get_generation(&state.sea_db, &id)
+        let generation = frogclaw_core::repo::drawing::get_generation(&state.sea_db, &id)
             .await
             .map_err(|e| e.to_string())?;
         let file_store = FileStore::new();
@@ -345,7 +345,7 @@ pub async fn delete_drawing_generation(
         }
     }
 
-    aqbot_core::repo::drawing::delete_generation(&state.sea_db, &id)
+    frogclaw_core::repo::drawing::delete_generation(&state.sea_db, &id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -355,10 +355,10 @@ async fn build_image_context(
     provider_id: &str,
 ) -> Result<(ProviderRequestContext, ProviderConfig, String), String> {
     let real_provider_id =
-        aqbot_core::repo::provider::resolve_provider_id(&state.sea_db, provider_id)
+        frogclaw_core::repo::provider::resolve_provider_id(&state.sea_db, provider_id)
             .await
             .map_err(|e| e.to_string())?;
-    let provider = aqbot_core::repo::provider::get_provider(&state.sea_db, &real_provider_id)
+    let provider = frogclaw_core::repo::provider::get_provider(&state.sea_db, &real_provider_id)
         .await
         .map_err(|e| e.to_string())?;
     if !provider.enabled {
@@ -370,12 +370,12 @@ async fn build_image_context(
     ) {
         return Err("Drawing only supports OpenAI-compatible providers".to_string());
     }
-    let key = aqbot_core::repo::provider::get_active_key(&state.sea_db, &real_provider_id)
+    let key = frogclaw_core::repo::provider::get_active_key(&state.sea_db, &real_provider_id)
         .await
         .map_err(|_| "Please configure an active OpenAI API key first".to_string())?;
-    let decrypted = aqbot_core::crypto::decrypt_key(&key.key_encrypted, &state.master_key)
+    let decrypted = frogclaw_core::crypto::decrypt_key(&key.key_encrypted, &state.master_key)
         .map_err(|e| e.to_string())?;
-    let settings = aqbot_core::repo::settings::get_settings(&state.sea_db)
+    let settings = frogclaw_core::repo::settings::get_settings(&state.sea_db)
         .await
         .unwrap_or_default();
     let proxy = ProviderProxyConfig::resolve(&provider.proxy_config, &settings);
@@ -410,7 +410,7 @@ async fn create_running_generation<T: Serialize>(
     parent_generation_id: Option<String>,
     mask_file_id: Option<String>,
 ) -> Result<DrawingGeneration, String> {
-    aqbot_core::repo::drawing::create_generation(
+    frogclaw_core::repo::drawing::create_generation(
         &state.sea_db,
         NewDrawingGeneration {
             parent_generation_id,
@@ -434,7 +434,7 @@ async fn create_running_generation<T: Serialize>(
 async fn persist_api_result(
     state: &AppState,
     generation: DrawingGeneration,
-    result: aqbot_core::error::Result<aqbot_providers::openai_images::ImageApiOutput>,
+    result: frogclaw_core::error::Result<frogclaw_providers::openai_images::ImageApiOutput>,
     output_format: &str,
     provider: &ProviderConfig,
 ) -> Result<DrawingGeneration, String> {
@@ -447,8 +447,8 @@ async fn persist_api_result(
                 let saved = FileStore::new()
                     .save_file(&image.bytes, &file_name, mime_type)
                     .map_err(|e| e.to_string())?;
-                let stored_file_id = aqbot_core::utils::gen_id();
-                aqbot_core::repo::stored_file::create_stored_file(
+                let stored_file_id = frogclaw_core::utils::gen_id();
+                frogclaw_core::repo::stored_file::create_stored_file(
                     &state.sea_db,
                     &stored_file_id,
                     &saved.hash,
@@ -461,7 +461,7 @@ async fn persist_api_result(
                 .await
                 .map_err(|e| e.to_string())?;
                 let dimensions = image_dimensions(&image.bytes).ok();
-                aqbot_core::repo::drawing::add_image(
+                frogclaw_core::repo::drawing::add_image(
                     &state.sea_db,
                     NewDrawingImage {
                         generation_id: generation.id.clone(),
@@ -476,7 +476,7 @@ async fn persist_api_result(
                 .await
                 .map_err(|e| e.to_string())?;
             }
-            aqbot_core::repo::drawing::mark_generation_succeeded(
+            frogclaw_core::repo::drawing::mark_generation_succeeded(
                 &state.sea_db,
                 &generation.id,
                 output.response_id,
@@ -484,13 +484,13 @@ async fn persist_api_result(
             )
             .await
             .map_err(|e| e.to_string())?;
-            aqbot_core::repo::drawing::get_generation(&state.sea_db, &generation.id)
+            frogclaw_core::repo::drawing::get_generation(&state.sea_db, &generation.id)
                 .await
                 .map_err(|e| e.to_string())
         }
         Err(err) => {
             let sanitized = sanitize_error(&err.to_string(), provider);
-            let _ = aqbot_core::repo::drawing::mark_generation_failed(
+            let _ = frogclaw_core::repo::drawing::mark_generation_failed(
                 &state.sea_db,
                 &generation.id,
                 sanitized.clone(),
@@ -512,12 +512,12 @@ async fn save_drawing_reference_file(
         .save_file(bytes, file_name, mime_type)
         .map_err(|e| e.to_string())?;
 
-    if let Some(existing) = aqbot_core::repo::stored_file::find_by_hash(&state.sea_db, &saved.hash)
+    if let Some(existing) = frogclaw_core::repo::stored_file::find_by_hash(&state.sea_db, &saved.hash)
         .await
         .map_err(|e| e.to_string())?
     {
         if existing.storage_path != saved.storage_path {
-            let references = aqbot_core::repo::stored_file::count_stored_files_with_storage_path(
+            let references = frogclaw_core::repo::stored_file::count_stored_files_with_storage_path(
                 &state.sea_db,
                 &saved.storage_path,
             )
@@ -532,8 +532,8 @@ async fn save_drawing_reference_file(
             return Ok(drawing_stored_file_from_repo(existing));
         }
 
-        let id = aqbot_core::utils::gen_id();
-        let stored = aqbot_core::repo::stored_file::create_stored_file(
+        let id = frogclaw_core::utils::gen_id();
+        let stored = frogclaw_core::repo::stored_file::create_stored_file(
             &state.sea_db,
             &id,
             &saved.hash,
@@ -548,8 +548,8 @@ async fn save_drawing_reference_file(
         return Ok(drawing_stored_file_from_repo(stored));
     }
 
-    let id = aqbot_core::utils::gen_id();
-    let stored = aqbot_core::repo::stored_file::create_stored_file(
+    let id = frogclaw_core::utils::gen_id();
+    let stored = frogclaw_core::repo::stored_file::create_stored_file(
         &state.sea_db,
         &id,
         &saved.hash,
@@ -571,7 +571,7 @@ async fn load_reference_uploads(
 ) -> Result<Vec<ImageUpload>, String> {
     let mut uploads = Vec::with_capacity(file_ids.len());
     for file_id in file_ids {
-        let file = aqbot_core::repo::stored_file::get_stored_file(&state.sea_db, file_id)
+        let file = frogclaw_core::repo::stored_file::get_stored_file(&state.sea_db, file_id)
             .await
             .map_err(|e| e.to_string())?;
         uploads.push(load_stored_file_upload(state, &file).await?);
@@ -583,7 +583,7 @@ async fn load_drawing_image_upload(
     state: &AppState,
     image: &DrawingImage,
 ) -> Result<ImageUpload, String> {
-    let file = aqbot_core::repo::stored_file::get_stored_file(&state.sea_db, &image.stored_file_id)
+    let file = frogclaw_core::repo::stored_file::get_stored_file(&state.sea_db, &image.stored_file_id)
         .await
         .map_err(|e| e.to_string())?;
     load_stored_file_upload(state, &file).await
@@ -591,7 +591,7 @@ async fn load_drawing_image_upload(
 
 async fn load_stored_file_upload(
     _state: &AppState,
-    file: &aqbot_core::repo::stored_file::StoredFile,
+    file: &frogclaw_core::repo::stored_file::StoredFile,
 ) -> Result<ImageUpload, String> {
     let bytes = FileStore::new()
         .read_file(&file.storage_path)
@@ -689,8 +689,8 @@ fn validate_upload_image(bytes: &[u8], mime_type: &str) -> Result<(), String> {
 }
 
 fn validate_mask_file(
-    source: &aqbot_core::repo::stored_file::StoredFile,
-    mask: &aqbot_core::repo::stored_file::StoredFile,
+    source: &frogclaw_core::repo::stored_file::StoredFile,
+    mask: &frogclaw_core::repo::stored_file::StoredFile,
 ) -> Result<(), String> {
     let store = FileStore::new();
     let source_bytes = store

@@ -26,8 +26,8 @@ import { IconEditor } from '@/components/shared/IconEditor';
 import type { McpServer, CreateMcpServerInput, ToolDescriptor } from '@/types';
 
 const BUILTIN_DISPLAY_NAME_KEYS: Record<string, string> = {
-  '@aqbot/fetch': 'settings.mcpServers.builtinFetch',
-  '@aqbot/search-file': 'settings.mcpServers.builtinSearchFile',
+  '@frogclaw/fetch': 'settings.mcpServers.builtinFetch',
+  '@frogclaw/search-file': 'settings.mcpServers.builtinSearchFile',
 };
 
 // ── Left Sidebar: Server List ─────────────────────────────

@@ -55,7 +55,6 @@ export type CreateBackupJobInput = {
   target: BackupTarget;
   includeAttachments: boolean;
   includeKnowledgeFiles: boolean;
-  includeGatewayConfig: boolean;
   passphrase?: string;
 };
 
@@ -67,59 +66,6 @@ export type ProgramPolicy = {
   defaultProviderId?: string;
   defaultModelId?: string;
   rateLimitPerMinute?: number;
-};
-
-export type GatewayDiagnosticCategory = 'provider_latency' | 'provider_error' | 'proxy' | 'auth' | 'port';
-export type GatewayDiagnosticStatus = 'ok' | 'warning' | 'error';
-
-export type GatewayDiagnostic = {
-  id: string;
-  category: GatewayDiagnosticCategory;
-  status: GatewayDiagnosticStatus;
-  message: string;
-  createdAt: string;
-};
-
-export type GatewayRequestLog = {
-  id: string;
-  keyId: string;
-  keyName: string;
-  method: string;
-  path: string;
-  model: string | null;
-  providerId: string | null;
-  statusCode: number;
-  durationMs: number;
-  requestTokens: number;
-  responseTokens: number;
-  errorMessage: string | null;
-  createdAt: number;
-};
-
-export type GatewayTemplateTarget = 'cursor' | 'vscode' | 'claude_code' | 'openai_compatible';
-export type GatewayTemplateFormat = 'json' | 'yaml' | 'markdown';
-
-export type GatewayTemplate = {
-  id: string;
-  name: string;
-  target: GatewayTemplateTarget;
-  format: GatewayTemplateFormat;
-  content: string;
-  copyHint?: string;
-};
-
-// CLI Tool Integration
-export type CliToolStatus = 'not_installed' | 'not_connected' | 'connected';
-export type QuickConnectProtocol = 'http' | 'https';
-
-export type CliToolInfo = {
-  id: string;
-  name: string;
-  status: CliToolStatus;
-  version: string | null;
-  configPath: string | null;
-  hasBackup: boolean;
-  connectedProtocol: QuickConnectProtocol | null;
 };
 
 export type DesktopCapabilityKey = 'tray' | 'global_shortcut' | 'protocol_handler' | 'mini_window' | 'artifact_window' | 'notification';
@@ -134,7 +80,7 @@ export type TrayAction = 'show_main' | 'open_mini_window' | 'resume_voice_call' 
 
 export type ProtocolLaunchPayload = {
   source: 'browser' | 'os_protocol';
-  route: 'chat' | 'gateway' | 'settings';
+  route: 'chat' | 'settings';
   query?: Record<string, string>;
 };
 

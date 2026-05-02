@@ -1,4 +1,4 @@
-name: Test Build
+﻿name: Test Build
 
 on:
   push:
@@ -93,7 +93,7 @@ jobs:
           APPLE_SIGNING_IDENTITY: '-'
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'AQBot ${{ github.ref_name }} (Test)'
+          releaseName: 'FrogClawClient ${{ github.ref_name }} (Test)'
           releaseBody: 'Internal test build for scrollbar fix verification.'
           releaseDraft: true
           prerelease: true

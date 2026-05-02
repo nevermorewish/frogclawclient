@@ -1,23 +1,23 @@
 ---
 layout: home
-title: AQBot — 开源 AI 桌面客户端 & AI 网关
+title: FrogClawClient — 开源 AI 桌面客户端 & AI 网关
 titleTemplate: false
 
 head:
   - - meta
     - name: description
-      content: AQBot 是一款免费开源的 AI 桌面客户端，内置 AI 网关。支持 OpenAI、Claude、Gemini、DeepSeek 等多模型对话，MCP 服务器、知识库、隐私优先。
+      content: FrogClawClient 是一款免费开源的 AI 桌面客户端，内置 AI 网关。支持 OpenAI、Claude、Gemini、DeepSeek 等多模型对话，MCP 服务器、知识库、隐私优先。
   - - meta
     - name: keywords
-      content: AQBot, AI桌面客户端, AI网关, AI聊天客户端, LLM客户端, 多模型AI, MCP服务器, ChatGPT替代, 开源AI, 大语言模型, AI桌面应用, DeepSeek客户端
+      content: FrogClawClient, AI桌面客户端, AI网关, AI聊天客户端, LLM客户端, 多模型AI, MCP服务器, ChatGPT替代, 开源AI, 大语言模型, AI桌面应用, DeepSeek客户端
 
 hero:
-  name: AQBot
+  name: FrogClawClient
   text: 你的 AI 桌面助手
   tagline: 多模型对话、MCP 工具、API 网关、知识库，一个开源客户端全部搞定
   image:
     src: /logo.png
-    alt: AQBot
+    alt: FrogClawClient
   actions:
     - theme: brand
       text: 快速开始
@@ -27,7 +27,7 @@ hero:
       link: /zh/download
     - theme: alt
       text: GitHub
-      link: https://github.com/AQBot-Desktop/AQBot
+      link: https://github.com/FrogClawClient-Desktop/FrogClawClient
 
 features:
   - icon: robot
@@ -38,7 +38,7 @@ features:
     details: 切换至 Agent 模式，AI 自主执行任务。读写文件、运行命令、分析代码——三级权限控制 + 工作目录沙箱，安全可控。
   - icon: api
     title: MCP 工具调用
-    details: 完整实现 Model Context Protocol，支持 stdio、SSE、StreamableHTTP。一键连接外部工具，内置 @aqbot/fetch 等 MCP 工具。
+    details: 完整实现 Model Context Protocol，支持 stdio、SSE、StreamableHTTP。一键连接外部工具，内置 @frogclaw/fetch 等 MCP 工具。
   - icon: cloud-server
     title: 内置 API 网关
     details: 本地 OpenAI 兼容 API 服务器，可作为 Claude Code、Codex、Gemini CLI 等工具的后端。密钥管理、速率限制、SSL/TLS。

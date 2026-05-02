@@ -10,12 +10,12 @@
 
 use sea_orm::DatabaseConnection;
 
-use aqbot_core::error::{AQBotError, Result};
-use aqbot_core::rag::{self, ChunkStrategy, KnowledgeRAG, MemoryRAG};
-use aqbot_core::types::*;
-use aqbot_core::vector_store::{VectorSearchResult, VectorStore};
+use frogclaw_core::error::{FrogClawClientError, Result};
+use frogclaw_core::rag::{self, ChunkStrategy, KnowledgeRAG, MemoryRAG};
+use frogclaw_core::types::*;
+use frogclaw_core::vector_store::{VectorSearchResult, VectorStore};
 
-use aqbot_providers::{
+use frogclaw_providers::{
     registry::ProviderRegistry, resolve_base_url_for_type, ProviderAdapter, ProviderRequestContext,
 };
 
@@ -63,7 +63,7 @@ impl rag::AsyncRerankFn for ProviderRerankFn {
 pub fn parse_embedding_provider(embedding_provider: &str) -> Result<(String, String)> {
     let parts: Vec<&str> = embedding_provider.splitn(2, "::").collect();
     if parts.len() != 2 || parts[0].is_empty() || parts[1].is_empty() {
-        return Err(AQBotError::Provider(format!(
+        return Err(FrogClawClientError::Provider(format!(
             "Invalid embedding_provider format '{}'. Expected 'providerId::modelId'",
             embedding_provider
         )));
@@ -91,11 +91,11 @@ pub async fn build_embed_context(
     master_key: &[u8; 32],
     provider_id: &str,
 ) -> Result<(ProviderRequestContext, ProviderConfig)> {
-    let provider = aqbot_core::repo::provider::get_provider(db, provider_id).await?;
-    let key_row = aqbot_core::repo::provider::get_active_key(db, provider_id).await?;
-    let decrypted_key = aqbot_core::crypto::decrypt_key(&key_row.key_encrypted, master_key)?;
+    let provider = frogclaw_core::repo::provider::get_provider(db, provider_id).await?;
+    let key_row = frogclaw_core::repo::provider::get_active_key(db, provider_id).await?;
+    let decrypted_key = frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, master_key)?;
 
-    let global_settings = aqbot_core::repo::settings::get_settings(db)
+    let global_settings = frogclaw_core::repo::settings::get_settings(db)
         .await
         .unwrap_or_default();
     let resolved_proxy = ProviderProxyConfig::resolve(&provider.proxy_config, &global_settings);
@@ -133,7 +133,7 @@ pub async fn generate_embeddings(
     let registry = ProviderRegistry::create_default();
     let registry_key = provider_type_to_registry_key(&provider_config.provider_type);
     let adapter: &dyn ProviderAdapter = registry.get(registry_key).ok_or_else(|| {
-        AQBotError::Provider(format!("Unsupported provider type: {}", registry_key))
+        FrogClawClientError::Provider(format!("Unsupported provider type: {}", registry_key))
     })?;
 
     let request = EmbedRequest {
@@ -160,7 +160,7 @@ pub async fn generate_rerank(
     let registry = ProviderRegistry::create_default();
     let registry_key = provider_type_to_registry_key(&provider_config.provider_type);
     let adapter: &dyn ProviderAdapter = registry.get(registry_key).ok_or_else(|| {
-        AQBotError::Provider(format!("Unsupported provider type: {}", registry_key))
+        FrogClawClientError::Provider(format!("Unsupported provider type: {}", registry_key))
     })?;
 
     let request = RerankRequest {
@@ -248,23 +248,23 @@ pub async fn index_knowledge_document(
     chunk_size: Option<i32>,
     chunk_overlap: Option<i32>,
 ) -> Result<()> {
-    aqbot_core::repo::knowledge::update_document_status(db, document_id, "indexing").await?;
+    frogclaw_core::repo::knowledge::update_document_status(db, document_id, "indexing").await?;
 
     let strategy = ChunkStrategy::ParseAndChunk {
         source_path: source_path.to_string(),
         mime_type: mime_type.to_string(),
         chunk_size: chunk_size
             .map(|v| v as usize)
-            .unwrap_or(aqbot_core::text_chunker::DEFAULT_CHUNK_SIZE),
+            .unwrap_or(frogclaw_core::text_chunker::DEFAULT_CHUNK_SIZE),
         overlap: chunk_overlap
             .map(|v| v as usize)
-            .unwrap_or(aqbot_core::text_chunker::DEFAULT_OVERLAP),
+            .unwrap_or(frogclaw_core::text_chunker::DEFAULT_OVERLAP),
     };
 
     let chunks = rag::prepare_chunks(document_id, &strategy)?;
 
     if chunks.is_empty() {
-        aqbot_core::repo::knowledge::update_document_status(db, document_id, "ready").await?;
+        frogclaw_core::repo::knowledge::update_document_status(db, document_id, "ready").await?;
         return Ok(());
     }
 
@@ -283,7 +283,7 @@ pub async fn index_knowledge_document(
     )
     .await?;
 
-    aqbot_core::repo::knowledge::update_document_status(db, document_id, "ready").await?;
+    frogclaw_core::repo::knowledge::update_document_status(db, document_id, "ready").await?;
 
     Ok(())
 }
@@ -332,7 +332,7 @@ pub async fn search_knowledge(
     query: &str,
     top_k: usize,
 ) -> Result<Vec<VectorSearchResult>> {
-    let kb = aqbot_core::repo::knowledge::get_knowledge_base(db, knowledge_base_id).await?;
+    let kb = frogclaw_core::repo::knowledge::get_knowledge_base(db, knowledge_base_id).await?;
     let final_top_k = kb
         .retrieval_top_k
         .filter(|v| *v > 0)
@@ -398,7 +398,7 @@ pub async fn search_memory(
     top_k: usize,
 ) -> Result<Vec<VectorSearchResult>> {
     // Look up namespace settings for dimensions
-    let dims = aqbot_core::repo::memory::get_namespace(db, namespace_id)
+    let dims = frogclaw_core::repo::memory::get_namespace(db, namespace_id)
         .await
         .ok()
         .and_then(|ns| ns.embedding_dimensions.map(|v| v as usize));

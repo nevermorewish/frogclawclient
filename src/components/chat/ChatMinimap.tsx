@@ -6,7 +6,7 @@ import { ModelIcon } from '@lobehub/icons';
 import { useConversationStore, useProviderStore, useSettingsStore } from '@/stores';
 import { useUserProfileStore } from '@/stores/userProfileStore';
 import { useResolvedAvatarSrc } from '@/hooks/useResolvedAvatarSrc';
-import { stripAqbotTags } from '@/lib/chatMarkdown';
+import { stripFrogclawTags } from '@/lib/chatMarkdown';
 import type { Message } from '@/types';
 
 // ── Scroll context — provided by ChatView ──
@@ -62,7 +62,7 @@ interface MinimapEntry {
 // ── Helpers ──
 
 function summarize(content: string, maxLen: number): string {
-  const stripped = stripAqbotTags(content)
+  const stripped = stripFrogclawTags(content)
     .replace(/```[\s\S]*?```/g, '[code]')
     .replace(/\n+/g, ' ')
     .trim();
@@ -120,7 +120,7 @@ function useEntries(): MinimapEntry[] {
   }, [messages]);
 }
 
-/** Find the bubble wrapper element for a data-aqbot-msg marker */
+/** Find the bubble wrapper element for a data-frogclaw-msg marker */
 function findBubbleEl(marker: Element, scrollBox: HTMLElement): Element {
   let el: Element = marker;
   // Walk up until we find an element whose parent is the scroll box or its first child container
@@ -162,8 +162,8 @@ function useActiveMessageId(entries: MinimapEntry[]): string | null {
       const boxRect = scrollBox.getBoundingClientRect();
 
       // Collect rects for first and last entries to detect scroll extremes
-      const firstMarker = scrollBox.querySelector(`[data-aqbot-msg="${entries[0].msg.id}"]`);
-      const lastMarker = scrollBox.querySelector(`[data-aqbot-msg="${entries[entries.length - 1].msg.id}"]`);
+      const firstMarker = scrollBox.querySelector(`[data-frogclaw-msg="${entries[0].msg.id}"]`);
+      const lastMarker = scrollBox.querySelector(`[data-frogclaw-msg="${entries[entries.length - 1].msg.id}"]`);
 
       // Edge case: scrolled to top — first entry's top is at or below viewport top
       if (firstMarker) {
@@ -190,7 +190,7 @@ function useActiveMessageId(entries: MinimapEntry[]): string | null {
       let best: { id: string; dist: number } | null = null;
 
       for (const entry of entries) {
-        const marker = scrollBox.querySelector(`[data-aqbot-msg="${entry.msg.id}"]`);
+        const marker = scrollBox.querySelector(`[data-frogclaw-msg="${entry.msg.id}"]`);
         if (!marker) continue;
         const el = findBubbleEl(marker, scrollBox);
         const rect = el.getBoundingClientRect();

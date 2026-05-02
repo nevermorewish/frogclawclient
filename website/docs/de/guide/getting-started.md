@@ -2,23 +2,23 @@
 
 ## Installation
 
-Laden Sie den neuesten Installer von der [Download-Seite](/de/download) oder [GitHub Releases](https://github.com/AQBot-Desktop/AQBot/releases) herunter.
+Laden Sie den neuesten Installer von der [Download-Seite](/de/download) oder [GitHub Releases](https://github.com/FrogClawClient-Desktop/FrogClawClient/releases) herunter.
 
 ### macOS
 
 | Chip | Datei |
 |------|-------|
-| Apple Silicon (M1 / M2 / M3 / M4) | `AQBot_x.x.x_aarch64.dmg` |
-| Intel | `AQBot_x.x.x_x64.dmg` |
+| Apple Silicon (M1 / M2 / M3 / M4) | `FrogClawClient_x.x.x_aarch64.dmg` |
+| Intel | `FrogClawClient_x.x.x_x64.dmg` |
 
-1. Öffnen Sie die `.dmg` und ziehen Sie **AQBot** in den **Programme**-Ordner.
-2. Starten Sie AQBot. Wenn macOS die App blockiert, gehen Sie zu **Systemeinstellungen → Datenschutz & Sicherheit** und klicken Sie auf **Trotzdem öffnen**.
+1. Öffnen Sie die `.dmg` und ziehen Sie **FrogClawClient** in den **Programme**-Ordner.
+2. Starten Sie FrogClawClient. Wenn macOS die App blockiert, gehen Sie zu **Systemeinstellungen → Datenschutz & Sicherheit** und klicken Sie auf **Trotzdem öffnen**.
 
 ::: warning macOS: „App ist beschädigt" oder „Entwickler kann nicht überprüft werden"
 Wenn Sie eine dieser Meldungen sehen, öffnen Sie Terminal und führen Sie aus:
 
 ```bash
-xattr -c /Applications/AQBot.app
+xattr -c /Applications/FrogClawClient.app
 ```
 
 Starten Sie die App dann erneut. Dies entfernt das Quarantäne-Flag, das macOS auf unsignierte Downloads anwendet.
@@ -28,32 +28,32 @@ Starten Sie die App dann erneut. Dies entfernt das Quarantäne-Flag, das macOS a
 
 | Architektur | Datei |
 |-------------|-------|
-| x64 (die meisten PCs) | `AQBot_x.x.x_x64-setup.exe` |
-| ARM64 | `AQBot_x.x.x_arm64-setup.exe` |
+| x64 (die meisten PCs) | `FrogClawClient_x.x.x_x64-setup.exe` |
+| ARM64 | `FrogClawClient_x.x.x_arm64-setup.exe` |
 
-Führen Sie den Installer aus und folgen Sie dem Assistenten. Starten Sie AQBot über das Startmenü oder die Desktop-Verknüpfung.
+Führen Sie den Installer aus und folgen Sie dem Assistenten. Starten Sie FrogClawClient über das Startmenü oder die Desktop-Verknüpfung.
 
 ### Linux
 
 | Format | Architektur | Datei |
 |--------|-------------|-------|
-| Debian / Ubuntu | x64 | `AQBot_x.x.x_amd64.deb` |
-| Debian / Ubuntu | ARM64 | `AQBot_x.x.x_arm64.deb` |
-| Fedora / openSUSE | x64 | `AQBot_x.x.x_x86_64.rpm` |
-| Fedora / openSUSE | ARM64 | `AQBot_x.x.x_aarch64.rpm` |
-| Beliebige Distribution | x64 | `AQBot_x.x.x_amd64.AppImage` |
-| Beliebige Distribution | ARM64 | `AQBot_x.x.x_aarch64.AppImage` |
+| Debian / Ubuntu | x64 | `FrogClawClient_x.x.x_amd64.deb` |
+| Debian / Ubuntu | ARM64 | `FrogClawClient_x.x.x_arm64.deb` |
+| Fedora / openSUSE | x64 | `FrogClawClient_x.x.x_x86_64.rpm` |
+| Fedora / openSUSE | ARM64 | `FrogClawClient_x.x.x_aarch64.rpm` |
+| Beliebige Distribution | x64 | `FrogClawClient_x.x.x_amd64.AppImage` |
+| Beliebige Distribution | ARM64 | `FrogClawClient_x.x.x_aarch64.AppImage` |
 
 ```bash
 # Debian / Ubuntu
-sudo dpkg -i AQBot_x.x.x_amd64.deb
+sudo dpkg -i FrogClawClient_x.x.x_amd64.deb
 
 # Fedora / openSUSE
-sudo rpm -i AQBot_x.x.x_x86_64.rpm
+sudo rpm -i FrogClawClient_x.x.x_x86_64.rpm
 
 # AppImage (beliebige Distribution)
-chmod +x AQBot_x.x.x_amd64.AppImage
-./AQBot_x.x.x_amd64.AppImage
+chmod +x FrogClawClient_x.x.x_amd64.AppImage
+./FrogClawClient_x.x.x_amd64.AppImage
 ```
 
 ---
@@ -62,7 +62,7 @@ chmod +x AQBot_x.x.x_amd64.AppImage
 
 ### 1. Einstellungen öffnen
 
-Starten Sie AQBot und klicken Sie auf das **Zahnrad-Symbol** unten in der Seitenleiste, oder drücken Sie <kbd>Cmd/Ctrl</kbd>+<kbd>,</kbd>.
+Starten Sie FrogClawClient und klicken Sie auf das **Zahnrad-Symbol** unten in der Seitenleiste, oder drücken Sie <kbd>Cmd/Ctrl</kbd>+<kbd>,</kbd>.
 
 ### 2. Anbieter hinzufügen
 
@@ -92,7 +92,7 @@ Gehen Sie zu **Einstellungen → Standardmodell** und wählen Sie den Anbieter u
 1. Klicken Sie auf **Neuer Chat** in der Seitenleiste (oder drücken Sie <kbd>Cmd/Ctrl</kbd>+<kbd>N</kbd>).
 2. Wählen Sie ein Modell aus dem Modell-Selektor oben im Chat.
 3. Geben Sie eine Nachricht ein und drücken Sie <kbd>Enter</kbd>.
-4. AQBot streamt die Antwort in Echtzeit. Modelle mit Denkblöcken (z.B. Claude, DeepSeek R1) zeigen den Reasoning-Prozess in einem einklappbaren Bereich.
+4. FrogClawClient streamt die Antwort in Echtzeit. Modelle mit Denkblöcken (z.B. Claude, DeepSeek R1) zeigen den Reasoning-Prozess in einem einklappbaren Bereich.
 
 ---
 
@@ -116,8 +116,8 @@ Gehen Sie zu **Einstellungen → Standardmodell** und wählen Sie den Anbieter u
 
 | Pfad | Inhalt |
 |------|--------|
-| `~/.aqbot/` | Anwendungszustand — Datenbank, Verschlüsselungsschlüssel, Vektor-DB, SSL-Zertifikate |
-| `~/Documents/aqbot/` | Benutzerdateien — Bilder, Dokumente, Backups |
+| `~/.frogclaw/` | Anwendungszustand — Datenbank, Verschlüsselungsschlüssel, Vektor-DB, SSL-Zertifikate |
+| `~/Documents/frogclaw/` | Benutzerdateien — Bilder, Dokumente, Backups |
 
 ---
 

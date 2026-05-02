@@ -1,5 +1,5 @@
-use aqbot_core::error::{AQBotError, Result};
-use aqbot_core::types::*;
+use frogclaw_core::error::{FrogClawClientError, Result};
+use frogclaw_core::types::*;
 use async_trait::async_trait;
 use futures::Stream;
 use futures::StreamExt;
@@ -453,12 +453,12 @@ impl ProviderAdapter for AnthropicAdapter {
         )
         .send()
         .await
-        .map_err(|e| AQBotError::Provider(format!("Request failed: {e}")))?;
+        .map_err(|e| FrogClawClientError::Provider(format!("Request failed: {e}")))?;
 
         if !resp.status().is_success() {
             let s = resp.status();
             let t = resp.text().await.unwrap_or_default();
-            return Err(AQBotError::Provider(format!(
+            return Err(FrogClawClientError::Provider(format!(
                 "Anthropic API error {s}: {t}"
             )));
         }
@@ -466,11 +466,11 @@ impl ProviderAdapter for AnthropicAdapter {
         let ar: AnthropicResponse = resp
             .json()
             .await
-            .map_err(|e| AQBotError::Provider(format!("Parse error: {e}")))?;
+            .map_err(|e| FrogClawClientError::Provider(format!("Parse error: {e}")))?;
 
         let mut content = String::new();
         let mut thinking = None;
-        let mut tool_calls: Vec<aqbot_core::types::ToolCall> = Vec::new();
+        let mut tool_calls: Vec<frogclaw_core::types::ToolCall> = Vec::new();
 
         for block in &ar.content {
             match block.block_type.as_str() {
@@ -492,10 +492,10 @@ impl ProviderAdapter for AnthropicAdapter {
                             .as_ref()
                             .map(|v| serde_json::to_string(v).unwrap_or_default())
                             .unwrap_or_default();
-                        tool_calls.push(aqbot_core::types::ToolCall {
+                        tool_calls.push(frogclaw_core::types::ToolCall {
                             id: id.clone(),
                             call_type: "function".to_string(),
-                            function: aqbot_core::types::ToolCallFunction {
+                            function: frogclaw_core::types::ToolCallFunction {
                                 name: name.clone(),
                                 arguments,
                             },
@@ -556,14 +556,14 @@ impl ProviderAdapter for AnthropicAdapter {
                 Ok(r) => {
                     let s = r.status();
                     let t = r.text().await.unwrap_or_default();
-                    let _ = tx.unbounded_send(Err(AQBotError::Provider(format!(
+                    let _ = tx.unbounded_send(Err(FrogClawClientError::Provider(format!(
                         "Anthropic API error {s}: {t}"
                     ))));
                     return;
                 }
                 Err(e) => {
                     let _ = tx
-                        .unbounded_send(Err(AQBotError::Provider(format!("Request failed: {e}"))));
+                        .unbounded_send(Err(FrogClawClientError::Provider(format!("Request failed: {e}"))));
                     return;
                 }
             };
@@ -722,10 +722,10 @@ impl ProviderAdapter for AnthropicAdapter {
                                         Some(
                                             pending_tool_uses
                                                 .iter()
-                                                .map(|tu| aqbot_core::types::ToolCall {
+                                                .map(|tu| frogclaw_core::types::ToolCall {
                                                     id: tu.id.clone(),
                                                     call_type: "function".to_string(),
-                                                    function: aqbot_core::types::ToolCallFunction {
+                                                    function: frogclaw_core::types::ToolCallFunction {
                                                         name: tu.name.clone(),
                                                         arguments: tu.arguments.clone(),
                                                     },
@@ -760,7 +760,7 @@ impl ProviderAdapter for AnthropicAdapter {
                         }
                     }
                     Err(e) => {
-                        let _ = tx.unbounded_send(Err(AQBotError::Provider(format!(
+                        let _ = tx.unbounded_send(Err(FrogClawClientError::Provider(format!(
                             "Stream error: {e}"
                         ))));
                         return;
@@ -793,12 +793,12 @@ impl ProviderAdapter for AnthropicAdapter {
         )
         .send()
         .await
-        .map_err(|e| AQBotError::Provider(format!("Request failed: {e}")))?;
+        .map_err(|e| FrogClawClientError::Provider(format!("Request failed: {e}")))?;
 
         if !resp.status().is_success() {
             let s = resp.status();
             let t = resp.text().await.unwrap_or_default();
-            return Err(AQBotError::Provider(format!(
+            return Err(FrogClawClientError::Provider(format!(
                 "Anthropic API error {s}: {t}"
             )));
         }
@@ -806,7 +806,7 @@ impl ProviderAdapter for AnthropicAdapter {
         let models: AnthropicModelsResponse = resp
             .json()
             .await
-            .map_err(|e| AQBotError::Provider(format!("Parse error: {e}")))?;
+            .map_err(|e| FrogClawClientError::Provider(format!("Parse error: {e}")))?;
 
         Ok(models
             .data
@@ -868,7 +868,7 @@ impl ProviderAdapter for AnthropicAdapter {
         )
         .send()
         .await
-        .map_err(|e| AQBotError::Provider(format!("Validation request failed: {e}")))?;
+        .map_err(|e| FrogClawClientError::Provider(format!("Validation request failed: {e}")))?;
         let status = resp.status().as_u16();
         Ok(status != 401 && status != 403)
     }
@@ -878,6 +878,6 @@ impl ProviderAdapter for AnthropicAdapter {
         _ctx: &ProviderRequestContext,
         _request: EmbedRequest,
     ) -> Result<EmbedResponse> {
-        Err(AQBotError::Provider("Anthropic does not support embedding API. Please use an OpenAI-compatible or Gemini provider for embeddings.".into()))
+        Err(FrogClawClientError::Provider("Anthropic does not support embedding API. Please use an OpenAI-compatible or Gemini provider for embeddings.".into()))
     }
 }
