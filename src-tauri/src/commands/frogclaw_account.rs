@@ -160,14 +160,6 @@ fn token_matches_group(token: &FrogclawToken, group: &str) -> bool {
     token_group == required || (required == "default" && token_group.is_empty())
 }
 
-fn pricing_model_matches_token(model: &FrogclawPricingModel, token: &FrogclawToken) -> bool {
-    if model.enable_groups.is_empty() {
-        return true;
-    }
-    let group = token_group(token);
-    model.enable_groups.iter().any(|g| normalize_group(g) == normalize_group(&group))
-}
-
 fn provider_type_for_key(provider_key: &str, api_mode: &str) -> Option<ProviderType> {
     match provider_key {
         "anthropic" | "claude" => Some(ProviderType::Anthropic),
@@ -489,11 +481,7 @@ async fn configure_system_providers(
         return Ok(Vec::new());
     };
     let api_key = format!("sk-{}", token.key);
-    let available_models: Vec<&FrogclawPricingModel> = session
-        .pricing_models
-        .iter()
-        .filter(|model| pricing_model_matches_token(model, token))
-        .collect();
+    let available_models: Vec<&FrogclawPricingModel> = session.pricing_models.iter().collect();
 
     let mut configured = Vec::new();
     for sp in &session.system_providers {
