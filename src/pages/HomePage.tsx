@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Button, Card, Descriptions, Form, Input, List, Progress, Space, Tag, Typography, theme } from 'antd';
+import { App, Button, Card, Descriptions, Form, Input, List, Progress, Select, Space, Tag, Typography, theme } from 'antd';
 import { CheckCircle2, Download, KeyRound, Loader2, LogIn, RefreshCw, Terminal, UserRound, XCircle } from 'lucide-react';
 import { getVersion } from '@tauri-apps/api/app';
-import { checkToolsInstalled, fetchAndConfigureFrogclaw, installTool } from '@/lib/homeApi';
+import { applyFrogclawTokenSelection, checkToolsInstalled, fetchAndConfigureFrogclaw, installTool } from '@/lib/homeApi';
+import { FROGCLAW_BASE_URL } from '@/lib/frogclawConfig';
 import { useProviderStore } from '@/stores/providerStore';
 import type { FrogclawConfigureResult, ToolStatus } from '@/types';
 
 const { Text, Title, Paragraph } = Typography;
 
-const INSTALL_ORDER = ['node', 'git', 'claude', 'codex', 'gemini', 'openclaw'];
+const INSTALL_ORDER = ['node', 'git', 'claude', 'codex', 'gemini'];
 
 function statusColor(tool: ToolStatus) {
   if (!tool.installed) return 'error';
@@ -26,6 +27,17 @@ function maskTokenKey(key: string) {
   if (!key) return '';
   if (key.length <= 8) return 'sk-****';
   return `sk-${key.slice(0, 4)}...${key.slice(-4)}`;
+}
+
+function parseStoredResult(raw: string): FrogclawConfigureResult | null {
+  try {
+    const parsed = JSON.parse(raw) as FrogclawConfigureResult;
+    if (!Array.isArray(parsed.session?.pricing_models)) return null;
+    if (!Array.isArray(parsed.session?.pricing_vendors)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
 }
 
 function SetupCard({
@@ -109,15 +121,15 @@ export function HomePage() {
   const [installingId, setInstallingId] = useState<string | null>(null);
   const [installingAll, setInstallingAll] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
+  const [tokenApplying, setTokenApplying] = useState(false);
   const [result, setResult] = useState<FrogclawConfigureResult | null>(() => {
     const raw = localStorage.getItem('frogclaw_home_last_result');
     if (!raw) return null;
-    try {
-      return JSON.parse(raw) as FrogclawConfigureResult;
-    } catch {
-      return null;
-    }
+    const parsed = parseStoredResult(raw);
+    if (!parsed) localStorage.removeItem('frogclaw_home_last_result');
+    return parsed;
   });
+  const [selectedTokenId, setSelectedTokenId] = useState<number | null>(() => result?.selected_token_id ?? null);
 
   const loadTools = useCallback(async () => {
     setToolsLoading(true);
@@ -191,18 +203,44 @@ export function HomePage() {
     async (values: { username: string; password: string }) => {
       setLoginLoading(true);
       try {
-        const configureResult = await fetchAndConfigureFrogclaw(values.username, values.password);
+        const configureResult = await fetchAndConfigureFrogclaw(values.username, values.password, selectedTokenId);
         setResult(configureResult);
+        setSelectedTokenId(configureResult.selected_token_id);
         localStorage.setItem('frogclaw_home_last_result', JSON.stringify(configureResult));
         await fetchProviders();
-        message.success('已登录 FrogClaw，并完成可用模型供应商配置');
+        message.success('已登录 FrogClaw，并同步可用模型与供应商令牌');
       } catch (error) {
         message.error(`登录或配置失败: ${String(error)}`);
       } finally {
         setLoginLoading(false);
       }
     },
-    [fetchProviders, message],
+    [fetchProviders, message, selectedTokenId],
+  );
+
+  const handleTokenChange = useCallback(
+    async (tokenId: number) => {
+      if (!result) return;
+      setSelectedTokenId(tokenId);
+      setTokenApplying(true);
+      try {
+        const configuredProviders = await applyFrogclawTokenSelection(result.session, tokenId);
+        const nextResult = {
+          ...result,
+          selected_token_id: tokenId,
+          configured_providers: configuredProviders,
+        };
+        setResult(nextResult);
+        localStorage.setItem('frogclaw_home_last_result', JSON.stringify(nextResult));
+        await fetchProviders();
+        message.success('已切换令牌，并同步更新 FrogClaw 供应商密钥');
+      } catch (error) {
+        message.error(`切换令牌失败: ${String(error)}`);
+      } finally {
+        setTokenApplying(false);
+      }
+    },
+    [fetchProviders, message, result],
   );
 
   return (
@@ -218,7 +256,7 @@ export function HomePage() {
             )}
           </Title>
           <Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
-            检测本机 CLI 环境，登录 frogclaw.com 获取令牌，并把可用供应商直接写入 FrogClawClient 配置。
+            检测本机 CLI 环境，登录 {FROGCLAW_BASE_URL} 获取令牌，并把可用供应商直接写入 FrogClawClient 配置。
           </Paragraph>
         </div>
 
@@ -226,7 +264,7 @@ export function HomePage() {
           <SetupCard
             step={1}
             title="开发环境"
-            description="检测并一键安装 Node.js、Git、Claude Code、Codex、Gemini CLI 和 OpenClaw"
+            description="检测并一键安装 Node.js、Git、Claude Code、Codex 和 Gemini CLI"
             icon={<Terminal size={20} />}
             completed={toolsReady}
           >
@@ -306,7 +344,7 @@ export function HomePage() {
           <SetupCard
             step={2}
             title="FrogClaw 登录与令牌配置"
-            description="登录 frogclaw.com 后自动获取可用令牌、供应商和 OpenClaw 配置"
+            description={`登录 ${FROGCLAW_BASE_URL} 后自动获取可用令牌、供应商和 /pricing 模型`}
             icon={<KeyRound size={20} />}
             completed={!!result?.configured_providers.length}
           >
@@ -337,14 +375,29 @@ export function HomePage() {
                   </Descriptions.Item>
                   <Descriptions.Item label="可用令牌">{result.session.tokens.length}</Descriptions.Item>
                   <Descriptions.Item label="已配置供应商">{result.configured_providers.length}</Descriptions.Item>
+                  <Descriptions.Item label="已同步模型">{result.session.pricing_models.length}</Descriptions.Item>
                 </Descriptions>
 
                 {result.session.tokens.length > 0 && (
                   <div>
-                    <Text strong>令牌</Text>
+                    <Text strong>用户令牌</Text>
+                    <div style={{ marginTop: 8, maxWidth: 420 }}>
+                      <Select
+                        value={selectedTokenId ?? result.selected_token_id ?? undefined}
+                        loading={tokenApplying}
+                        disabled={tokenApplying}
+                        style={{ width: '100%' }}
+                        placeholder="选择要写入供应商的令牌"
+                        onChange={handleTokenChange}
+                        options={result.session.tokens.map((frogToken) => ({
+                          value: frogToken.id,
+                          label: `${frogToken.name} (${frogToken.group || 'default'} / ${maskTokenKey(frogToken.key)})`,
+                        }))}
+                      />
+                    </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
                       {result.session.tokens.map((frogToken) => (
-                        <Tag key={frogToken.id}>
+                        <Tag key={frogToken.id} color={frogToken.id === selectedTokenId ? 'blue' : undefined}>
                           {frogToken.name}
                           <Text type="secondary" style={{ marginLeft: 6, fontSize: 11 }}>
                             {frogToken.group || 'default'} / {maskTokenKey(frogToken.key)}
@@ -366,13 +419,12 @@ export function HomePage() {
                         <Space wrap>
                           <Text strong>{provider.name}</Text>
                           <Tag>{provider.provider_type}</Tag>
-                          {provider.model_id && <Tag color="blue">{provider.model_id}</Tag>}
+                          <Tag color="blue">{provider.model_count} 个模型</Tag>
                           <Text type="secondary">
                             {provider.token_name} ({provider.token_group})
                           </Text>
                           {provider.created_provider ? <Tag color="green">新建</Tag> : <Tag>复用</Tag>}
-                          {provider.added_key && <Tag color="cyan">已添加密钥</Tag>}
-                          {provider.reused_key && <Tag>密钥已存在</Tag>}
+                          {provider.updated_key && <Tag color="cyan">密钥已同步</Tag>}
                         </Space>
                       </List.Item>
                     )}
@@ -380,21 +432,13 @@ export function HomePage() {
                 )}
 
                 <div>
-                  <Text strong>OpenClaw 配置</Text>
-                  <div style={{ marginTop: 8 }}>
-                    {result.openclaw.applied ? (
-                      <Tag color="green">已写入 {result.openclaw.path}</Tag>
-                    ) : (
-                      <Tag>未发现服务端 OpenClaw 配置</Tag>
-                    )}
-                    {result.openclaw.models.length > 0 && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-                        {result.openclaw.models.map((model) => (
-                          <Tag key={`${model.provider}/${model.id}`} color="purple">
-                            {model.name}
-                          </Tag>
-                        ))}
-                      </div>
+                  <Text strong>/pricing 可用模型</Text>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8, maxHeight: 140, overflow: 'auto' }}>
+                    {result.session.pricing_models.slice(0, 80).map((model) => (
+                      <Tag key={model.model_name}>{model.model_name}</Tag>
+                    ))}
+                    {result.session.pricing_models.length > 80 && (
+                      <Tag>+{result.session.pricing_models.length - 80}</Tag>
                     )}
                   </div>
                 </div>

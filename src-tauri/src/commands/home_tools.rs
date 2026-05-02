@@ -30,7 +30,7 @@ pub struct InstallResult {
 #[cfg(target_os = "windows")]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-const MIN_NODE_FOR_OPENCLAW: (u32, u32) = (22, 14);
+const MIN_NODE_FOR_CLI: (u32, u32) = (18, 0);
 
 fn frogclaw_log_path() -> Option<std::path::PathBuf> {
     Some(crate::paths::frogclaw_home().join("install.log"))
@@ -239,7 +239,7 @@ fn check_tool(id: &str, name: &str, cmd: &str) -> ToolStatus {
         && version
             .as_deref()
             .and_then(parse_node_version)
-            .map(|v| v < MIN_NODE_FOR_OPENCLAW)
+            .map(|v| v < MIN_NODE_FOR_CLI)
             .unwrap_or(false);
     write_log(&format!(
         "check_tool({id}): path={path:?}, version={version:?}, installed={installed}, needs_upgrade={needs_upgrade}"
@@ -266,7 +266,6 @@ pub async fn check_tools_installed() -> Result<HomeToolsStatus, String> {
             ("claude", "Claude Code", "claude"),
             ("codex", "Codex", "codex"),
             ("gemini", "Gemini CLI", "gemini"),
-            ("openclaw", "OpenClaw", "openclaw"),
         ]
         .into_iter()
         .map(|(id, name, cmd)| check_tool(id, name, cmd))
@@ -309,7 +308,6 @@ fn install_command(tool_id: &str) -> Result<(String, Vec<String>, bool), String>
         "claude" => Ok(("cmd".into(), vec!["/C".into(), "npm".into(), "install".into(), "-g".into(), "@anthropic-ai/claude-code".into(), "--registry".into(), "https://registry.npmmirror.com".into()], true)),
         "codex" => Ok(("cmd".into(), vec!["/C".into(), "npm".into(), "install".into(), "-g".into(), "@openai/codex".into(), "--registry".into(), "https://registry.npmmirror.com".into()], true)),
         "gemini" => Ok(("cmd".into(), vec!["/C".into(), "npm".into(), "install".into(), "-g".into(), "@google/gemini-cli".into(), "--registry".into(), "https://registry.npmmirror.com".into()], true)),
-        "openclaw" => Ok(("cmd".into(), vec!["/C".into(), "npm".into(), "install".into(), "-g".into(), "openclaw@latest".into(), "--registry".into(), "https://registry.npmmirror.com".into()], true)),
         other => Err(format!("Unknown tool id: {other}")),
     }
 }
@@ -322,7 +320,6 @@ fn install_command(tool_id: &str) -> Result<(String, Vec<String>, bool), String>
         "claude" => Ok(("npm".into(), vec!["install".into(), "-g".into(), "@anthropic-ai/claude-code".into(), "--registry".into(), "https://registry.npmmirror.com".into()], true)),
         "codex" => Ok(("npm".into(), vec!["install".into(), "-g".into(), "@openai/codex".into(), "--registry".into(), "https://registry.npmmirror.com".into()], true)),
         "gemini" => Ok(("npm".into(), vec!["install".into(), "-g".into(), "@google/gemini-cli".into(), "--registry".into(), "https://registry.npmmirror.com".into()], true)),
-        "openclaw" => Ok(("npm".into(), vec!["install".into(), "-g".into(), "openclaw@latest".into(), "--registry".into(), "https://registry.npmmirror.com".into()], true)),
         other => Err(format!("Unknown tool id: {other}")),
     }
 }
@@ -335,7 +332,6 @@ fn install_command(tool_id: &str) -> Result<(String, Vec<String>, bool), String>
         "claude" => Ok(("npm".into(), vec!["install".into(), "-g".into(), "@anthropic-ai/claude-code".into(), "--registry".into(), "https://registry.npmmirror.com".into()], true)),
         "codex" => Ok(("npm".into(), vec!["install".into(), "-g".into(), "@openai/codex".into(), "--registry".into(), "https://registry.npmmirror.com".into()], true)),
         "gemini" => Ok(("npm".into(), vec!["install".into(), "-g".into(), "@google/gemini-cli".into(), "--registry".into(), "https://registry.npmmirror.com".into()], true)),
-        "openclaw" => Ok(("npm".into(), vec!["install".into(), "-g".into(), "openclaw@latest".into(), "--registry".into(), "https://registry.npmmirror.com".into()], true)),
         other => Err(format!("Unknown tool id: {other}")),
     }
 }
@@ -356,25 +352,6 @@ pub async fn install_tool(tool_id: String) -> Result<InstallResult, String> {
                 message: "需要先安装 Node.js 才能安装该工具".into(),
                 log_file,
             });
-        }
-
-        if tool_id == "openclaw" {
-            let node_ok = lookup_in_path("node")
-                .as_deref()
-                .and_then(|p| run_version(p, &["--version"]))
-                .as_deref()
-                .and_then(parse_node_version)
-                .map(|v| v >= MIN_NODE_FOR_OPENCLAW)
-                .unwrap_or(false);
-            if !node_ok {
-                return Ok(InstallResult {
-                    success: false,
-                    stdout: String::new(),
-                    stderr: String::new(),
-                    message: "OpenClaw 需要 Node.js v22.14+，请先安装或升级 Node.js".into(),
-                    log_file,
-                });
-            }
         }
 
         let spawn_target = lookup_in_path(&program).unwrap_or(program.clone());

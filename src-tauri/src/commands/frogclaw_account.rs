@@ -1,6 +1,8 @@
+use crate::frogclaw_config::FROGCLAW_BASE_URL;
 use crate::AppState;
+use frogclaw_core::crypto::encrypt_key;
 use frogclaw_core::types::{
-    DeepLinkProviderImportInput, Model, ModelCapability, ModelType, ProviderType, UpdateProviderInput,
+    CreateProviderInput, Model, ModelCapability, ModelType, ProviderType, UpdateProviderInput,
 };
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -9,7 +11,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tauri::State;
 
-const FROGCLAW_BASE_URL: &str = "https://frogclaw.com";
 const FROGCLAW_PROVIDER_PREFIX: &str = "frogclaw-";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,23 +49,28 @@ pub struct FrogclawSystemProvider {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FrogclawCliProvider {
-    pub id: i64,
-    pub name: String,
-    pub provider_type: String,
-    pub base_url: Option<String>,
-    pub api_key: Option<String>,
-    pub settings_config: Option<String>,
-    pub is_default: Option<bool>,
-    pub created_time: Option<i64>,
-    pub updated_time: Option<i64>,
+pub struct FrogclawPricingModel {
+    pub model_name: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub tags: String,
+    #[serde(default)]
+    pub vendor_id: Option<i64>,
+    #[serde(default)]
+    pub enable_groups: Vec<String>,
+    #[serde(default)]
+    pub supported_endpoint_types: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OpenClawModelInfo {
-    pub id: String,
+pub struct FrogclawPricingVendor {
+    pub id: i64,
     pub name: String,
-    pub provider: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub icon: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -72,7 +78,8 @@ pub struct FrogclawLoginSession {
     pub user: FrogclawUserData,
     pub tokens: Vec<FrogclawToken>,
     pub system_providers: Vec<FrogclawSystemProvider>,
-    pub cli_providers: Vec<FrogclawCliProvider>,
+    pub pricing_models: Vec<FrogclawPricingModel>,
+    pub pricing_vendors: Vec<FrogclawPricingVendor>,
 }
 
 #[derive(Debug, Serialize)]
@@ -80,26 +87,19 @@ pub struct FrogclawConfiguredProvider {
     pub provider_id: String,
     pub name: String,
     pub provider_type: String,
-    pub model_id: Option<String>,
+    pub model_count: usize,
+    pub token_id: i64,
     pub token_name: String,
     pub token_group: String,
     pub created_provider: bool,
-    pub added_key: bool,
-    pub reused_key: bool,
-}
-
-#[derive(Debug, Serialize)]
-pub struct OpenClawConfigSummary {
-    pub applied: bool,
-    pub path: Option<String>,
-    pub models: Vec<OpenClawModelInfo>,
+    pub updated_key: bool,
 }
 
 #[derive(Debug, Serialize)]
 pub struct FrogclawConfigureResult {
     pub session: FrogclawLoginSession,
     pub configured_providers: Vec<FrogclawConfiguredProvider>,
-    pub openclaw: OpenClawConfigSummary,
+    pub selected_token_id: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -120,9 +120,13 @@ struct TokenListResponse {
     items: Option<Vec<FrogclawToken>>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct CliProviderListResponse {
-    items: Option<Vec<FrogclawCliProvider>>,
+#[derive(Debug, Deserialize)]
+struct PricingResponse {
+    success: bool,
+    #[serde(default)]
+    data: Vec<FrogclawPricingModel>,
+    #[serde(default)]
+    vendors: Vec<FrogclawPricingVendor>,
 }
 
 fn account_log(event: &str, detail: &str) {
@@ -141,10 +145,27 @@ fn normalize_group(value: &str) -> String {
     value.to_lowercase().split_whitespace().collect::<String>()
 }
 
+fn token_group(token: &FrogclawToken) -> String {
+    let group = token.group.trim();
+    if group.is_empty() {
+        "default".to_string()
+    } else {
+        group.to_string()
+    }
+}
+
 fn token_matches_group(token: &FrogclawToken, group: &str) -> bool {
     let token_group = normalize_group(&token.group);
     let required = normalize_group(group);
     token_group == required || (required == "default" && token_group.is_empty())
+}
+
+fn pricing_model_matches_token(model: &FrogclawPricingModel, token: &FrogclawToken) -> bool {
+    if model.enable_groups.is_empty() {
+        return true;
+    }
+    let group = token_group(token);
+    model.enable_groups.iter().any(|g| normalize_group(g) == normalize_group(&group))
 }
 
 fn provider_type_for_key(provider_key: &str, api_mode: &str) -> Option<ProviderType> {
@@ -175,36 +196,34 @@ fn provider_type_name(provider_type: &ProviderType) -> &'static str {
     }
 }
 
-fn base_url_for_provider(sp: &FrogclawSystemProvider, provider_type: &ProviderType) -> String {
-    let raw = sp.base_url.trim();
-    let fallback = match provider_type {
-        ProviderType::OpenAI | ProviderType::OpenAIResponses => "https://frogclaw.com/v1",
-        _ => "https://frogclaw.com",
-    };
-    let base = if raw.is_empty() { fallback } else { raw };
-    let base = base.trim_end_matches('/').to_string();
-    if sp.needs_v1_suffix && !base.ends_with("/v1") {
-        format!("{base}/v1")
-    } else {
-        base
+fn model_supports_provider(model: &FrogclawPricingModel, provider_type: &ProviderType) -> bool {
+    if model.supported_endpoint_types.is_empty() {
+        return true;
     }
+    model.supported_endpoint_types.iter().any(|endpoint| match provider_type {
+        ProviderType::Anthropic => endpoint == "anthropic",
+        ProviderType::Gemini => endpoint == "gemini",
+        ProviderType::OpenAI | ProviderType::OpenAIResponses => {
+            endpoint == "openai" || endpoint == "chat_completions" || endpoint == "responses"
+        }
+        _ => true,
+    })
 }
 
-fn selected_token_for_provider<'a>(
-    sp: &FrogclawSystemProvider,
-    tokens: &'a [FrogclawToken],
-) -> Option<&'a FrogclawToken> {
-    if !sp.token_group.trim().is_empty() {
-        if let Some(token) = tokens.iter().find(|t| token_matches_group(t, &sp.token_group)) {
-            return Some(token);
-        }
+fn capabilities_for_model(model_id: &str, provider_type: &ProviderType) -> Vec<ModelCapability> {
+    let mut capabilities = vec![ModelCapability::TextChat];
+    let lower = model_id.to_lowercase();
+    if matches!(
+        provider_type,
+        ProviderType::Anthropic | ProviderType::OpenAI | ProviderType::OpenAIResponses | ProviderType::Gemini
+    ) {
+        capabilities.push(ModelCapability::Vision);
+        capabilities.push(ModelCapability::FunctionCalling);
     }
-    if matches!(sp.provider_key.as_str(), "openai" | "codex" | "google" | "gemini") {
-        if let Some(token) = tokens.iter().find(|t| token_matches_group(t, "default")) {
-            return Some(token);
-        }
+    if lower.contains("reason") || lower.contains("thinking") || lower.starts_with('o') {
+        capabilities.push(ModelCapability::Reasoning);
     }
-    tokens.first()
+    capabilities
 }
 
 async fn login_and_client(username: &str, password: &str) -> Result<(Client, FrogclawUserData), String> {
@@ -213,7 +232,7 @@ async fn login_and_client(username: &str, password: &str) -> Result<(Client, Fro
         .cookie_store(true)
         .cookie_provider(Arc::new(reqwest::cookie::Jar::default()))
         .build()
-        .map_err(|e| format!("Failed to create HTTP client: {e}"))?;
+        .map_err(|e| format!("创建 HTTP 客户端失败: {e}"))?;
 
     let resp = client
         .post(format!("{FROGCLAW_BASE_URL}/api/user/login"))
@@ -223,31 +242,29 @@ async fn login_and_client(username: &str, password: &str) -> Result<(Client, Fro
         })
         .send()
         .await
-        .map_err(|e| format!("Login request failed: {e}"))?;
+        .map_err(|e| format!("登录请求失败: {e}"))?;
 
     if !resp.status().is_success() {
-        return Err(format!("Server error: {}", resp.status()));
+        return Err(format!("服务器错误: {}", resp.status()));
     }
 
     let result: FrogclawResponse<FrogclawUserData> = resp
         .json()
         .await
-        .map_err(|e| format!("Failed to parse login response: {e}"))?;
+        .map_err(|e| format!("解析登录响应失败: {e}"))?;
     if !result.success {
         return Err(result.message);
     }
-    let user = result
+    result
         .data
-        .ok_or_else(|| "Login succeeded but no user data returned".to_string())?;
-    Ok((client, user))
+        .ok_or_else(|| "登录成功，但服务器没有返回用户信息".to_string())
+        .map(|user| (client, user))
 }
 
-async fn fetch_session_data(client: &Client, user: FrogclawUserData) -> Result<FrogclawLoginSession, String> {
-    let user_id = user.id.to_string();
-
-    let tokens = match client
+async fn fetch_tokens(client: &Client, user_id: i64) -> Vec<FrogclawToken> {
+    match client
         .get(format!("{FROGCLAW_BASE_URL}/api/token/?p=0&size=100"))
-        .header("New-Api-User", &user_id)
+        .header("New-Api-User", user_id.to_string())
         .send()
         .await
     {
@@ -270,20 +287,23 @@ async fn fetch_session_data(client: &Client, user: FrogclawUserData) -> Result<F
             }
         }
         _ => Vec::new(),
-    };
+    }
+}
 
-    let system_providers = match client
+async fn fetch_system_providers(client: &Client, user_id: i64) -> Vec<FrogclawSystemProvider> {
+    match client
         .get(format!("{FROGCLAW_BASE_URL}/api/system-cli-provider/"))
-        .header("New-Api-User", &user_id)
+        .header("New-Api-User", user_id.to_string())
         .send()
         .await
     {
         Ok(resp) if resp.status().is_success() => {
-            let result: FrogclawResponse<Vec<FrogclawSystemProvider>> = resp.json().await.unwrap_or(FrogclawResponse {
-                success: false,
-                message: String::new(),
-                data: None,
-            });
+            let result: FrogclawResponse<Vec<FrogclawSystemProvider>> =
+                resp.json().await.unwrap_or(FrogclawResponse {
+                    success: false,
+                    message: String::new(),
+                    data: None,
+                });
             if result.success {
                 result.data.unwrap_or_default()
             } else {
@@ -291,35 +311,30 @@ async fn fetch_session_data(client: &Client, user: FrogclawUserData) -> Result<F
             }
         }
         _ => Vec::new(),
-    };
+    }
+}
 
-    let cli_providers = match client
-        .get(format!("{FROGCLAW_BASE_URL}/api/cli-provider/?p=0&page_size=100"))
-        .header("New-Api-User", &user_id)
+async fn fetch_pricing(client: &Client, user_id: i64) -> (Vec<FrogclawPricingModel>, Vec<FrogclawPricingVendor>) {
+    match client
+        .get(format!("{FROGCLAW_BASE_URL}/api/pricing"))
+        .header("New-Api-User", user_id.to_string())
         .send()
         .await
     {
         Ok(resp) if resp.status().is_success() => {
-            let result: FrogclawResponse<CliProviderListResponse> = resp.json().await.unwrap_or(FrogclawResponse {
+            let pricing: PricingResponse = resp.json().await.unwrap_or(PricingResponse {
                 success: false,
-                message: String::new(),
-                data: None,
+                data: Vec::new(),
+                vendors: Vec::new(),
             });
-            if result.success {
-                result.data.and_then(|d| d.items).unwrap_or_default()
+            if pricing.success {
+                (pricing.data, pricing.vendors)
             } else {
-                Vec::new()
+                (Vec::new(), Vec::new())
             }
         }
-        _ => Vec::new(),
-    };
-
-    Ok(FrogclawLoginSession {
-        user,
-        tokens,
-        system_providers,
-        cli_providers,
-    })
+        _ => (Vec::new(), Vec::new()),
+    }
 }
 
 async fn ensure_group_token(client: &Client, user_id: i64, group: &str) -> Result<(), String> {
@@ -334,29 +349,42 @@ async fn ensure_group_token(client: &Client, user_id: i64, group: &str) -> Resul
         .json(&EnsureBody { group })
         .send()
         .await
-        .map_err(|e| format!("ensure-group request failed: {e}"))?;
+        .map_err(|e| format!("ensure-group 请求失败: {e}"))?;
     if !resp.status().is_success() {
-        return Err(format!("ensure-group server error: {}", resp.status()));
+        return Err(format!("ensure-group 服务器错误: {}", resp.status()));
     }
     let result: FrogclawResponse<Value> = resp
         .json()
         .await
-        .map_err(|e| format!("Failed to parse ensure-group response: {e}"))?;
+        .map_err(|e| format!("解析 ensure-group 响应失败: {e}"))?;
     if !result.success {
         return Err(result.message);
     }
     Ok(())
 }
 
-async fn ensure_required_token_groups(
-    client: &Client,
-    session: &FrogclawLoginSession,
-) -> Result<bool, String> {
+async fn fetch_session_data(client: &Client, user: FrogclawUserData) -> Result<FrogclawLoginSession, String> {
+    let tokens = fetch_tokens(client, user.id).await;
+    let system_providers = fetch_system_providers(client, user.id).await;
+    let (pricing_models, pricing_vendors) = fetch_pricing(client, user.id).await;
+
+    Ok(FrogclawLoginSession {
+        user,
+        tokens,
+        system_providers,
+        pricing_models,
+        pricing_vendors,
+    })
+}
+
+async fn ensure_required_token_groups(client: &Client, session: &FrogclawLoginSession) -> Result<bool, String> {
     let mut changed = false;
-    let needs_default = session.system_providers.iter().any(|sp| {
-        matches!(sp.provider_key.as_str(), "openai" | "codex" | "google" | "gemini")
-    }) || session.cli_providers.iter().any(|p| p.provider_type == "openclaw");
-    if needs_default && !session.tokens.iter().any(|t| token_matches_group(t, "default")) {
+    if session
+        .system_providers
+        .iter()
+        .any(|sp| matches!(sp.provider_key.as_str(), "openai" | "codex" | "google" | "gemini"))
+        && !session.tokens.iter().any(|t| token_matches_group(t, "default"))
+    {
         ensure_group_token(client, session.user.id, "default").await?;
         changed = true;
     }
@@ -372,221 +400,176 @@ async fn ensure_required_token_groups(
     Ok(changed)
 }
 
-fn extract_openclaw_config(session: &FrogclawLoginSession) -> (Option<String>, Vec<OpenClawModelInfo>) {
-    let mut candidates: Vec<&FrogclawCliProvider> = session
-        .cli_providers
-        .iter()
-        .filter(|p| p.provider_type == "openclaw")
-        .collect();
-    candidates.sort_by_key(|p| std::cmp::Reverse(p.updated_time.unwrap_or_default()));
-    let chosen = candidates
-        .iter()
-        .copied()
-        .find(|p| p.is_default.unwrap_or(false))
-        .or_else(|| candidates.first().copied());
-
-    let Some(config_json) = chosen.and_then(|p| p.settings_config.clone()) else {
-        return (None, Vec::new());
-    };
-    let Ok(config) = serde_json::from_str::<Value>(&config_json) else {
-        return (Some(config_json), Vec::new());
-    };
-    let mut models = Vec::new();
-    if let Some(providers) = config.pointer("/models/providers").and_then(|v| v.as_object()) {
-        for (provider, data) in providers {
-            if let Some(model_list) = data.get("models").and_then(|v| v.as_array()) {
-                for model in model_list {
-                    if let Some(id) = model.get("id").and_then(|v| v.as_str()) {
-                        models.push(OpenClawModelInfo {
-                            id: id.to_string(),
-                            name: model
-                                .get("name")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or(id)
-                                .to_string(),
-                            provider: provider.clone(),
-                        });
-                    }
-                }
-            }
-        }
-    }
-    (Some(config_json), models)
+fn selected_token<'a>(tokens: &'a [FrogclawToken], selected_token_id: Option<i64>) -> Option<&'a FrogclawToken> {
+    selected_token_id
+        .and_then(|id| tokens.iter().find(|token| token.id == id))
+        .or_else(|| tokens.iter().find(|token| token_matches_group(token, "default")))
+        .or_else(|| tokens.first())
 }
 
-fn apply_openclaw_config_to_disk(config_json: &str) -> Result<String, String> {
-    let server_config: Value = serde_json::from_str(config_json).map_err(|e| format!("Invalid JSON: {e}"))?;
-    let config_dir = crate::paths::frogclaw_home().join("openclaw").join("config");
-    let config_path = config_dir.join("openclaw.json");
-    std::fs::create_dir_all(&config_dir).map_err(|e| format!("Failed to create config dir: {e}"))?;
-
-    let mut existing: Value = if config_path.exists() {
-        std::fs::read_to_string(&config_path)
-            .ok()
-            .and_then(|raw| serde_json::from_str(&raw).ok())
-            .unwrap_or_else(|| Value::Object(serde_json::Map::new()))
+fn key_prefix(raw_key: &str) -> String {
+    if raw_key.len() >= 8 {
+        format!("{}...", &raw_key[..8])
     } else {
-        Value::Object(serde_json::Map::new())
+        raw_key.to_string()
+    }
+}
+
+async fn ensure_provider_with_token(
+    state: &AppState,
+    name: &str,
+    provider_type: ProviderType,
+    raw_key: &str,
+) -> Result<(String, bool, bool), String> {
+    let providers = frogclaw_core::repo::provider::list_providers(&state.sea_db)
+        .await
+        .map_err(|e| e.to_string())?;
+    let (provider, created_provider) = if let Some(provider) = providers
+        .into_iter()
+        .find(|p| p.provider_type == provider_type && p.api_host.trim_end_matches('/') == FROGCLAW_BASE_URL)
+    {
+        (provider, false)
+    } else {
+        (
+            frogclaw_core::repo::provider::create_provider(
+                &state.sea_db,
+                CreateProviderInput {
+                    name: name.to_string(),
+                    provider_type: provider_type.clone(),
+                    api_host: FROGCLAW_BASE_URL.to_string(),
+                    api_path: None,
+                    enabled: true,
+                    builtin_id: None,
+                },
+            )
+            .await
+            .map_err(|e| e.to_string())?,
+            true,
+        )
     };
 
-    let saved_gateway_port = existing.pointer("/gateway/port").cloned();
-    let saved_workspace = existing.pointer("/agents/defaults/workspace").cloned();
+    let mut update = UpdateProviderInput::default();
+    update.name = Some(name.to_string());
+    update.provider_type = Some(provider_type);
+    update.api_host = Some(FROGCLAW_BASE_URL.to_string());
+    update.enabled = Some(true);
+    let provider = frogclaw_core::repo::provider::update_provider(&state.sea_db, &provider.id, update)
+        .await
+        .map_err(|e| e.to_string())?;
 
-    if let (Some(existing_obj), Some(server_obj)) = (existing.as_object_mut(), server_config.as_object()) {
-        for (key, value) in server_obj {
-            existing_obj.insert(key.clone(), value.clone());
-        }
-    }
-
-    if let Some(port) = saved_gateway_port {
-        if let Some(obj) = existing.as_object_mut() {
-            let gateway = obj.entry("gateway").or_insert_with(|| Value::Object(serde_json::Map::new()));
-            if let Some(gateway_obj) = gateway.as_object_mut() {
-                gateway_obj.insert("port".to_string(), port);
+    let encrypted = encrypt_key(raw_key, &state.master_key).map_err(|e| e.to_string())?;
+    let prefix = key_prefix(raw_key);
+    let keys = frogclaw_core::repo::provider::list_keys_for_provider(&state.sea_db, &provider.id)
+        .await
+        .map_err(|e| e.to_string())?;
+    if keys.is_empty() {
+        frogclaw_core::repo::provider::add_provider_key(&state.sea_db, &provider.id, &encrypted, &prefix)
+            .await
+            .map_err(|e| e.to_string())?;
+    } else {
+        for key in keys {
+            frogclaw_core::repo::provider::update_provider_key(&state.sea_db, &key.id, &encrypted, &prefix)
+                .await
+                .map_err(|e| e.to_string())?;
+            if !key.enabled {
+                let _ = frogclaw_core::repo::provider::toggle_provider_key(&state.sea_db, &key.id, true).await;
             }
         }
     }
-    if let Some(workspace) = saved_workspace {
-        if let Some(obj) = existing.as_object_mut() {
-            let agents = obj.entry("agents").or_insert_with(|| Value::Object(serde_json::Map::new()));
-            if let Some(agents_obj) = agents.as_object_mut() {
-                let defaults = agents_obj
-                    .entry("defaults")
-                    .or_insert_with(|| Value::Object(serde_json::Map::new()));
-                if let Some(defaults_obj) = defaults.as_object_mut() {
-                    defaults_obj.insert("workspace".to_string(), workspace);
-                }
-            }
-        }
-    }
 
-    let tmp_path = config_dir.join(format!(
-        "openclaw.json.tmp.{}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis()
-    ));
-    let raw = serde_json::to_string_pretty(&existing).map_err(|e| format!("Failed to serialize config: {e}"))?;
-    std::fs::write(&tmp_path, raw).map_err(|e| format!("Failed to write temp config: {e}"))?;
-    if cfg!(windows) && config_path.exists() {
-        let _ = std::fs::remove_file(&config_path);
-    }
-    std::fs::rename(&tmp_path, &config_path).map_err(|e| format!("Failed to rename config: {e}"))?;
-    Ok(config_path.to_string_lossy().to_string())
+    Ok((provider.id, created_provider, true))
 }
 
 async fn configure_system_providers(
     state: &AppState,
     session: &FrogclawLoginSession,
+    selected_token_id: Option<i64>,
 ) -> Result<Vec<FrogclawConfiguredProvider>, String> {
-    let mut configured = Vec::new();
+    let Some(token) = selected_token(&session.tokens, selected_token_id) else {
+        return Ok(Vec::new());
+    };
+    let api_key = format!("sk-{}", token.key);
+    let available_models: Vec<&FrogclawPricingModel> = session
+        .pricing_models
+        .iter()
+        .filter(|model| pricing_model_matches_token(model, token))
+        .collect();
 
+    let mut configured = Vec::new();
     for sp in &session.system_providers {
         let Some(provider_type) = provider_type_for_key(&sp.provider_key, &sp.api_mode) else {
             continue;
         };
-        let Some(token) = selected_token_for_provider(sp, &session.tokens) else {
-            continue;
-        };
-
         let provider_name = format!("{FROGCLAW_PROVIDER_PREFIX}{}", sp.name);
-        let api_key = format!("sk-{}", token.key);
-        let base_url = base_url_for_provider(sp, &provider_type);
-        let import_result = frogclaw_core::repo::provider::import_provider_from_deep_link(
-            &state.sea_db,
-            &state.master_key,
-            DeepLinkProviderImportInput {
-                name: provider_name.clone(),
-                baseurl: base_url.clone(),
-                apikey: api_key,
-                provider_type: provider_type_name(&provider_type).to_string(),
-            },
-        )
-        .await
-        .map_err(|e| e.to_string())?;
-
-        let provider = frogclaw_core::repo::provider::get_provider(&state.sea_db, &import_result.provider_id)
-            .await
-            .map_err(|e| e.to_string())?;
-
-        let mut update = UpdateProviderInput::default();
-        update.name = Some(provider_name.clone());
-        update.provider_type = Some(provider_type.clone());
-        update.api_host = Some(base_url);
-        update.enabled = Some(true);
-        let _ = frogclaw_core::repo::provider::update_provider(&state.sea_db, &provider.id, update).await;
-
-        let model_id = sp.default_model.as_ref().filter(|m| !m.trim().is_empty()).cloned();
-        if let Some(model_id) = &model_id {
-            let capabilities = match provider_type {
-                ProviderType::Anthropic | ProviderType::OpenAI | ProviderType::OpenAIResponses | ProviderType::Gemini => {
-                    vec![
-                        ModelCapability::TextChat,
-                        ModelCapability::Vision,
-                        ModelCapability::FunctionCalling,
-                    ]
-                }
-                _ => vec![ModelCapability::TextChat],
-            };
-            let model = Model {
-                provider_id: provider.id.clone(),
-                model_id: model_id.clone(),
-                name: model_id.clone(),
+        let (provider_id, created_provider, updated_key) =
+            ensure_provider_with_token(state, &provider_name, provider_type.clone(), &api_key).await?;
+        let models: Vec<Model> = available_models
+            .iter()
+            .filter(|model| model_supports_provider(model, &provider_type))
+            .map(|model| Model {
+                provider_id: provider_id.clone(),
+                model_id: model.model_name.clone(),
+                name: model.model_name.clone(),
                 group_name: Some("FrogClaw".into()),
-                model_type: ModelType::Chat,
-                capabilities,
+                model_type: ModelType::detect(&model.model_name),
+                capabilities: capabilities_for_model(&model.model_name, &provider_type),
                 max_tokens: None,
                 enabled: true,
                 param_overrides: None,
-            };
-            frogclaw_core::repo::provider::save_models(&state.sea_db, &provider.id, &[model])
-                .await
-                .map_err(|e| e.to_string())?;
-        }
+            })
+            .collect();
+        frogclaw_core::repo::provider::save_models(&state.sea_db, &provider_id, &models)
+            .await
+            .map_err(|e| e.to_string())?;
 
         configured.push(FrogclawConfiguredProvider {
-            provider_id: provider.id,
+            provider_id,
             name: provider_name,
             provider_type: provider_type_name(&provider_type).to_string(),
-            model_id,
+            model_count: models.len(),
+            token_id: token.id,
             token_name: token.name.clone(),
-            token_group: if token.group.is_empty() {
-                "default".into()
-            } else {
-                token.group.clone()
-            },
-            created_provider: import_result.created_provider,
-            added_key: import_result.added_key,
-            reused_key: import_result.reused_key,
+            token_group: token_group(token),
+            created_provider,
+            updated_key,
         });
     }
 
-    if configured.is_empty() && !session.tokens.is_empty() {
-        let token = &session.tokens[0];
-        let api_key = format!("sk-{}", token.key);
-        let result = frogclaw_core::repo::provider::import_provider_from_deep_link(
-            &state.sea_db,
-            &state.master_key,
-            DeepLinkProviderImportInput {
-                name: "frogclaw-openai".into(),
-                baseurl: "https://frogclaw.com/v1".into(),
-                apikey: api_key,
-                provider_type: "openai_responses".into(),
-            },
+    if configured.is_empty() {
+        let (provider_id, created_provider, updated_key) = ensure_provider_with_token(
+            state,
+            "frogclaw-openai",
+            ProviderType::OpenAIResponses,
+            &api_key,
         )
-        .await
-        .map_err(|e| e.to_string())?;
+        .await?;
+        let models: Vec<Model> = available_models
+            .iter()
+            .map(|model| Model {
+                provider_id: provider_id.clone(),
+                model_id: model.model_name.clone(),
+                name: model.model_name.clone(),
+                group_name: Some("FrogClaw".into()),
+                model_type: ModelType::detect(&model.model_name),
+                capabilities: capabilities_for_model(&model.model_name, &ProviderType::OpenAIResponses),
+                max_tokens: None,
+                enabled: true,
+                param_overrides: None,
+            })
+            .collect();
+        frogclaw_core::repo::provider::save_models(&state.sea_db, &provider_id, &models)
+            .await
+            .map_err(|e| e.to_string())?;
         configured.push(FrogclawConfiguredProvider {
-            provider_id: result.provider_id,
-            name: result.provider_name,
+            provider_id,
+            name: "frogclaw-openai".into(),
             provider_type: "openai_responses".into(),
-            model_id: None,
+            model_count: models.len(),
+            token_id: token.id,
             token_name: token.name.clone(),
-            token_group: if token.group.is_empty() { "default".into() } else { token.group.clone() },
-            created_provider: result.created_provider,
-            added_key: result.added_key,
-            reused_key: result.reused_key,
+            token_group: token_group(token),
+            created_provider,
+            updated_key,
         });
     }
 
@@ -598,6 +581,7 @@ pub async fn fetch_and_configure_frogclaw(
     state: State<'_, AppState>,
     username: String,
     password: String,
+    selected_token_id: Option<i64>,
 ) -> Result<FrogclawConfigureResult, String> {
     let (client, user) = login_and_client(&username, &password).await?;
     let mut session = fetch_session_data(&client, user).await?;
@@ -605,51 +589,32 @@ pub async fn fetch_and_configure_frogclaw(
         session = fetch_session_data(&client, session.user.clone()).await?;
     }
 
+    let selected = selected_token(&session.tokens, selected_token_id).map(|t| t.id);
     account_log(
         "login",
         &format!(
-            "user={} tokens={} system_providers={} cli_providers={}",
+            "user={} tokens={} system_providers={} pricing_models={} selected_token={:?}",
             session.user.username,
             session.tokens.len(),
             session.system_providers.len(),
-            session.cli_providers.len()
+            session.pricing_models.len(),
+            selected
         ),
     );
 
-    let configured_providers = configure_system_providers(&state, &session).await?;
-    let (openclaw_config_json, openclaw_models) = extract_openclaw_config(&session);
-    let openclaw = if let Some(config_json) = openclaw_config_json {
-        match apply_openclaw_config_to_disk(&config_json) {
-            Ok(path) => OpenClawConfigSummary {
-                applied: true,
-                path: Some(path),
-                models: openclaw_models,
-            },
-            Err(e) => {
-                account_log("openclaw-config-error", &e);
-                OpenClawConfigSummary {
-                    applied: false,
-                    path: None,
-                    models: openclaw_models,
-                }
-            }
-        }
-    } else {
-        OpenClawConfigSummary {
-            applied: false,
-            path: None,
-            models: openclaw_models,
-        }
-    };
-
+    let configured_providers = configure_system_providers(&state, &session, selected).await?;
     Ok(FrogclawConfigureResult {
         session,
         configured_providers,
-        openclaw,
+        selected_token_id: selected,
     })
 }
 
 #[tauri::command]
-pub async fn apply_openclaw_config(config_json: String) -> Result<String, String> {
-    apply_openclaw_config_to_disk(&config_json)
+pub async fn apply_frogclaw_token_selection(
+    state: State<'_, AppState>,
+    session: FrogclawLoginSession,
+    selected_token_id: i64,
+) -> Result<Vec<FrogclawConfiguredProvider>, String> {
+    configure_system_providers(&state, &session, Some(selected_token_id)).await
 }

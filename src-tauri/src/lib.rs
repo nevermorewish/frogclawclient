@@ -30,6 +30,7 @@ pub struct AppState {
 
 mod commands;
 mod context_manager;
+mod frogclaw_config;
 mod indexing;
 mod paths;
 mod tray;
@@ -99,7 +100,7 @@ pub fn run() {
             commands::home_tools::check_tools_installed,
             commands::home_tools::install_tool,
             commands::frogclaw_account::fetch_and_configure_frogclaw,
-            commands::frogclaw_account::apply_openclaw_config,
+            commands::frogclaw_account::apply_frogclaw_token_selection,
             // drawing
             commands::drawing::list_drawing_generations,
             commands::drawing::upload_drawing_reference,

@@ -1270,7 +1270,6 @@ export async function handleCommand<T>(cmd: string, args?: Record<string, unknow
           { id: 'claude', name: 'Claude Code', installed: false, version: null, path: null, installable: true, needs_upgrade: false },
           { id: 'codex', name: 'Codex', installed: false, version: null, path: null, installable: true, needs_upgrade: false },
           { id: 'gemini', name: 'Gemini CLI', installed: false, version: null, path: null, installable: true, needs_upgrade: false },
-          { id: 'openclaw', name: 'OpenClaw', installed: false, version: null, path: null, installable: true, needs_upgrade: false },
         ],
       } as T;
 
@@ -1285,6 +1284,8 @@ export async function handleCommand<T>(cmd: string, args?: Record<string, unknow
 
     case 'fetch_and_configure_frogclaw':
       throw new Error('浏览器预览模式不能登录 frogclaw.com，请在 Tauri 应用中使用。');
+    case 'apply_frogclaw_token_selection':
+      return [] as T;
 
     // ── Phase 2: Workspace Snapshot ────────────────────────────────────
     case 'get_workspace_snapshot':

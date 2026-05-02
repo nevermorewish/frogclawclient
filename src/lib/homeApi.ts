@@ -1,6 +1,8 @@
 import { invoke } from './invoke';
 import type {
   FrogclawConfigureResult,
+  FrogclawConfiguredProvider,
+  FrogclawLoginSession,
   HomeToolsStatus,
   InstallResult,
 } from '@/types';
@@ -16,9 +18,21 @@ export async function installTool(toolId: string): Promise<InstallResult> {
 export async function fetchAndConfigureFrogclaw(
   username: string,
   password: string,
+  selectedTokenId?: number | null,
 ): Promise<FrogclawConfigureResult> {
   return invoke<FrogclawConfigureResult>('fetch_and_configure_frogclaw', {
     username,
     password,
+    selectedTokenId,
+  });
+}
+
+export async function applyFrogclawTokenSelection(
+  session: FrogclawLoginSession,
+  selectedTokenId: number,
+): Promise<FrogclawConfiguredProvider[]> {
+  return invoke<FrogclawConfiguredProvider[]>('apply_frogclaw_token_selection', {
+    session,
+    selectedTokenId,
   });
 }
