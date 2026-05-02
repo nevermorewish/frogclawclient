@@ -406,7 +406,7 @@ export interface RealtimeConfig {
 }
 
 // === UI State ===
-export type PageKey = 'home' | 'chat' | 'drawing' | 'knowledge' | 'memory' | 'files' | 'settings' | 'skills';
+export type PageKey = 'home' | 'chat' | 'drawing' | 'knowledge' | 'memory' | 'files' | 'settings' | 'skills' | 'im';
 
 // === Drawing ===
 export type DrawingModelId = 'gpt-image-2' | 'gpt-image-1.5' | 'gpt-image-1' | 'gpt-image-1-mini';

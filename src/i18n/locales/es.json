@@ -11,7 +11,8 @@
     "files": "Archivos",
     "settings": "Configuración",
     "skills": "Habilidades",
-    "drawing": "Drawing"
+    "drawing": "Drawing",
+    "im": "IM Channels"
   },
   "chat": {
     "newConversation": "Nueva conversación",

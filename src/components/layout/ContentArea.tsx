@@ -6,6 +6,7 @@ import { MemoryPage } from '@/pages/MemoryPage';
 import { FilesPage } from '@/pages/FilesPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { SkillsPage } from '@/pages/SkillsPage';
+import { IMChannelsPage } from '@/pages/IMChannelsPage';
 
 interface ContentAreaProps {
   activePage: PageKey;
@@ -27,6 +28,8 @@ export function ContentArea({ activePage }: ContentAreaProps) {
       return <SettingsPage />;
     case 'skills':
       return <SkillsPage />;
+    case 'im':
+      return <IMChannelsPage />;
     case 'knowledge':
       return <ChatPage />;
     default: {

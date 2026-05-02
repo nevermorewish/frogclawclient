@@ -11,7 +11,8 @@
     "files": "文件",
     "settings": "设置",
     "skills": "技能",
-    "drawing": "绘画"
+    "drawing": "绘画",
+    "im": "IM 通道"
   },
   "chat": {
     "newConversation": "新建对话",

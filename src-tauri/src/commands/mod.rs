@@ -16,6 +16,7 @@ pub mod knowledge;
 pub mod mcp;
 pub mod memory;
 pub mod messages;
+pub mod platform_bridge;
 pub mod providers;
 pub mod search;
 pub mod settings;

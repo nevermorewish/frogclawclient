@@ -11,7 +11,8 @@
     "files": "파일",
     "settings": "설정",
     "skills": "스킬",
-    "drawing": "Drawing"
+    "drawing": "Drawing",
+    "im": "IM Channels"
   },
   "chat": {
     "newConversation": "새 대화",

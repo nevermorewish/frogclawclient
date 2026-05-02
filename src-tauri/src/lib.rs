@@ -101,6 +101,15 @@ pub fn run() {
             commands::home_tools::install_tool,
             commands::frogclaw_account::fetch_and_configure_frogclaw,
             commands::frogclaw_account::apply_frogclaw_token_selection,
+            // IM bridge
+            commands::platform_bridge::get_im_channels,
+            commands::platform_bridge::save_im_channels,
+            commands::platform_bridge::platform_start,
+            commands::platform_bridge::platform_stop,
+            commands::platform_bridge::platform_status,
+            commands::platform_bridge::platform_reload_config,
+            commands::platform_bridge::platform_connect_feishu,
+            commands::platform_bridge::platform_read_log,
             // drawing
             commands::drawing::list_drawing_generations,
             commands::drawing::upload_drawing_reference,
@@ -448,6 +457,7 @@ pub fn run() {
                 agent_ask_senders: Arc::new(Mutex::new(std::collections::HashMap::new())),
                 agent_always_allowed: Arc::new(Mutex::new(std::collections::HashMap::new())),
             });
+            app.manage(commands::platform_bridge::PlatformBridgeState::default());
 
             // Reset any agent sessions that were running when app crashed/closed
             {

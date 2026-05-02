@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Tooltip, Avatar, theme } from 'antd';
-import { MessageSquare, Brain, FolderOpen, User, Sparkles, ImagePlus, MessageSquarePlus, Search, Settings, XCircle, Home } from 'lucide-react';
+import { MessageSquare, Brain, FolderOpen, User, Sparkles, ImagePlus, MessageSquarePlus, Search, Settings, XCircle, Home, MessageCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '@/stores';
 import { useUserProfileStore } from '@/stores/userProfileStore';
@@ -13,6 +13,7 @@ const mainNavItems: { key: PageKey; icon: React.ReactNode; labelKey: string }[] 
   { key: 'chat', icon: <MessageSquare size={18} />, labelKey: 'nav.chat' },
   { key: 'drawing', icon: <ImagePlus size={18} />, labelKey: 'nav.drawing' },
   { key: 'skills', icon: <Sparkles size={18} />, labelKey: 'nav.skills' },
+  { key: 'im', icon: <MessageCircle size={18} />, labelKey: 'nav.im' },
   { key: 'memory', icon: <Brain size={18} />, labelKey: 'nav.memory' },
   { key: 'files', icon: <FolderOpen size={18} />, labelKey: 'nav.files' },
 ];
