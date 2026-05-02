@@ -26,7 +26,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false
+
+      - name: Configure and update submodules
+        shell: pwsh
+        env:
+          SUBMODULE_TOKEN: ${{ secrets.SUBMODULE_TOKEN || secrets.GH_PAT || github.token }}
+        run: |
+          if ($env:SUBMODULE_TOKEN) {
+            Write-Host "::add-mask::$env:SUBMODULE_TOKEN"
+            git config submodule.src-tauri/crates/open-agent-sdk.url "https://x-access-token:$env:SUBMODULE_TOKEN@github.com/frogclaw/open-agent-sdk-rust.git"
+            git config submodule.libs/markstream-vue.url "https://x-access-token:$env:SUBMODULE_TOKEN@github.com/frogclaw/markstream-vue.git"
+            git config submodule.libs/stream-monaco.url "https://x-access-token:$env:SUBMODULE_TOKEN@github.com/frogclaw/stream-monaco.git"
+          } else {
+            git config submodule.src-tauri/crates/open-agent-sdk.url "https://github.com/frogclaw/open-agent-sdk-rust.git"
+            git config submodule.libs/markstream-vue.url "https://github.com/frogclaw/markstream-vue.git"
+            git config submodule.libs/stream-monaco.url "https://github.com/frogclaw/stream-monaco.git"
+          }
+
+          git submodule sync --recursive
+          git submodule update --init --recursive --depth 1
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
