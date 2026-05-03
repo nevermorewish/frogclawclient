@@ -50,7 +50,6 @@ serde_json = { workspace = true }
 frogclaw-core = { path = "crates/core" }
 frogclaw-providers = { path = "crates/providers" }
 frogclaw-agent = { path = "crates/agent" }
-open-agent-sdk = { path = "crates/open-agent-sdk" }
 tokio = { workspace = true }
 sea-orm = { workspace = true }
 chrono = { workspace = true }

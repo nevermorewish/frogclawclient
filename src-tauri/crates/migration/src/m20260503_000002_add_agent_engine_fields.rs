@@ -14,7 +14,7 @@ impl MigrationTrait for Migration {
                         ColumnDef::new(Alias::new("engine_kind"))
                             .string()
                             .not_null()
-                            .default("frog_agent"),
+                            .default("codex_app_server"),
                     )
                     .to_owned(),
             )
@@ -24,7 +24,11 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(Alias::new("agent_sessions"))
-                    .add_column(ColumnDef::new(Alias::new("engine_session_id")).string().null())
+                    .add_column(
+                        ColumnDef::new(Alias::new("engine_session_id"))
+                            .string()
+                            .null(),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -33,7 +37,11 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(Alias::new("agent_sessions"))
-                    .add_column(ColumnDef::new(Alias::new("engine_context_json")).text().null())
+                    .add_column(
+                        ColumnDef::new(Alias::new("engine_context_json"))
+                            .text()
+                            .null(),
+                    )
                     .to_owned(),
             )
             .await?;

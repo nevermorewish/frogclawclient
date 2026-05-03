@@ -1,5 +1,5 @@
-use frogclaw_core::db;
 use chrono;
+use frogclaw_core::db;
 use sea_orm::DatabaseConnection;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -22,10 +22,14 @@ pub struct AppState {
     pub webdav_sync_handle: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
     pub vector_store: Arc<frogclaw_core::vector_store::VectorStore>,
     pub stream_cancel_flags: Arc<Mutex<std::collections::HashMap<String, Arc<AtomicBool>>>>,
-    pub agent_cancel_tokens: Arc<Mutex<std::collections::HashMap<String, open_agent_sdk::CancellationToken>>>,
-    pub agent_permission_senders: Arc<Mutex<std::collections::HashMap<String, tokio::sync::oneshot::Sender<String>>>>,
-    pub agent_ask_senders: Arc<Mutex<std::collections::HashMap<String, tokio::sync::oneshot::Sender<String>>>>,
-    pub agent_always_allowed: Arc<Mutex<std::collections::HashMap<String, std::collections::HashSet<String>>>>,
+    pub agent_cancel_tokens:
+        Arc<Mutex<std::collections::HashMap<String, commands::agent::AgentCancellationToken>>>,
+    pub agent_permission_senders:
+        Arc<Mutex<std::collections::HashMap<String, tokio::sync::oneshot::Sender<String>>>>,
+    pub agent_ask_senders:
+        Arc<Mutex<std::collections::HashMap<String, tokio::sync::oneshot::Sender<String>>>>,
+    pub agent_always_allowed:
+        Arc<Mutex<std::collections::HashMap<String, std::collections::HashSet<String>>>>,
 }
 
 mod commands;
@@ -702,7 +706,8 @@ pub fn run() {
             #[cfg(target_os = "windows")]
             {
                 let lower = error_msg.to_lowercase();
-                if lower.contains("webview2") || lower.contains("webview") || lower.contains("edge") {
+                if lower.contains("webview2") || lower.contains("webview") || lower.contains("edge")
+                {
                     let user_ok = windows_utils::show_warning_ok_cancel(
                         "FrogClawClient",
                         "未检测到 Microsoft Edge WebView2 Runtime，FrogClawClient 无法启动。\n\n\
@@ -726,14 +731,18 @@ pub fn run() {
     };
 
     app.run(|app, event| {
-            #[cfg(target_os = "macos")]
-            if let tauri::RunEvent::Reopen { has_visible_windows, .. } = event {
-                if !has_visible_windows {
-                    if let Some(w) = app.get_webview_window("main") {
-                        let _ = w.show();
-                        let _ = w.set_focus();
-                    }
+        #[cfg(target_os = "macos")]
+        if let tauri::RunEvent::Reopen {
+            has_visible_windows,
+            ..
+        } = event
+        {
+            if !has_visible_windows {
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.show();
+                    let _ = w.set_focus();
                 }
             }
-        });
+        }
+    });
 }

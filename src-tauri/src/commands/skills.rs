@@ -12,10 +12,89 @@ fn skills_dir() -> PathBuf {
     frogclaw_home().join("skills")
 }
 
+#[derive(Clone)]
+struct LocalSkill {
+    name: String,
+    description: String,
+    source: String,
+    path: PathBuf,
+    content: String,
+    user_invocable: bool,
+    argument_hint: Option<String>,
+    when_to_use: Option<String>,
+    group: Option<String>,
+    author: Option<String>,
+    version: Option<String>,
+}
+
+fn load_local_skills() -> Vec<LocalSkill> {
+    let home = home_dir();
+    let roots = [
+        ("frogclaw", frogclaw_home().join("skills")),
+        ("claude", home.join(".claude").join("skills")),
+        ("agents", home.join(".agents").join("skills")),
+        ("codex", home.join(".codex").join("skills")),
+    ];
+    let mut skills = Vec::new();
+    for (source, root) in roots {
+        collect_skills_from_root(&root, source, None, 0, &mut skills);
+    }
+    skills
+}
+
+fn collect_skills_from_root(
+    dir: &Path,
+    source: &str,
+    group: Option<String>,
+    depth: u8,
+    out: &mut Vec<LocalSkill>,
+) {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(_) => return,
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let skill_path = path.join("SKILL.md");
+        if skill_path.exists() {
+            if let Ok(content) = std::fs::read_to_string(&skill_path) {
+                let name = path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "skill".to_string());
+                let description = content
+                    .lines()
+                    .find(|line| !line.trim().is_empty() && !line.trim_start().starts_with('#'))
+                    .unwrap_or("")
+                    .trim()
+                    .to_string();
+                out.push(LocalSkill {
+                    name,
+                    description,
+                    source: source.to_string(),
+                    path: skill_path,
+                    content,
+                    user_invocable: false,
+                    argument_hint: None,
+                    when_to_use: None,
+                    group: group.clone(),
+                    author: None,
+                    version: None,
+                });
+            }
+        } else if depth == 0 {
+            let next_group = path.file_name().map(|n| n.to_string_lossy().to_string());
+            collect_skills_from_root(&path, source, next_group, depth + 1, out);
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn list_skills(state: State<'_, AppState>) -> Result<Vec<SkillInfo>, String> {
-    let home = home_dir();
-    let skills = open_agent_sdk::skills::load_all_global(&home);
+    let skills = load_local_skills();
     let disabled = frogclaw_core::repo::skill::get_disabled_skills(&state.sea_db)
         .await
         .map_err(|e| e.to_string())?;
@@ -26,28 +105,16 @@ pub async fn list_skills(state: State<'_, AppState>) -> Result<Vec<SkillInfo>, S
             let enabled = !disabled.contains(&s.name);
             SkillInfo {
                 name: s.name.clone(),
-                description: s.metadata.description.clone().unwrap_or_default(),
-                author: s
-                    .metadata
-                    .metadata
-                    .as_ref()
-                    .and_then(|m| m.get("author"))
-                    .and_then(|v| v.as_str())
-                    .map(String::from),
-                version: s
-                    .metadata
-                    .metadata
-                    .as_ref()
-                    .and_then(|m| m.get("version"))
-                    .and_then(|v| v.as_str())
-                    .map(String::from),
-                source: s.source.as_str().to_string(),
+                description: s.description.clone(),
+                author: s.author.clone(),
+                version: s.version.clone(),
+                source: s.source.clone(),
                 source_path: s.path.to_string_lossy().to_string(),
                 enabled,
                 has_update: false,
-                user_invocable: s.metadata.user_invocable,
-                argument_hint: s.metadata.argument_hint.clone(),
-                when_to_use: s.metadata.when_to_use.clone(),
+                user_invocable: s.user_invocable,
+                argument_hint: s.argument_hint.clone(),
+                when_to_use: s.when_to_use.clone(),
                 group: s.group.clone(),
             }
         })
@@ -58,8 +125,7 @@ pub async fn list_skills(state: State<'_, AppState>) -> Result<Vec<SkillInfo>, S
 
 #[tauri::command]
 pub async fn get_skill(state: State<'_, AppState>, name: String) -> Result<SkillDetail, String> {
-    let home = home_dir();
-    let skills = open_agent_sdk::skills::load_all_global(&home);
+    let skills = load_local_skills();
     let skill = skills
         .into_iter()
         .find(|s| s.name == name)
@@ -89,28 +155,16 @@ pub async fn get_skill(state: State<'_, AppState>, name: String) -> Result<Skill
 
     let info = SkillInfo {
         name: skill.name.clone(),
-        description: skill.metadata.description.clone().unwrap_or_default(),
-        author: skill
-            .metadata
-            .metadata
-            .as_ref()
-            .and_then(|m| m.get("author"))
-            .and_then(|v| v.as_str())
-            .map(String::from),
-        version: skill
-            .metadata
-            .metadata
-            .as_ref()
-            .and_then(|m| m.get("version"))
-            .and_then(|v| v.as_str())
-            .map(String::from),
-        source: skill.source.as_str().to_string(),
+        description: skill.description.clone(),
+        author: skill.author.clone(),
+        version: skill.version.clone(),
+        source: skill.source.clone(),
         source_path: skill.path.to_string_lossy().to_string(),
         enabled: !disabled.contains(&skill.name),
         has_update: false,
-        user_invocable: skill.metadata.user_invocable,
-        argument_hint: skill.metadata.argument_hint.clone(),
-        when_to_use: skill.metadata.when_to_use.clone(),
+        user_invocable: skill.user_invocable,
+        argument_hint: skill.argument_hint.clone(),
+        when_to_use: skill.when_to_use.clone(),
         group: skill.group.clone(),
     };
 
@@ -173,15 +227,8 @@ fn parse_github_source(source: &str) -> Result<(String, String), String> {
     }
 }
 
-async fn install_from_github(
-    owner: &str,
-    repo: &str,
-    target_dir: &Path,
-) -> Result<String, String> {
-    let url = format!(
-        "https://api.github.com/repos/{}/{}/zipball",
-        owner, repo
-    );
+async fn install_from_github(owner: &str, repo: &str, target_dir: &Path) -> Result<String, String> {
+    let url = format!("https://api.github.com/repos/{}/{}/zipball", owner, repo);
 
     let client = reqwest::Client::new();
     let response = client
@@ -343,7 +390,9 @@ pub async fn open_skill_dir(path: String) -> Result<(), String> {
     let dir = if p.is_dir() {
         p.to_path_buf()
     } else {
-        p.parent().map(|d| d.to_path_buf()).unwrap_or_else(|| p.to_path_buf())
+        p.parent()
+            .map(|d| d.to_path_buf())
+            .unwrap_or_else(|| p.to_path_buf())
     };
     if dir.exists() {
         open::that(&dir).map_err(|e| format!("Failed to open directory: {}", e))
@@ -433,26 +482,19 @@ pub async fn search_marketplace(
                 return Err(format!("GitHub API error: {}", response.status()));
             }
 
-            let body: serde_json::Value =
-                response.json().await.map_err(|e| e.to_string())?;
+            let body: serde_json::Value = response.json().await.map_err(|e| e.to_string())?;
             let items = body["items"].as_array().cloned().unwrap_or_default();
 
             let results: Vec<MarketplaceSkill> = items
                 .into_iter()
                 .map(|item| {
                     let skill_name = item["name"].as_str().unwrap_or("").to_string();
-                    let repo = item["full_name"]
-                        .as_str()
-                        .unwrap_or("")
-                        .to_string();
-                    let installed = installed_refs
-                        .contains(&repo.trim().trim_end_matches('/').to_lowercase());
+                    let repo = item["full_name"].as_str().unwrap_or("").to_string();
+                    let installed =
+                        installed_refs.contains(&repo.trim().trim_end_matches('/').to_lowercase());
                     MarketplaceSkill {
                         name: skill_name,
-                        description: item["description"]
-                            .as_str()
-                            .unwrap_or("")
-                            .to_string(),
+                        description: item["description"].as_str().unwrap_or("").to_string(),
                         repo,
                         stars: item["stargazers_count"].as_i64().unwrap_or(0),
                         installs: 0,
@@ -481,8 +523,7 @@ pub async fn search_marketplace(
                 return Err(format!("skills.sh API error: {}", response.status()));
             }
 
-            let body: serde_json::Value =
-                response.json().await.map_err(|e| e.to_string())?;
+            let body: serde_json::Value = response.json().await.map_err(|e| e.to_string())?;
             let items = body["skills"].as_array().cloned().unwrap_or_default();
 
             let results: Vec<MarketplaceSkill> = items
@@ -490,8 +531,8 @@ pub async fn search_marketplace(
                 .map(|item| {
                     let skill_name = item["name"].as_str().unwrap_or("").to_string();
                     let repo = item["source"].as_str().unwrap_or("").to_string();
-                    let installed = installed_refs
-                        .contains(&repo.trim().trim_end_matches('/').to_lowercase());
+                    let installed =
+                        installed_refs.contains(&repo.trim().trim_end_matches('/').to_lowercase());
                     MarketplaceSkill {
                         name: skill_name,
                         description: String::new(),
@@ -567,18 +608,14 @@ pub async fn check_skill_updates() -> Result<Vec<SkillUpdateInfo>, String> {
                 if let Ok(body) = resp.json::<serde_json::Value>().await {
                     if let Some(commits) = body.as_array() {
                         if let Some(latest) = commits.first() {
-                            let latest_sha =
-                                latest["sha"].as_str().unwrap_or("").to_string();
+                            let latest_sha = latest["sha"].as_str().unwrap_or("").to_string();
                             let short_latest = &latest_sha[..7.min(latest_sha.len())];
                             if !current_commit.is_empty()
                                 && !latest_sha.starts_with(&current_commit)
                                 && current_commit != short_latest
                             {
                                 updates.push(SkillUpdateInfo {
-                                    name: entry
-                                        .file_name()
-                                        .to_string_lossy()
-                                        .to_string(),
+                                    name: entry.file_name().to_string_lossy().to_string(),
                                     current_commit: current_commit.clone(),
                                     latest_commit: short_latest.to_string(),
                                     source_ref: source_ref.clone(),

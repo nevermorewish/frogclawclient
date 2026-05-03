@@ -41,15 +41,15 @@ async function fileToAttachmentInput(file: File): Promise<AttachmentInput> {
 // In-memory draft cache: persists input text per-conversation across component unmounts
 const _draftCache = new Map<string, string>();
 const DEFAULT_AGENT_ENGINE_KEY = 'frogclaw:default-agent-engine';
-const SUPPORTED_AGENT_ENGINE_KINDS: AgentEngineKind[] = ['frog_agent', 'claude_code', 'codex_cli', 'gemini_cli'];
+const SUPPORTED_AGENT_ENGINE_KINDS: AgentEngineKind[] = ['codex_app_server', 'frog_agent', 'claude_code', 'codex_cli', 'gemini_cli'];
 const DEFAULT_AGENT_PERMISSION_MODE = 'full_access';
 
 function readDefaultAgentEngine(): AgentEngineKind {
   try {
     const stored = localStorage.getItem(DEFAULT_AGENT_ENGINE_KEY) as AgentEngineKind | null;
-    return stored && SUPPORTED_AGENT_ENGINE_KINDS.includes(stored) ? stored : 'frog_agent';
+    return stored && SUPPORTED_AGENT_ENGINE_KINDS.includes(stored) ? stored : 'codex_app_server';
   } catch {
-    return 'frog_agent';
+    return 'codex_app_server';
   }
 }
 
@@ -485,7 +485,7 @@ export function InputArea() {
     [activeConversation?.model_id, currentModel?.model_id, currentProviderType],
   );
 
-  const agentEngineMode = agentEngine === 'frog_agent' ? 'frog_agent' : 'native_cli';
+  const agentEngineMode = agentEngine === 'codex_app_server' || agentEngine === 'frog_agent' ? 'frog_agent' : 'native_cli';
   const nativeCliEngineInfo = useMemo(
     () => agentEngines.find((engine) => engine.kind === nativeCliEngine),
     [agentEngines, nativeCliEngine],
@@ -530,7 +530,7 @@ export function InputArea() {
   }, [activeConversationId, agentEngine, agentEngines, messageApi, streaming, t, updateAgentEngine]);
 
   const handleAgentEngineModeChange = useCallback((value: string | number) => {
-    const nextEngine = value === 'native_cli' ? nativeCliEngine : 'frog_agent';
+    const nextEngine = value === 'native_cli' ? nativeCliEngine : 'codex_app_server';
     const runChange = () => applyAgentEngine(nextEngine);
     if (activeConversationId && messages.length > 0 && nextEngine !== agentEngine) {
       modal.confirm({
@@ -546,7 +546,7 @@ export function InputArea() {
   }, [activeConversationId, agentEngine, applyAgentEngine, messages.length, modal, nativeCliEngine, t]);
 
   useEffect(() => {
-    if (agentEngine !== 'frog_agent' && agentEngine !== nativeCliEngine && !streaming) {
+    if (agentEngine !== 'codex_app_server' && agentEngine !== 'frog_agent' && agentEngine !== nativeCliEngine && !streaming) {
       void applyAgentEngine(nativeCliEngine, { silent: true });
     }
   }, [agentEngine, applyAgentEngine, nativeCliEngine, streaming]);
@@ -1411,7 +1411,7 @@ export function InputArea() {
                 type={agentEngineMode === 'frog_agent' ? 'primary' : 'text'}
                 disabled={streaming || loadingAgentEngines}
                 icon={<Atom size={12} />}
-                onClick={() => handleAgentEngineModeChange('frog_agent')}
+                onClick={() => handleAgentEngineModeChange('codex_app_server')}
                 style={{
                   height: 26,
                   flex: 1,

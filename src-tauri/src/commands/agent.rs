@@ -1,22 +1,17 @@
 use crate::AppState;
-use frogclaw_agent::permission::{classify_tool_risk, decide_permission, PermissionAction};
-use frogclaw_agent::security::check_path_safety;
-use frogclaw_core::repo::{agent_session, conversation, message, provider, tool_execution};
-use frogclaw_core::types::{
-    AgentEngineInfo, AgentSession, MessageRole, ProviderProxyConfig, ProviderType,
-};
-use frogclaw_providers::{resolve_base_url_for_type, ProviderAdapter, ProviderRequestContext};
-use open_agent_sdk::{
-    Agent, AgentOptions, CanUseToolFn, ContentBlock, PermissionDecision, SDKMessage, Usage,
-};
+use frogclaw_core::repo::{agent_session, conversation, message, provider};
+use frogclaw_core::types::{AgentEngineInfo, AgentSession, MessageRole, ProviderType};
+use frogclaw_providers::{resolve_base_url_for_type, ProviderAdapter};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
+use std::fs;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command as StdCommand, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
 use tauri::{Emitter, State};
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::sync::RwLock;
 
 /// In-memory map of conversation IDs to actively running agent task IDs.
@@ -24,10 +19,30 @@ use tokio::sync::RwLock;
 static RUNNING_AGENTS: LazyLock<Mutex<HashMap<String, String>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
+const ENGINE_CODEX_APP_SERVER: &str = "codex_app_server";
 const ENGINE_FROG_AGENT: &str = "frog_agent";
 const ENGINE_CLAUDE_CODE: &str = "claude_code";
 const ENGINE_CODEX_CLI: &str = "codex_cli";
 const ENGINE_GEMINI_CLI: &str = "gemini_cli";
+
+#[derive(Clone, Default)]
+pub struct AgentCancellationToken {
+    cancelled: Arc<AtomicBool>,
+}
+
+impl AgentCancellationToken {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn cancel(&self) {
+        self.cancelled.store(true, Ordering::SeqCst);
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::SeqCst)
+    }
+}
 
 /// RAII guard that removes a conversation ID from RUNNING_AGENTS on drop.
 /// Ensures cleanup even if the spawned task panics.
@@ -48,7 +63,7 @@ impl Drop for RunningAgentGuard {
 
 struct AgentCancelTokenGuard {
     conversation_id: String,
-    tokens: Arc<tokio::sync::Mutex<HashMap<String, open_agent_sdk::CancellationToken>>>,
+    tokens: Arc<tokio::sync::Mutex<HashMap<String, AgentCancellationToken>>>,
 }
 
 impl Drop for AgentCancelTokenGuard {
@@ -152,6 +167,12 @@ pub struct AgentDonePayload {
 pub struct AgentUsagePayload {
     pub input_tokens: u64,
     pub output_tokens: u64,
+}
+
+#[derive(Debug, Clone)]
+struct CodexUsage {
+    input_tokens: u64,
+    output_tokens: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -296,8 +317,81 @@ fn provider_type_to_registry_key_for_model(pt: &ProviderType, model_id: &str) ->
 fn is_supported_engine_kind(kind: &str) -> bool {
     matches!(
         kind,
-        ENGINE_FROG_AGENT | ENGINE_CLAUDE_CODE | ENGINE_CODEX_CLI | ENGINE_GEMINI_CLI
+        ENGINE_CODEX_APP_SERVER
+            | ENGINE_FROG_AGENT
+            | ENGINE_CLAUDE_CODE
+            | ENGINE_CODEX_CLI
+            | ENGINE_GEMINI_CLI
     )
+}
+
+fn escape_toml_string(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
+}
+
+fn codex_sandbox_mode(permission_mode: &str) -> &'static str {
+    match permission_mode {
+        "full_access" => "danger-full-access",
+        "accept_edits" => "workspace-write",
+        _ => "workspace-write",
+    }
+}
+
+fn codex_approval_policy(permission_mode: &str) -> &'static str {
+    match permission_mode {
+        "full_access" => "never",
+        "accept_edits" => "on-request",
+        _ => "on-request",
+    }
+}
+
+struct CodexRuntimeConfig {
+    codex_home: PathBuf,
+    env_key_name: String,
+    api_key: String,
+}
+
+fn write_codex_config(
+    model_id: &str,
+    base_url: &str,
+    api_key: String,
+    permission_mode: &str,
+) -> Result<CodexRuntimeConfig, String> {
+    let codex_home = crate::paths::frogclaw_home().join("codex");
+    let state_dir = codex_home.join("state");
+    let log_dir = codex_home.join("log");
+    fs::create_dir_all(&state_dir)
+        .map_err(|e| format!("Failed to create Codex state directory: {e}"))?;
+    fs::create_dir_all(&log_dir)
+        .map_err(|e| format!("Failed to create Codex log directory: {e}"))?;
+
+    let env_key_name = "FROG_CODEX_API_KEY".to_string();
+    let config = format!(
+        "model = \"{}\"\nmodel_provider = \"frog-provider\"\nsandbox_mode = \"{}\"\napproval_policy = \"{}\"\nsqlite_home = \"{}\"\nlog_dir = \"{}\"\n\n[model_providers.frog-provider]\nname = \"Frog Provider\"\nbase_url = \"{}\"\nenv_key = \"{}\"\nwire_api = \"responses\"\nrequires_openai_auth = false\n",
+        escape_toml_string(model_id),
+        codex_sandbox_mode(permission_mode),
+        codex_approval_policy(permission_mode),
+        escape_toml_string(&state_dir.to_string_lossy().replace('\\', "/")),
+        escape_toml_string(&log_dir.to_string_lossy().replace('\\', "/")),
+        escape_toml_string(base_url.trim_end_matches('/')),
+        env_key_name,
+    );
+
+    let config_path = codex_home.join("config.toml");
+    let tmp_path = codex_home.join("config.toml.tmp");
+    fs::write(&tmp_path, config).map_err(|e| format!("Failed to write Codex config: {e}"))?;
+    fs::rename(&tmp_path, &config_path)
+        .map_err(|e| format!("Failed to replace Codex config: {e}"))?;
+
+    Ok(CodexRuntimeConfig {
+        codex_home,
+        env_key_name,
+        api_key,
+    })
 }
 
 fn path_entries() -> Vec<PathBuf> {
@@ -365,8 +459,21 @@ fn claude_candidate_dirs() -> Vec<PathBuf> {
     dirs
 }
 
+fn codex_app_server_candidate_dirs() -> Vec<PathBuf> {
+    let mut dirs = claude_candidate_dirs();
+    if let Some(root) = std::env::var_os("FROG_CODEX_RS") {
+        let root = PathBuf::from(root);
+        dirs.push(root.join("target").join("release"));
+        dirs.push(root.join("target").join("debug"));
+    }
+    let local_codex_rs = PathBuf::from(r"E:\frogclaw\codex\codex-rs");
+    dirs.push(local_codex_rs.join("target").join("release"));
+    dirs.push(local_codex_rs.join("target").join("debug"));
+    dirs
+}
+
 fn command_version(path: &PathBuf) -> Option<String> {
-    Command::new(path)
+    StdCommand::new(path)
         .arg("--version")
         .output()
         .ok()
@@ -616,6 +723,7 @@ pub async fn agent_query(
                     prompt_for_task,
                     cwd,
                     permission_mode,
+                    None,
                     is_first_message,
                 )
                 .await;
@@ -624,7 +732,10 @@ pub async fn agent_query(
         return Ok(());
     }
 
-    if session.engine_kind != ENGINE_FROG_AGENT {
+    if !matches!(
+        session.engine_kind.as_str(),
+        ENGINE_CODEX_APP_SERVER | ENGINE_FROG_AGENT
+    ) {
         let _ =
             agent_session::update_agent_session_status(&state.sea_db, &session.id, "idle").await;
         return Err(format!(
@@ -633,950 +744,37 @@ pub async fn agent_query(
         ));
     }
 
-    // 5. Get provider + key
-    let prov = provider::get_provider(&state.sea_db, &provider_id)
-        .await
-        .map_err(|e| e.to_string())?;
-    let key_row = provider::get_active_key(&state.sea_db, &provider_id)
-        .await
-        .map_err(|e| e.to_string())?;
-    let decrypted_key =
-        frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
-            .map_err(|e| e.to_string())?;
-
-    // 6. Build ProviderRequestContext
-    let global_settings = frogclaw_core::repo::settings::get_settings(&state.sea_db)
-        .await
-        .unwrap_or_default();
-    let resolved_proxy = ProviderProxyConfig::resolve(&prov.proxy_config, &global_settings);
-    let ctx = ProviderRequestContext {
-        api_key: decrypted_key,
-        key_id: key_row.id.clone(),
-        provider_id: prov.id.clone(),
-        base_url: Some(resolve_base_url_for_type(
-            &prov.api_host,
-            &prov.provider_type,
-        )),
-        api_path: prov.api_path.clone(),
-        proxy_config: resolved_proxy,
-        custom_headers: prov
-            .custom_headers
-            .as_ref()
-            .and_then(|s| serde_json::from_str(s).ok()),
-    };
-
-    // 7. Create bridge
-    let title_ctx = ctx.clone();
-    let adapter = create_adapter_arc(&prov.provider_type, &model_id)?;
-    let provider_type_str = provider_type_to_registry_key_for_model(&prov.provider_type, &model_id);
-    let bridge =
-        frogclaw_agent::bridge::FrogClawClientProviderBridge::new(adapter, ctx, provider_type_str)
-            .map_err(|e| e.to_string())?
-            .with_app(app.clone(), conversation_id.clone());
-
-    // 8. Build permission callback (CanUseToolFn)
-    let permission_mode =
-        frogclaw_agent::permission::PermissionMode::from_str(&session.permission_mode);
-    let cwd_for_check = session.cwd.clone().unwrap_or_default();
-    let cancel_token = open_agent_sdk::CancellationToken::new();
-    let always_allowed_map = state.agent_always_allowed.clone();
-    let conv_id_for_allowed = conversation_id.clone();
-    let permission_senders = state.agent_permission_senders.clone();
-    let app_for_perm = app.clone();
-    let conv_id_for_perm = conversation_id.clone();
-    let current_assistant_id_for_perm: Arc<RwLock<Option<String>>> = Arc::new(RwLock::new(None));
-    let assistant_id_for_task = current_assistant_id_for_perm.clone();
-    let db_for_perm = state.sea_db.clone();
-    let cancel_token_for_perm = cancel_token.clone();
-
-    let can_use_tool: CanUseToolFn = Arc::new(move |tool_name: &str, input: &Value| {
-        let tool_name = tool_name.to_string();
-        let input = input.clone();
-        let cwd = cwd_for_check.clone();
-        let always_allowed_map = always_allowed_map.clone();
-        let conv_id = conv_id_for_perm.clone();
-        let conv_id_allowed = conv_id_for_allowed.clone();
-        let permission_senders = permission_senders.clone();
-        let app = app_for_perm.clone();
-        let assistant_id = current_assistant_id_for_perm.clone();
-        let db = db_for_perm.clone();
-        let cancel_token = cancel_token_for_perm.clone();
-
-        Box::pin(async move {
-            if cancel_token.is_cancelled() {
-                return PermissionDecision::Deny("Agent cancelled".to_string());
-            }
-
-            // 1. CWD safety check (hard deny, skipped in FullAccess mode)
-            if permission_mode != frogclaw_agent::permission::PermissionMode::FullAccess
-                && !cwd.is_empty()
-            {
-                if let Some(deny) = check_path_safety(&tool_name, &input, &cwd) {
-                    return deny;
-                }
-            }
-
-            // 2. Check conversation-level always_allowed cache
-            {
-                let map = always_allowed_map.lock().await;
-                if let Some(set) = map.get(&conv_id_allowed) {
-                    if set.contains(&tool_name) {
-                        return PermissionDecision::Allow;
-                    }
-                }
-            }
-
-            // 3. Decision matrix
-            let risk = classify_tool_risk(&tool_name);
-            match decide_permission(permission_mode, risk, false) {
-                PermissionAction::AutoAllow => PermissionDecision::Allow,
-                PermissionAction::RequireApproval => {
-                    // Create oneshot channel
-                    let (tx, rx) = tokio::sync::oneshot::channel();
-                    let perm_id = format!("perm_{}", frogclaw_core::utils::gen_id());
-
-                    // Store sender
-                    permission_senders.lock().await.insert(perm_id.clone(), tx);
-
-                    // Create a tool_execution record for the permission request
-                    let input_str =
-                        truncate_preview(&serde_json::to_string(&input).unwrap_or_default(), 500);
-                    let exec_id = tool_execution::create_tool_execution(
-                        &db,
-                        &conv_id,
-                        assistant_id.read().await.as_deref(),
-                        "__agent_sdk__",
-                        &tool_name,
-                        Some(&input_str),
-                        Some("pending"),
-                    )
-                    .await
-                    .ok()
-                    .map(|e| e.id);
-
-                    // Emit permission request event
-                    let risk_str = match risk {
-                        frogclaw_agent::permission::RiskLevel::ReadOnly => "read_only",
-                        frogclaw_agent::permission::RiskLevel::Write => "write",
-                        frogclaw_agent::permission::RiskLevel::Execute => "execute",
-                    };
-                    let _ = app.emit(
-                        "agent-permission-request",
-                        AgentPermissionRequestPayload {
-                            conversation_id: conv_id.clone(),
-                            assistant_message_id: assistant_id
-                                .read()
-                                .await
-                                .clone()
-                                .unwrap_or_default(),
-                            tool_use_id: perm_id.clone(),
-                            tool_name: tool_name.clone(),
-                            input,
-                            risk_level: risk_str.to_string(),
-                        },
-                    );
-
-                    // Wait for user response (raw decision string)
-                    let final_decision = tokio::select! {
-                        result = rx => match result {
-                            Ok(decision_str) => match decision_str.as_str() {
-                                "allow_once" => PermissionDecision::Allow,
-                                "allow_always" => {
-                                    always_allowed_map.lock().await
-                                        .entry(conv_id_allowed.clone())
-                                        .or_default()
-                                        .insert(tool_name.clone());
-                                    PermissionDecision::Allow
-                                }
-                                "deny" => PermissionDecision::Deny(
-                                    "User denied permission".to_string(),
-                                ),
-                                other => PermissionDecision::Deny(
-                                    format!("Unknown decision: {}", other),
-                                ),
-                            },
-                            Err(_) => {
-                                PermissionDecision::Deny("Permission request cancelled".to_string())
-                            }
-                        },
-                        _ = cancel_token.cancelled() => {
-                            permission_senders.lock().await.remove(&perm_id);
-                            PermissionDecision::Deny("Agent cancelled".to_string())
-                        }
-                    };
-
-                    // Persist approval decision to DB
-                    if let Some(eid) = &exec_id {
-                        let status = match &final_decision {
-                            PermissionDecision::Allow
-                            | PermissionDecision::AllowWithModifiedInput(_) => "approved",
-                            PermissionDecision::Deny(_) => "denied",
-                        };
-                        let _ =
-                            tool_execution::update_tool_execution_approval_status(&db, eid, status)
-                                .await;
-                    }
-
-                    final_decision
-                }
-                PermissionAction::HardDeny => {
-                    PermissionDecision::Deny("Operation not permitted".to_string())
-                }
-            }
-        })
-    });
-
-    // 9. Build AgentOptions with our custom provider + permission callback
-    let conv = conversation::get_conversation(&state.sea_db, &conversation_id)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    // Load enabled skills, build context summary, and create SkillTool
-    let home = dirs::home_dir().unwrap_or_default();
-    let all_skills = open_agent_sdk::skills::load_all_global(&home);
-    let disabled = frogclaw_core::repo::skill::get_disabled_skills(&state.sea_db)
-        .await
-        .unwrap_or_default();
-    let mut registry = open_agent_sdk::skills::SkillRegistry::new();
-    for skill in all_skills {
-        registry.register(skill);
-    }
-    registry.set_disabled(disabled);
-    let skills_summary = {
-        let summary = registry.generate_context_summary();
-        if summary.is_empty() {
-            None
-        } else {
-            Some(summary)
-        }
-    };
-    let skill_registry = Arc::new(tokio::sync::RwLock::new(registry));
-    let skill_tool: Arc<dyn open_agent_sdk::types::Tool> = Arc::new(
-        open_agent_sdk::tools::skill_tool::SkillTool::new(skill_registry),
-    );
-
-    // Build ask_fn for AskUserQuestion tool
-    let ask_senders = state.agent_ask_senders.clone();
-    let app_for_ask = app.clone();
-    let conv_id_for_ask = conversation_id.clone();
-    let assistant_id_for_ask = assistant_id_for_task.clone();
-    let cancel_token_for_ask = cancel_token.clone();
-
-    let ask_fn: open_agent_sdk::tools::askuser::AskUserFn = Arc::new(
-        move |request: open_agent_sdk::tools::askuser::AskUserRequest| {
-            let question = request.question;
-            let options = request.options;
-            let ask_senders = ask_senders.clone();
-            let app = app_for_ask.clone();
-            let conv_id = conv_id_for_ask.clone();
-            let assistant_id = assistant_id_for_ask.clone();
-            let cancel_token = cancel_token_for_ask.clone();
-            Box::pin(async move {
-                let (tx, rx) = tokio::sync::oneshot::channel();
-                let ask_id = format!("ask_{}", frogclaw_core::utils::gen_id());
-
-                ask_senders.lock().await.insert(ask_id.clone(), tx);
-
-                let _ = app.emit(
-                    "agent-ask-user",
-                    AgentAskUserPayload {
-                        conversation_id: conv_id,
-                        assistant_message_id: assistant_id.read().await.clone().unwrap_or_default(),
-                        ask_id: ask_id.clone(),
-                        question,
-                        options,
-                    },
-                );
-
-                tokio::select! {
-                    result = rx => result.map_err(|_| "Ask user channel closed".to_string()),
-                    _ = cancel_token.cancelled() => {
-                        ask_senders.lock().await.remove(&ask_id);
-                        Err("Agent cancelled".to_string())
-                    }
-                }
-            })
-        },
-    );
-
-    let agent_options = AgentOptions {
-        model: Some(model_id.clone()),
-        provider: Some(Arc::new(bridge)),
-        cwd: session.cwd.clone(),
-        system_prompt: conv.system_prompt.clone(),
-        skills_summary,
-        ask_fn: Some(ask_fn),
-        can_use_tool: Some(can_use_tool),
-        custom_tools: vec![skill_tool],
-        abort_signal: Some(cancel_token.clone()),
-        ..Default::default()
-    };
-
-    let mut agent = Agent::new(agent_options).await.map_err(|e| e.to_string())?;
-
-    // Restore previous conversation context from the agent session
-    if let Some(ref ctx_json) = session.sdk_context_json {
-        match serde_json::from_str::<Vec<open_agent_sdk::Message>>(ctx_json) {
-            Ok(prev_messages) => {
-                tracing::info!(
-                    "[agent] Restored {} messages from previous session",
-                    prev_messages.len()
-                );
-                agent.messages = prev_messages;
-            }
-            Err(e) => {
-                tracing::warn!("[agent] Failed to deserialize sdk_context_json: {}", e);
-            }
-        }
-    }
-
-    tracing::info!(
-        "[agent] Agent created for conversation {}, model {}",
-        conversation_id,
-        model_id
-    );
-
-    // 10. Spawn background task — mark as running in-memory
-    let run_id = frogclaw_core::utils::gen_id();
-    {
-        let mut running = RUNNING_AGENTS.lock().unwrap();
-        running.insert(conversation_id.clone(), run_id.clone());
-    }
-    state
-        .agent_cancel_tokens
-        .lock()
-        .await
-        .insert(conversation_id.clone(), cancel_token);
-
     let db = state.sea_db.clone();
+    let tokens = state.agent_cancel_tokens.clone();
     let session_id = session.id.clone();
-    let conv_id = conversation_id.clone();
     let user_msg_id = user_message.id.clone();
+    let cwd = session.cwd.clone();
+    let permission_mode = session.permission_mode.clone();
+    let conv_id = conversation_id.clone();
+    let prompt_for_task = prompt.clone();
     let master_key = state.master_key;
-    let title_prov = prov.clone();
-    let title_model_id = model_id.clone();
-    let title_settings = global_settings.clone();
-    let title_prompt = prompt.clone();
-    let cancel_tokens = state.agent_cancel_tokens.clone();
 
     tokio::spawn(async move {
-        // RAII guard: ensures conv_id is removed from RUNNING_AGENTS on exit (even panic)
-        let _running_guard = RunningAgentGuard {
-            conversation_id: conv_id.clone(),
-            run_id,
-        };
-        let _cancel_guard = AgentCancelTokenGuard {
-            conversation_id: conv_id.clone(),
-            tokens: cancel_tokens,
-        };
-
-        tracing::info!(
-            "[agent] Background task started for conversation {}",
-            conv_id
-        );
-        let (mut rx, handle) = agent.query(&prompt).await;
-
-        let mut result_text = String::new();
-        let mut final_usage: Option<Usage> = None;
-        let mut num_turns = 0u32;
-        let mut cost_usd = 0.0f64;
-        let mut sdk_messages: Option<Vec<open_agent_sdk::Message>> = None;
-        let mut current_assistant_msg_id: Option<String> = None;
-        let mut accumulated_text = String::new();
-        let mut accumulated_thinking = String::new();
-        let mut in_thinking_block = false;
-        let mut has_streamed_deltas = false;
-        let mut got_result_or_error = false;
-        // Map SDK tool_use_id → DB tool_execution.id
-        let mut tool_exec_map: HashMap<String, String> = HashMap::new();
-
-        while let Some(msg) = rx.recv().await {
-            match msg {
-                SDKMessage::Assistant { message: msg, .. } => {
-                    // Ordered processing: collect text/thinking in order,
-                    // collect tool_use blocks for processing after message creation.
-                    let mut pending_tool_uses: Vec<(String, String, Value)> = Vec::new();
-
-                    if !has_streamed_deltas {
-                        // Process content blocks in order to preserve interleaving
-                        for block in &msg.content {
-                            match block {
-                                ContentBlock::Thinking { thinking, .. } => {
-                                    if !in_thinking_block {
-                                        if !accumulated_text.is_empty() {
-                                            accumulated_text.push_str("\n\n");
-                                        }
-                                        accumulated_text.push_str("<think data-frogclaw=\"1\">\n");
-                                        in_thinking_block = true;
-                                    }
-                                    accumulated_text.push_str(thinking);
-                                    accumulated_thinking.push_str(thinking);
-
-                                    let _ = app.emit(
-                                        "agent-stream-thinking",
-                                        AgentThinkingPayload {
-                                            conversation_id: conv_id.clone(),
-                                            assistant_message_id: current_assistant_msg_id
-                                                .clone()
-                                                .unwrap_or_default(),
-                                            thinking: thinking.clone(),
-                                        },
-                                    );
-                                }
-                                ContentBlock::Text { text } => {
-                                    if in_thinking_block {
-                                        accumulated_text.push_str("\n</think>\n\n");
-                                        in_thinking_block = false;
-                                    }
-                                    accumulated_text.push_str(text);
-
-                                    let _ = app.emit(
-                                        "agent-stream-text",
-                                        AgentTextPayload {
-                                            conversation_id: conv_id.clone(),
-                                            assistant_message_id: current_assistant_msg_id
-                                                .clone()
-                                                .unwrap_or_default(),
-                                            text: text.clone(),
-                                        },
-                                    );
-                                }
-                                ContentBlock::ToolUse { id, name, input } => {
-                                    pending_tool_uses.push((
-                                        id.clone(),
-                                        name.clone(),
-                                        input.clone(),
-                                    ));
-                                }
-                                _ => {}
-                            }
-                        }
-                    } else {
-                        // Deltas already streamed text/thinking; only collect tool_use blocks
-                        for block in &msg.content {
-                            if let ContentBlock::ToolUse { id, name, input } = block {
-                                pending_tool_uses.push((id.clone(), name.clone(), input.clone()));
-                            }
-                        }
-                    }
-                    // Reset delta flag for next turn
-                    has_streamed_deltas = false;
-
-                    // Create or update assistant message BEFORE processing tool events
-                    if current_assistant_msg_id.is_none() {
-                        let _ = ensure_agent_assistant_message(
-                            &db,
-                            &app,
-                            &conv_id,
-                            &user_msg_id,
-                            &accumulated_text,
-                            &mut current_assistant_msg_id,
-                            &assistant_id_for_task,
-                        )
-                        .await;
-                    } else if let Some(ref mid) = current_assistant_msg_id {
-                        let _ = message::update_message_content(&db, mid, &accumulated_text).await;
-                    }
-
-                    // Process tool_use blocks: create DB records, insert inline markers
-                    if !pending_tool_uses.is_empty() {
-                        // Close any open thinking block before tool markers
-                        if in_thinking_block {
-                            accumulated_text.push_str("\n</think>\n\n");
-                            in_thinking_block = false;
-                        }
-
-                        for (sdk_id, name, input) in &pending_tool_uses {
-                            tracing::info!(
-                                "[agent] ToolUse in assistant message: {} ({}), assistantMsgId={:?}",
-                                name, sdk_id, current_assistant_msg_id
-                            );
-
-                            // Create tool_execution record in DB
-                            let input_str = truncate_preview(
-                                &serde_json::to_string(input).unwrap_or_default(),
-                                500,
-                            );
-                            let exec_id = if let Ok(exec) = tool_execution::create_tool_execution(
-                                &db,
-                                &conv_id,
-                                current_assistant_msg_id.as_deref(),
-                                "__agent_sdk__",
-                                &name,
-                                Some(&input_str),
-                                None,
-                            )
-                            .await
-                            {
-                                let eid = exec.id.clone();
-                                tool_exec_map.insert(sdk_id.clone(), eid.clone());
-                                Some(eid)
-                            } else {
-                                None
-                            };
-
-                            // Build inline <tool-call> marker with DB execution ID
-                            let summary = get_tool_input_summary(&name, input);
-                            let tag_id = exec_id.as_deref().unwrap_or(sdk_id);
-                            let marker = format!(
-                                "\n\n<tool-call data-frogclaw=\"1\" id=\"{}\" name=\"{}\">{}</tool-call>\n\n",
-                                tag_id, name, summary
-                            );
-                            accumulated_text.push_str(&marker);
-
-                            // Emit agent-stream-text so frontend content updates in real-time
-                            let _ = app.emit(
-                                "agent-stream-text",
-                                AgentTextPayload {
-                                    conversation_id: conv_id.clone(),
-                                    assistant_message_id: current_assistant_msg_id
-                                        .clone()
-                                        .unwrap_or_default(),
-                                    text: marker,
-                                },
-                            );
-
-                            // Emit agent-tool-use event for agentStore
-                            let _ = app.emit(
-                                "agent-tool-use",
-                                AgentToolUsePayload {
-                                    conversation_id: conv_id.clone(),
-                                    assistant_message_id: current_assistant_msg_id
-                                        .clone()
-                                        .unwrap_or_default(),
-                                    tool_use_id: sdk_id.clone(),
-                                    tool_name: name.clone(),
-                                    input: input.clone(),
-                                    execution_id: exec_id,
-                                },
-                            );
-                        }
-
-                        // Update message content with tool-call markers
-                        if let Some(ref mid) = current_assistant_msg_id {
-                            let _ =
-                                message::update_message_content(&db, mid, &accumulated_text).await;
-                        }
-                    }
-                }
-                SDKMessage::ToolStart {
-                    tool_use_id,
-                    tool_name,
-                    input,
-                } => {
-                    tracing::info!("[agent] ToolStart: {} ({})", tool_name, tool_use_id);
-                    // Emit agent-tool-start
-                    let _ = app.emit(
-                        "agent-tool-start",
-                        AgentToolStartPayload {
-                            conversation_id: conv_id.clone(),
-                            assistant_message_id: current_assistant_msg_id
-                                .clone()
-                                .unwrap_or_default(),
-                            tool_use_id: tool_use_id.clone(),
-                            tool_name: tool_name.clone(),
-                            input,
-                        },
-                    );
-
-                    // Update tool_execution status to 'running'
-                    if let Some(exec_id) = tool_exec_map.get(&tool_use_id) {
-                        let _ = tool_execution::update_tool_execution_status(
-                            &db, exec_id, "running", None, None,
-                        )
-                        .await;
-                    }
-                }
-                SDKMessage::ToolResult {
-                    tool_use_id,
-                    tool_name,
-                    content,
-                    is_error,
-                } => {
-                    // Emit agent-tool-result
-                    let _ = app.emit(
-                        "agent-tool-result",
-                        AgentToolResultPayload {
-                            conversation_id: conv_id.clone(),
-                            assistant_message_id: current_assistant_msg_id
-                                .clone()
-                                .unwrap_or_default(),
-                            tool_use_id: tool_use_id.clone(),
-                            tool_name: tool_name.clone(),
-                            content: content.clone(),
-                            is_error,
-                        },
-                    );
-
-                    // Update tool_execution status + output
-                    if let Some(exec_id) = tool_exec_map.get(&tool_use_id) {
-                        let status = if is_error { "failed" } else { "success" };
-                        let output_preview = truncate_preview(&content, 500);
-                        let error_msg = if is_error {
-                            Some(content.as_str())
-                        } else {
-                            None
-                        };
-                        let _ = tool_execution::update_tool_execution_status(
-                            &db,
-                            exec_id,
-                            status,
-                            Some(&output_preview),
-                            error_msg,
-                        )
-                        .await;
-                    }
-                }
-                SDKMessage::PermissionRequest {
-                    tool_use_id,
-                    tool_name,
-                    input,
-                    ..
-                } => {
-                    // Emit agent-permission-request
-                    let _ = app.emit(
-                        "agent-permission-request",
-                        AgentPermissionRequestPayload {
-                            conversation_id: conv_id.clone(),
-                            assistant_message_id: current_assistant_msg_id
-                                .clone()
-                                .unwrap_or_default(),
-                            tool_use_id: tool_use_id.clone(),
-                            tool_name: tool_name.clone(),
-                            input,
-                            risk_level: "execute".to_string(),
-                        },
-                    );
-
-                    // Update tool_execution approval_status to 'pending'
-                    if let Some(exec_id) = tool_exec_map.get(&tool_use_id) {
-                        let _ = tool_execution::update_tool_execution_approval_status(
-                            &db, exec_id, "pending",
-                        )
-                        .await;
-                    }
-                }
-                SDKMessage::Status {
-                    message: status_msg,
-                }
-                | SDKMessage::Progress {
-                    message: status_msg,
-                } => {
-                    let _ = app.emit(
-                        "agent-status",
-                        AgentStatusPayload {
-                            conversation_id: conv_id.clone(),
-                            message: status_msg,
-                        },
-                    );
-                }
-                SDKMessage::RateLimit {
-                    retry_after_ms,
-                    message: limit_msg,
-                } => {
-                    let _ = app.emit(
-                        "agent-rate-limit",
-                        AgentRateLimitPayload {
-                            conversation_id: conv_id.clone(),
-                            retry_after_ms,
-                            message: limit_msg,
-                        },
-                    );
-                }
-                SDKMessage::Result {
-                    text,
-                    usage,
-                    num_turns: t,
-                    cost_usd: c,
-                    messages,
-                    ..
-                } => {
-                    tracing::info!("[agent] Result: {} turns, cost ${:.4}", t, c);
-                    got_result_or_error = true;
-                    result_text = text;
-                    final_usage = Some(usage);
-                    num_turns = t;
-                    cost_usd = c;
-                    sdk_messages = Some(messages);
-                }
-                SDKMessage::Error { message: err_msg } => {
-                    tracing::error!("[agent] Error: {}", err_msg);
-                    let _ = app.emit(
-                        "agent-error",
-                        AgentErrorPayload {
-                            conversation_id: conv_id.clone(),
-                            assistant_message_id: current_assistant_msg_id.clone(),
-                            message: err_msg,
-                        },
-                    );
-                    let _ =
-                        agent_session::update_agent_session_status(&db, &session_id, "idle").await;
-                    return;
-                }
-                SDKMessage::ThinkingDelta { thinking } => {
-                    // Real-time thinking token from API stream
-                    has_streamed_deltas = true;
-                    if !in_thinking_block {
-                        if !accumulated_text.is_empty() {
-                            accumulated_text.push_str("\n\n");
-                        }
-                        accumulated_text.push_str("<think data-frogclaw=\"1\">\n");
-                        in_thinking_block = true;
-                    }
-                    accumulated_text.push_str(&thinking);
-                    accumulated_thinking.push_str(&thinking);
-                    let assistant_message_id = persist_agent_partial_content(
-                        &db,
-                        &app,
-                        &conv_id,
-                        &user_msg_id,
-                        &accumulated_text,
-                        &mut current_assistant_msg_id,
-                        &assistant_id_for_task,
-                    )
-                    .await
-                    .unwrap_or_default();
-
-                    let _ = app.emit(
-                        "agent-stream-thinking",
-                        AgentThinkingPayload {
-                            conversation_id: conv_id.clone(),
-                            assistant_message_id,
-                            thinking,
-                        },
-                    );
-                }
-                SDKMessage::TextDelta { text } => {
-                    // Real-time text token from API stream
-                    has_streamed_deltas = true;
-                    if in_thinking_block {
-                        accumulated_text.push_str("\n</think>\n\n");
-                        in_thinking_block = false;
-                    }
-                    accumulated_text.push_str(&text);
-                    let assistant_message_id = persist_agent_partial_content(
-                        &db,
-                        &app,
-                        &conv_id,
-                        &user_msg_id,
-                        &accumulated_text,
-                        &mut current_assistant_msg_id,
-                        &assistant_id_for_task,
-                    )
-                    .await
-                    .unwrap_or_default();
-
-                    let _ = app.emit(
-                        "agent-stream-text",
-                        AgentTextPayload {
-                            conversation_id: conv_id.clone(),
-                            assistant_message_id,
-                            text,
-                        },
-                    );
-                }
-                _ => {
-                    tracing::debug!("[agent] unhandled SDKMessage: {:?}", msg);
-                }
-            }
-        }
-
-        // Bug 4: panic protection — check if inner task panicked
-        match handle.await {
-            Ok(()) => {}
-            Err(join_err) => {
-                tracing::error!("[agent] Agent inner task failed: {}", join_err);
-                if !got_result_or_error {
-                    let _ = app.emit(
-                        "agent-error",
-                        AgentErrorPayload {
-                            conversation_id: conv_id.clone(),
-                            assistant_message_id: current_assistant_msg_id.clone(),
-                            message: "Agent task crashed unexpectedly".to_string(),
-                        },
-                    );
-                    let _ =
-                        agent_session::update_agent_session_status(&db, &session_id, "idle").await;
-                    return;
-                }
-            }
-        }
-
-        // If channel closed without Result or Error, emit a fallback error
-        if !got_result_or_error {
-            tracing::error!("[agent] Channel closed without Result or Error");
-            let _ = app.emit(
-                "agent-error",
-                AgentErrorPayload {
-                    conversation_id: conv_id.clone(),
-                    assistant_message_id: current_assistant_msg_id.clone(),
-                    message: "Agent ended unexpectedly without producing a result".to_string(),
-                },
-            );
-            let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
-            return;
-        }
-
-        // Build final content with thinking embedded as <think> tags
-        let mut final_content = accumulated_text.clone();
-        // Close any unclosed thinking block
-        if in_thinking_block {
-            final_content.push_str("\n</think>\n\n");
-        }
-        // Append result_text if it has content not yet in accumulated_text
-        if !result_text.is_empty() && !accumulated_text.contains(&result_text) {
-            if in_thinking_block {
-                // thinking was just closed above
-            }
-            final_content.push_str(&result_text);
-        }
-
-        // Update assistant message with final content (including <think> blocks)
-        if !final_content.is_empty() {
-            if let Some(ref mid) = current_assistant_msg_id {
-                let _ = message::update_message_content(&db, mid, &final_content).await;
-            } else {
-                // No assistant message was created during streaming — create one now
-                if let Ok(assist_msg) = message::create_message(
-                    &db,
-                    &conv_id,
-                    MessageRole::Assistant,
-                    &final_content,
-                    &[],
-                    Some(&user_msg_id),
-                    0,
-                )
-                .await
-                {
-                    current_assistant_msg_id = Some(assist_msg.id.clone());
-                    let _ = conversation::increment_message_count(&db, &conv_id).await;
-                }
-            }
-        }
-
-        let usage_payload = final_usage.as_ref().map(|u| AgentUsagePayload {
-            input_tokens: u.input_tokens,
-            output_tokens: u.output_tokens,
-        });
-
-        // Persist token usage on the assistant message so the standard footer renders it
-        if let (Some(ref mid), Some(ref usage)) = (&current_assistant_msg_id, &final_usage) {
-            let _ = message::update_message_usage(
-                &db,
-                mid,
-                Some(usage.input_tokens as i64),
-                Some(usage.output_tokens as i64),
-            )
-            .await;
-        }
-
-        let _ = app.emit(
-            "agent-done",
-            AgentDonePayload {
-                conversation_id: conv_id.clone(),
-                assistant_message_id: current_assistant_msg_id.clone().unwrap_or_default(),
-                text: final_content.clone(),
-                usage: usage_payload,
-                num_turns: Some(num_turns),
-                cost_usd: Some(cost_usd),
-            },
-        );
-
-        // Auto-title: generate AI title after agent completes (first message only)
-        if is_first_message {
-            let _ = app.emit(
-                "conversation-title-generating",
-                frogclaw_core::types::ConversationTitleGeneratingEvent {
-                    conversation_id: conv_id.clone(),
-                    generating: true,
-                    error: None,
-                },
-            );
-
-            let ai_title = crate::commands::conversations::generate_ai_title(
-                &db,
-                &title_prompt,
-                &result_text,
-                &title_prov,
-                &title_ctx,
-                &title_model_id,
-                &title_settings,
-                &master_key,
-            )
-            .await;
-
-            match ai_title {
-                Ok(title) => {
-                    if let Err(e) =
-                        conversation::update_conversation_title(&db, &conv_id, &title).await
-                    {
-                        tracing::error!("[agent] Failed to update AI title: {}", e);
-                        let _ = app.emit(
-                            "conversation-title-generating",
-                            frogclaw_core::types::ConversationTitleGeneratingEvent {
-                                conversation_id: conv_id.clone(),
-                                generating: false,
-                                error: Some(format!("Failed to save title: {}", e)),
-                            },
-                        );
-                    } else {
-                        let _ = app.emit(
-                            "conversation-title-updated",
-                            frogclaw_core::types::ConversationTitleUpdatedEvent {
-                                conversation_id: conv_id.clone(),
-                                title,
-                            },
-                        );
-                        let _ = app.emit(
-                            "conversation-title-generating",
-                            frogclaw_core::types::ConversationTitleGeneratingEvent {
-                                conversation_id: conv_id.clone(),
-                                generating: false,
-                                error: None,
-                            },
-                        );
-                    }
-                }
-                Err(err) => {
-                    tracing::warn!("[agent] Auto title generation failed: {}", err);
-                    let _ = app.emit(
-                        "conversation-title-generating",
-                        frogclaw_core::types::ConversationTitleGeneratingEvent {
-                            conversation_id: conv_id.clone(),
-                            generating: false,
-                            error: Some(err),
-                        },
-                    );
-                }
-            }
-        }
-
-        // Update session
-        let tokens_delta = final_usage
-            .as_ref()
-            .map(|u| (u.input_tokens + u.output_tokens) as i32)
-            .unwrap_or(0);
-        // Serialize SDK messages context for future resume
-        let sdk_context = sdk_messages
-            .as_ref()
-            .and_then(|msgs| serde_json::to_string(msgs).ok());
-        if let Err(e) = agent_session::update_agent_session_after_query(
-            &db,
-            &session_id,
-            "idle",
-            sdk_context.as_deref(),
-            tokens_delta,
-            cost_usd,
+        run_codex_app_server_query(
+            app,
+            db,
+            tokens,
+            conv_id,
+            session_id,
+            user_msg_id,
+            prompt_for_task,
+            provider_id,
+            model_id,
+            cwd,
+            permission_mode,
+            master_key,
+            is_first_message,
         )
-        .await
-        {
-            tracing::error!("[agent] Failed to update session after query: {}", e);
-        }
+        .await;
     });
 
     Ok(())
 }
-
 #[tauri::command]
 pub async fn agent_approve(
     state: State<'_, AppState>,
@@ -1716,12 +914,12 @@ fn extract_codex_texts(value: &Value) -> Vec<String> {
     texts
 }
 
-fn extract_codex_usage(value: &Value) -> Option<Usage> {
+fn extract_codex_usage(value: &Value) -> Option<CodexUsage> {
     if value.get("type").and_then(|v| v.as_str()) != Some("turn.completed") {
         return None;
     }
     let usage = value.get("usage")?;
-    Some(Usage {
+    Some(CodexUsage {
         input_tokens: usage
             .get("input_tokens")
             .and_then(|v| v.as_u64())
@@ -1730,18 +928,825 @@ fn extract_codex_usage(value: &Value) -> Option<Usage> {
             .get("output_tokens")
             .and_then(|v| v.as_u64())
             .unwrap_or_default(),
-        cache_creation_input_tokens: 0,
-        cache_read_input_tokens: usage
-            .get("cached_input_tokens")
-            .and_then(|v| v.as_u64())
-            .unwrap_or_default(),
     })
+}
+
+async fn write_app_server_message(
+    stdin: &mut tokio::process::ChildStdin,
+    value: &Value,
+) -> Result<(), String> {
+    let payload = serde_json::to_vec(value)
+        .map_err(|err| format!("Failed to serialize Codex app-server JSON-RPC: {err}"))?;
+    stdin
+        .write_all(&payload)
+        .await
+        .map_err(|err| format!("Failed to write Codex app-server request: {err}"))?;
+    stdin
+        .write_all(b"\n")
+        .await
+        .map_err(|err| format!("Failed to write Codex app-server request terminator: {err}"))?;
+    stdin
+        .flush()
+        .await
+        .map_err(|err| format!("Failed to flush Codex app-server request: {err}"))?;
+    Ok(())
+}
+
+async fn send_app_server_request(
+    stdin: &mut tokio::process::ChildStdin,
+    next_id: &mut i64,
+    method: &str,
+    params: Value,
+) -> Result<i64, String> {
+    let id = *next_id;
+    *next_id += 1;
+    write_app_server_message(
+        stdin,
+        &serde_json::json!({
+            "id": id,
+            "method": method,
+            "params": params,
+        }),
+    )
+    .await?;
+    Ok(id)
+}
+
+async fn read_app_server_response<R>(
+    lines: &mut tokio::io::Lines<BufReader<R>>,
+    request_id: i64,
+) -> Result<Value, String>
+where
+    R: tokio::io::AsyncRead + Unpin,
+{
+    loop {
+        let line = lines
+            .next_line()
+            .await
+            .map_err(|err| format!("Failed to read Codex app-server response: {err}"))?
+            .ok_or_else(|| "Codex app-server closed stdout before responding".to_string())?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let value: Value = serde_json::from_str(&line)
+            .map_err(|err| format!("Invalid Codex app-server JSON-RPC line: {err}: {line}"))?;
+        if value.get("id").and_then(|v| v.as_i64()) != Some(request_id) {
+            continue;
+        }
+        if let Some(error) = value.get("error") {
+            let message = error
+                .get("message")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown error");
+            return Err(format!("Codex app-server request failed: {message}"));
+        }
+        return Ok(value.get("result").cloned().unwrap_or(Value::Null));
+    }
+}
+
+fn extract_app_server_thread_id(result: &Value) -> Option<String> {
+    result
+        .get("thread")
+        .and_then(|thread| thread.get("id"))
+        .and_then(|id| id.as_str())
+        .map(ToString::to_string)
+}
+
+fn extract_app_server_completed_text(params: &Value) -> Option<String> {
+    let item = params.get("item")?;
+    if item.get("type").and_then(|v| v.as_str()) != Some("agentMessage") {
+        return None;
+    }
+    item.get("text")
+        .and_then(|v| v.as_str())
+        .filter(|text| !text.trim().is_empty())
+        .map(ToString::to_string)
+}
+
+async fn run_codex_app_server_query(
+    app: tauri::AppHandle,
+    db: sea_orm::DatabaseConnection,
+    state_tokens: Arc<tokio::sync::Mutex<HashMap<String, AgentCancellationToken>>>,
+    conversation_id: String,
+    session_id: String,
+    user_msg_id: String,
+    prompt: String,
+    provider_id: String,
+    model_id: String,
+    cwd: Option<String>,
+    permission_mode: String,
+    master_key: [u8; 32],
+    is_first_message: bool,
+) {
+    let prov = match provider::get_provider(&db, &provider_id).await {
+        Ok(prov) => prov,
+        Err(err) => {
+            let _ = app.emit(
+                "agent-error",
+                AgentErrorPayload {
+                    conversation_id: conversation_id.clone(),
+                    assistant_message_id: None,
+                    message: format!("Failed to load provider for Codex runtime: {err}"),
+                },
+            );
+            let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+            return;
+        }
+    };
+    let key_row = match provider::get_active_key(&db, &provider_id).await {
+        Ok(key) => key,
+        Err(err) => {
+            let _ = app.emit(
+                "agent-error",
+                AgentErrorPayload {
+                    conversation_id: conversation_id.clone(),
+                    assistant_message_id: None,
+                    message: format!("Failed to load provider API key for Codex runtime: {err}"),
+                },
+            );
+            let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+            return;
+        }
+    };
+    let api_key = match frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, &master_key) {
+        Ok(key) => key,
+        Err(err) => {
+            let _ = app.emit(
+                "agent-error",
+                AgentErrorPayload {
+                    conversation_id: conversation_id.clone(),
+                    assistant_message_id: None,
+                    message: format!("Failed to decrypt provider API key for Codex runtime: {err}"),
+                },
+            );
+            let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+            return;
+        }
+    };
+
+    let base_url = resolve_base_url_for_type(&prov.api_host, &prov.provider_type);
+    let codex_config = match write_codex_config(&model_id, &base_url, api_key, &permission_mode) {
+        Ok(config) => config,
+        Err(err) => {
+            let _ = app.emit(
+                "agent-error",
+                AgentErrorPayload {
+                    conversation_id: conversation_id.clone(),
+                    assistant_message_id: None,
+                    message: err,
+                },
+            );
+            let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+            return;
+        }
+    };
+
+    let _ = app.emit(
+        "agent-status",
+        AgentStatusPayload {
+            conversation_id: conversation_id.clone(),
+            message: format!(
+                "Codex runtime config generated at {}",
+                codex_config.codex_home.join("config.toml").display()
+            ),
+        },
+    );
+
+    run_codex_app_server_stdio_query(
+        app,
+        db,
+        state_tokens,
+        conversation_id,
+        session_id,
+        user_msg_id,
+        prompt,
+        codex_config,
+        cwd,
+        permission_mode,
+        is_first_message,
+    )
+    .await;
+}
+
+async fn run_codex_app_server_stdio_query(
+    app: tauri::AppHandle,
+    db: sea_orm::DatabaseConnection,
+    state_tokens: Arc<tokio::sync::Mutex<HashMap<String, AgentCancellationToken>>>,
+    conversation_id: String,
+    session_id: String,
+    user_msg_id: String,
+    prompt: String,
+    codex_config: CodexRuntimeConfig,
+    cwd: Option<String>,
+    permission_mode: String,
+    is_first_message: bool,
+) {
+    let run_id = format!("codex_app_server_{}", frogclaw_core::utils::gen_id());
+    if let Ok(mut running) = RUNNING_AGENTS.lock() {
+        running.insert(conversation_id.clone(), run_id.clone());
+    }
+    let _guard = RunningAgentGuard {
+        conversation_id: conversation_id.clone(),
+        run_id,
+    };
+
+    let cancel_token = AgentCancellationToken::new();
+    state_tokens
+        .lock()
+        .await
+        .insert(conversation_id.clone(), cancel_token.clone());
+    let _cancel_guard = AgentCancelTokenGuard {
+        conversation_id: conversation_id.clone(),
+        tokens: state_tokens.clone(),
+    };
+
+    let app_server_path = match find_binary("codex-app-server", &codex_app_server_candidate_dirs())
+    {
+        Some(path) => path,
+        None => {
+            let _ = app.emit(
+                "agent-error",
+                AgentErrorPayload {
+                    conversation_id: conversation_id.clone(),
+                    assistant_message_id: None,
+                    message: "Codex app-server binary not found. Build E:\\frogclaw\\codex\\codex-rs with `cargo build -p codex-app-server` or bundle codex-app-server.exe.".to_string(),
+                },
+            );
+            let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+            return;
+        }
+    };
+
+    let mut current_assistant_msg_id: Option<String> = None;
+    let assistant_id_for_task: Arc<RwLock<Option<String>>> = Arc::new(RwLock::new(None));
+    let mut accumulated_text = String::new();
+    let mut saw_agent_delta = false;
+
+    let mut cmd = tokio::process::Command::new(&app_server_path);
+    cmd.arg("--listen")
+        .arg("stdio://")
+        .current_dir(&codex_config.codex_home)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .env("CODEX_HOME", &codex_config.codex_home)
+        .env("RUST_LOG", "warn")
+        .env("CODEX_APP_SERVER_DISABLE_MANAGED_CONFIG", "1")
+        .env(&codex_config.env_key_name, &codex_config.api_key);
+
+    #[cfg(windows)]
+    {
+        cmd.creation_flags(0x08000000);
+    }
+
+    let mut child = match cmd.spawn() {
+        Ok(child) => child,
+        Err(err) => {
+            let _ = app.emit(
+                "agent-error",
+                AgentErrorPayload {
+                    conversation_id: conversation_id.clone(),
+                    assistant_message_id: None,
+                    message: format!("Failed to start Codex app-server: {err}"),
+                },
+            );
+            let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+            return;
+        }
+    };
+
+    let Some(mut stdin) = child.stdin.take() else {
+        let _ = app.emit(
+            "agent-error",
+            AgentErrorPayload {
+                conversation_id: conversation_id.clone(),
+                assistant_message_id: None,
+                message: "Codex app-server stdin was not available".to_string(),
+            },
+        );
+        let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+        return;
+    };
+    let Some(stdout) = child.stdout.take() else {
+        let _ = app.emit(
+            "agent-error",
+            AgentErrorPayload {
+                conversation_id: conversation_id.clone(),
+                assistant_message_id: None,
+                message: "Codex app-server stdout was not available".to_string(),
+            },
+        );
+        let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+        return;
+    };
+    let stderr = child.stderr.take();
+    let mut stdout_lines = BufReader::new(stdout).lines();
+    let mut stderr_lines = stderr.map(|err| BufReader::new(err).lines());
+    let mut next_request_id = 1_i64;
+
+    let _ = app.emit(
+        "agent-status",
+        AgentStatusPayload {
+            conversation_id: conversation_id.clone(),
+            message: "Codex app-server starting".to_string(),
+        },
+    );
+
+    let init_id = match send_app_server_request(
+        &mut stdin,
+        &mut next_request_id,
+        "initialize",
+        serde_json::json!({
+            "clientInfo": {
+                "name": "frogclawclient",
+                "title": "FrogClawClient",
+                "version": env!("CARGO_PKG_VERSION"),
+            },
+            "capabilities": {
+                "experimentalApi": true,
+            },
+        }),
+    )
+    .await
+    {
+        Ok(id) => id,
+        Err(err) => {
+            let _ = app.emit(
+                "agent-error",
+                AgentErrorPayload {
+                    conversation_id: conversation_id.clone(),
+                    assistant_message_id: None,
+                    message: err,
+                },
+            );
+            let _ = child.kill().await;
+            let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+            return;
+        }
+    };
+
+    if let Err(err) = read_app_server_response(&mut stdout_lines, init_id).await {
+        let _ = app.emit(
+            "agent-error",
+            AgentErrorPayload {
+                conversation_id: conversation_id.clone(),
+                assistant_message_id: None,
+                message: err,
+            },
+        );
+        let _ = child.kill().await;
+        let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+        return;
+    }
+    if let Err(err) = write_app_server_message(
+        &mut stdin,
+        &serde_json::json!({
+            "method": "initialized",
+        }),
+    )
+    .await
+    {
+        let _ = app.emit(
+            "agent-error",
+            AgentErrorPayload {
+                conversation_id: conversation_id.clone(),
+                assistant_message_id: None,
+                message: err,
+            },
+        );
+        let _ = child.kill().await;
+        let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+        return;
+    }
+
+    let thread_start_id = match send_app_server_request(
+        &mut stdin,
+        &mut next_request_id,
+        "thread/start",
+        serde_json::json!({
+            "model": null,
+            "modelProvider": null,
+            "cwd": cwd.clone(),
+            "sessionStartSource": "vscode",
+            "experimentalRawEvents": false,
+        }),
+    )
+    .await
+    {
+        Ok(id) => id,
+        Err(err) => {
+            let _ = app.emit(
+                "agent-error",
+                AgentErrorPayload {
+                    conversation_id: conversation_id.clone(),
+                    assistant_message_id: None,
+                    message: err,
+                },
+            );
+            let _ = child.kill().await;
+            let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+            return;
+        }
+    };
+    let thread_id = match read_app_server_response(&mut stdout_lines, thread_start_id)
+        .await
+        .and_then(|result| {
+            extract_app_server_thread_id(&result).ok_or_else(|| {
+                format!("Codex app-server thread/start response missing thread.id: {result}")
+            })
+        }) {
+        Ok(thread_id) => thread_id,
+        Err(err) => {
+            let _ = app.emit(
+                "agent-error",
+                AgentErrorPayload {
+                    conversation_id: conversation_id.clone(),
+                    assistant_message_id: None,
+                    message: err,
+                },
+            );
+            let _ = child.kill().await;
+            let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+            return;
+        }
+    };
+
+    let turn_id = match send_app_server_request(
+        &mut stdin,
+        &mut next_request_id,
+        "turn/start",
+        serde_json::json!({
+            "threadId": thread_id,
+            "input": [{
+                "type": "text",
+                "text": prompt,
+                "textElements": [],
+            }],
+            "cwd": cwd,
+        }),
+    )
+    .await
+    {
+        Ok(id) => id,
+        Err(err) => {
+            let _ = app.emit(
+                "agent-error",
+                AgentErrorPayload {
+                    conversation_id: conversation_id.clone(),
+                    assistant_message_id: None,
+                    message: err,
+                },
+            );
+            let _ = child.kill().await;
+            let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+            return;
+        }
+    };
+
+    let _ = app.emit(
+        "agent-status",
+        AgentStatusPayload {
+            conversation_id: conversation_id.clone(),
+            message: "Codex app-server running".to_string(),
+        },
+    );
+
+    let mut turn_started_ack = false;
+    loop {
+        tokio::select! {
+            _ = async {
+                while !cancel_token.is_cancelled() {
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                }
+            } => {
+                let _ = child.kill().await;
+                let _ = app.emit(
+                    "agent-error",
+                    AgentErrorPayload {
+                        conversation_id: conversation_id.clone(),
+                        assistant_message_id: current_assistant_msg_id.clone(),
+                        message: "Codex app-server run cancelled".to_string(),
+                    },
+                );
+                let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+                return;
+            }
+            line = stdout_lines.next_line() => {
+                let line = match line {
+                    Ok(Some(line)) => line,
+                    Ok(None) => break,
+                    Err(err) => {
+                        let _ = app.emit(
+                            "agent-error",
+                            AgentErrorPayload {
+                                conversation_id: conversation_id.clone(),
+                                assistant_message_id: current_assistant_msg_id.clone(),
+                                message: format!("Failed to read Codex app-server output: {err}"),
+                            },
+                        );
+                        let _ = child.kill().await;
+                        let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+                        return;
+                    }
+                };
+                if line.trim().is_empty() {
+                    continue;
+                }
+                let value: Value = match serde_json::from_str(&line) {
+                    Ok(value) => value,
+                    Err(err) => {
+                        tracing::warn!("[agent:codex_app_server] invalid JSON-RPC line: {}: {}", err, line);
+                        continue;
+                    }
+                };
+
+                if value.get("id").and_then(|v| v.as_i64()) == Some(turn_id) {
+                    if let Some(error) = value.get("error") {
+                        let message = error
+                            .get("message")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("Codex app-server turn/start failed")
+                            .to_string();
+                        let _ = app.emit(
+                            "agent-error",
+                            AgentErrorPayload {
+                                conversation_id: conversation_id.clone(),
+                                assistant_message_id: current_assistant_msg_id.clone(),
+                                message,
+                            },
+                        );
+                        let _ = child.kill().await;
+                        let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+                        return;
+                    }
+                    continue;
+                }
+
+                if let (Some(request_id), Some(method)) = (
+                    value.get("id").and_then(|v| v.as_i64()),
+                    value.get("method").and_then(|v| v.as_str()),
+                ) {
+                    let result = match method {
+                        "item/commandExecution/requestApproval" => {
+                            let decision = if permission_mode == "full_access" {
+                                "acceptForSession"
+                            } else {
+                                "decline"
+                            };
+                            let _ = app.emit(
+                                "agent-status",
+                                AgentStatusPayload {
+                                    conversation_id: conversation_id.clone(),
+                                    message: format!("Codex command approval: {decision}"),
+                                },
+                            );
+                            Some(serde_json::json!({ "decision": decision }))
+                        }
+                        "item/fileChange/requestApproval" => {
+                            let decision = if matches!(permission_mode.as_str(), "full_access" | "accept_edits") {
+                                "acceptForSession"
+                            } else {
+                                "decline"
+                            };
+                            let _ = app.emit(
+                                "agent-status",
+                                AgentStatusPayload {
+                                    conversation_id: conversation_id.clone(),
+                                    message: format!("Codex file-change approval: {decision}"),
+                                },
+                            );
+                            Some(serde_json::json!({ "decision": decision }))
+                        }
+                        "execCommandApproval" => {
+                            let decision = if permission_mode == "full_access" {
+                                "approved_for_session"
+                            } else {
+                                "denied"
+                            };
+                            Some(serde_json::json!({ "decision": decision }))
+                        }
+                        "applyPatchApproval" => {
+                            let decision = if matches!(permission_mode.as_str(), "full_access" | "accept_edits") {
+                                "approved_for_session"
+                            } else {
+                                "denied"
+                            };
+                            Some(serde_json::json!({ "decision": decision }))
+                        }
+                        _ => None,
+                    };
+
+                    let response = if let Some(result) = result {
+                        serde_json::json!({
+                            "id": request_id,
+                            "result": result,
+                        })
+                    } else {
+                        serde_json::json!({
+                            "id": request_id,
+                            "error": {
+                                "code": -32601,
+                                "message": format!("FrogClaw does not implement Codex app-server request method: {method}"),
+                            },
+                        })
+                    };
+                    if let Err(err) = write_app_server_message(&mut stdin, &response).await {
+                        let _ = app.emit(
+                            "agent-error",
+                            AgentErrorPayload {
+                                conversation_id: conversation_id.clone(),
+                                assistant_message_id: current_assistant_msg_id.clone(),
+                                message: err,
+                            },
+                        );
+                        let _ = child.kill().await;
+                        let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+                        return;
+                    }
+                    continue;
+                }
+
+                let method = value.get("method").and_then(|v| v.as_str()).unwrap_or_default();
+                let params = value.get("params").cloned().unwrap_or(Value::Null);
+                match method {
+                    "turn/started" => {
+                        turn_started_ack = true;
+                        let _ = app.emit(
+                            "agent-status",
+                            AgentStatusPayload {
+                                conversation_id: conversation_id.clone(),
+                                message: "Codex app-server thinking".to_string(),
+                            },
+                        );
+                    }
+                    "item/agentMessage/delta" => {
+                        if let Some(delta) = params.get("delta").and_then(|v| v.as_str()) {
+                            if delta.is_empty() {
+                                continue;
+                            }
+                            saw_agent_delta = true;
+                            accumulated_text.push_str(delta);
+                            let assistant_message_id = persist_agent_partial_content(
+                                &db,
+                                &app,
+                                &conversation_id,
+                                &user_msg_id,
+                                &accumulated_text,
+                                &mut current_assistant_msg_id,
+                                &assistant_id_for_task,
+                            )
+                            .await
+                            .unwrap_or_default();
+                            let _ = app.emit(
+                                "agent-stream-text",
+                                AgentTextPayload {
+                                    conversation_id: conversation_id.clone(),
+                                    assistant_message_id,
+                                    text: delta.to_string(),
+                                },
+                            );
+                        }
+                    }
+                    "item/completed" => {
+                        if !saw_agent_delta {
+                            if let Some(text) = extract_app_server_completed_text(&params) {
+                                accumulated_text.push_str(&text);
+                                let assistant_message_id = persist_agent_partial_content(
+                                    &db,
+                                    &app,
+                                    &conversation_id,
+                                    &user_msg_id,
+                                    &accumulated_text,
+                                    &mut current_assistant_msg_id,
+                                    &assistant_id_for_task,
+                                )
+                                .await
+                                .unwrap_or_default();
+                                let _ = app.emit(
+                                    "agent-stream-text",
+                                    AgentTextPayload {
+                                        conversation_id: conversation_id.clone(),
+                                        assistant_message_id,
+                                        text,
+                                    },
+                                );
+                            }
+                        }
+                    }
+                    "error" => {
+                        let will_retry = params.get("willRetry").and_then(|v| v.as_bool()).unwrap_or(false);
+                        if !will_retry {
+                            let message = params
+                                .get("error")
+                                .and_then(|err| err.get("message").or_else(|| err.get("details")))
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("Codex app-server turn failed")
+                                .to_string();
+                            let _ = app.emit(
+                                "agent-error",
+                                AgentErrorPayload {
+                                    conversation_id: conversation_id.clone(),
+                                    assistant_message_id: current_assistant_msg_id.clone(),
+                                    message,
+                                },
+                            );
+                            let _ = child.kill().await;
+                            let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+                            return;
+                        }
+                    }
+                    "turn/completed" => {
+                        let assistant_message_id = if let Some(id) = current_assistant_msg_id.clone() {
+                            id
+                        } else {
+                            let fallback = if accumulated_text.is_empty() {
+                                "Codex app-server completed without text output.".to_string()
+                            } else {
+                                accumulated_text.clone()
+                            };
+                            match message::create_message(
+                                &db,
+                                &conversation_id,
+                                MessageRole::Assistant,
+                                &fallback,
+                                &[],
+                                Some(&user_msg_id),
+                                0,
+                            )
+                            .await
+                            {
+                                Ok(msg) => {
+                                    let _ = conversation::increment_message_count(&db, &conversation_id).await;
+                                    msg.id
+                                }
+                                Err(_) => String::new(),
+                            }
+                        };
+                        let _ = app.emit(
+                            "agent-done",
+                            AgentDonePayload {
+                                conversation_id: conversation_id.clone(),
+                                assistant_message_id,
+                                text: accumulated_text.clone(),
+                                usage: None,
+                                num_turns: None,
+                                cost_usd: None,
+                            },
+                        );
+                        let _ = child.kill().await;
+                        let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+                        if is_first_message {
+                            tracing::info!("[agent:codex_app_server] first message completed; title fallback already set");
+                        }
+                        return;
+                    }
+                    _ => {}
+                }
+            }
+            line = async {
+                match stderr_lines.as_mut() {
+                    Some(lines) => lines.next_line().await,
+                    None => Ok(None),
+                }
+            } => {
+                if let Ok(Some(line)) = line {
+                    if !line.trim().is_empty() {
+                        let _ = app.emit(
+                            "agent-status",
+                            AgentStatusPayload {
+                                conversation_id: conversation_id.clone(),
+                                message: line.chars().take(160).collect(),
+                            },
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    let status = child.wait().await;
+    let message = match status {
+        Ok(status) if status.success() && !turn_started_ack => {
+            "Codex app-server exited before the turn started".to_string()
+        }
+        Ok(status) => format!("Codex app-server exited before turn completion: {status}"),
+        Err(err) => format!("Failed to wait for Codex app-server: {err}"),
+    };
+    let _ = app.emit(
+        "agent-error",
+        AgentErrorPayload {
+            conversation_id: conversation_id.clone(),
+            assistant_message_id: current_assistant_msg_id,
+            message,
+        },
+    );
+    let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
 }
 
 async fn run_claude_code_cli_query(
     app: tauri::AppHandle,
     db: sea_orm::DatabaseConnection,
-    state_tokens: Arc<tokio::sync::Mutex<HashMap<String, open_agent_sdk::CancellationToken>>>,
+    state_tokens: Arc<tokio::sync::Mutex<HashMap<String, AgentCancellationToken>>>,
     conversation_id: String,
     session_id: String,
     user_msg_id: String,
@@ -1759,7 +1764,7 @@ async fn run_claude_code_cli_query(
         run_id,
     };
 
-    let cancel_token = open_agent_sdk::CancellationToken::new();
+    let cancel_token = AgentCancellationToken::new();
     state_tokens
         .lock()
         .await
@@ -2037,13 +2042,14 @@ async fn run_claude_code_cli_query(
 async fn run_codex_cli_query(
     app: tauri::AppHandle,
     db: sea_orm::DatabaseConnection,
-    state_tokens: Arc<tokio::sync::Mutex<HashMap<String, open_agent_sdk::CancellationToken>>>,
+    state_tokens: Arc<tokio::sync::Mutex<HashMap<String, AgentCancellationToken>>>,
     conversation_id: String,
     session_id: String,
     user_msg_id: String,
     prompt: String,
     cwd: Option<String>,
     permission_mode: String,
+    extra_env: Option<HashMap<String, String>>,
     is_first_message: bool,
 ) {
     let run_id = format!("codex_{}", frogclaw_core::utils::gen_id());
@@ -2055,7 +2061,7 @@ async fn run_codex_cli_query(
         run_id,
     };
 
-    let cancel_token = open_agent_sdk::CancellationToken::new();
+    let cancel_token = AgentCancellationToken::new();
     state_tokens
         .lock()
         .await
@@ -2084,7 +2090,7 @@ async fn run_codex_cli_query(
     let mut current_assistant_msg_id: Option<String> = None;
     let assistant_id_for_task: Arc<RwLock<Option<String>>> = Arc::new(RwLock::new(None));
     let mut accumulated_text = String::new();
-    let mut final_usage: Option<Usage> = None;
+    let mut final_usage: Option<CodexUsage> = None;
 
     let mut cmd = tokio::process::Command::new(&codex_path);
     cmd.arg("exec")
@@ -2109,6 +2115,9 @@ async fn run_codex_cli_query(
     if let Some(cwd) = cwd.as_deref() {
         cmd.arg("-C").arg(cwd);
         cmd.current_dir(cwd);
+    }
+    if let Some(env) = extra_env {
+        cmd.envs(env);
     }
     cmd.arg(&prompt);
 
@@ -2363,9 +2372,9 @@ pub async fn agent_list_engines() -> Result<Vec<AgentEngineInfo>, String> {
 
     Ok(vec![
         AgentEngineInfo {
-            kind: ENGINE_FROG_AGENT.to_string(),
-            display_name: "Frog Agent".to_string(),
-            description: "Built-in FrogClaw agent powered by the configured model provider."
+            kind: ENGINE_CODEX_APP_SERVER.to_string(),
+            display_name: "Codex App Server".to_string(),
+            description: "Codex runtime using FrogClaw-generated config under ~/.frogclaw/codex."
                 .to_string(),
             available: true,
             installed: true,
@@ -2373,6 +2382,19 @@ pub async fn agent_list_engines() -> Result<Vec<AgentEngineInfo>, String> {
             binary_path: None,
             status: "available".to_string(),
             message: None,
+            experimental: false,
+        },
+        AgentEngineInfo {
+            kind: ENGINE_FROG_AGENT.to_string(),
+            display_name: "Frog Agent (legacy alias)".to_string(),
+            description: "Legacy engine value routed to Codex App Server for compatibility."
+                .to_string(),
+            available: true,
+            installed: true,
+            version: None,
+            binary_path: None,
+            status: "available".to_string(),
+            message: Some("Uses Codex App Server runtime".to_string()),
             experimental: false,
         },
         cli_engine_info(

@@ -34,6 +34,13 @@ pub enum PermissionAction {
     HardDeny,
 }
 
+/// Runtime-agnostic permission decision used by FrogClaw.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PermissionDecision {
+    Allow,
+    Deny(String),
+}
+
 /// Classify a tool's risk level based on its name
 pub fn classify_tool_risk(tool_name: &str) -> RiskLevel {
     let name_lower = tool_name.to_lowercase();

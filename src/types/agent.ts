@@ -1,7 +1,7 @@
 export type AgentPermissionMode = 'default' | 'accept_edits' | 'full_access';
 export type AgentRuntimeStatus = 'idle' | 'running' | 'waiting_approval' | 'completed' | 'error';
 export type ApprovalStatus = 'pending' | 'approved' | 'denied';
-export type AgentEngineKind = 'frog_agent' | 'claude_code' | 'codex_cli' | 'gemini_cli';
+export type AgentEngineKind = 'codex_app_server' | 'frog_agent' | 'claude_code' | 'codex_cli' | 'gemini_cli';
 
 export interface AgentSession {
   id: string;

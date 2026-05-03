@@ -2,8 +2,8 @@ use crate::entity::agent_sessions;
 use crate::error::{FrogClawClientError, Result};
 use crate::types::AgentSession;
 use crate::utils::gen_id;
-use sea_orm::*;
 use sea_orm::sea_query::Expr;
+use sea_orm::*;
 
 fn model_to_agent_session(model: agent_sessions::Model) -> AgentSession {
     AgentSession {
@@ -73,7 +73,7 @@ pub async fn upsert_agent_session(
             runtime_status: Set("idle".to_string()),
             sdk_context_json: Set(None),
             sdk_context_backup_json: Set(None),
-            engine_kind: Set(engine_kind.unwrap_or("frog_agent").to_string()),
+            engine_kind: Set(engine_kind.unwrap_or("codex_app_server").to_string()),
             engine_session_id: Set(None),
             engine_context_json: Set(None),
             engine_context_backup_json: Set(None),
@@ -121,11 +121,7 @@ pub async fn update_agent_session_status(
 }
 
 /// Update the working directory of an agent session.
-pub async fn update_agent_session_cwd(
-    db: &DatabaseConnection,
-    id: &str,
-    cwd: &str,
-) -> Result<()> {
+pub async fn update_agent_session_cwd(db: &DatabaseConnection, id: &str, cwd: &str) -> Result<()> {
     let model = agent_sessions::Entity::find_by_id(id)
         .one(db)
         .await?
@@ -162,14 +158,8 @@ pub async fn update_agent_session_permission_mode(
 pub async fn reset_running_sessions(db: &DatabaseConnection) -> Result<u64> {
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let result = agent_sessions::Entity::update_many()
-        .col_expr(
-            agent_sessions::Column::RuntimeStatus,
-            Expr::value("idle"),
-        )
-        .col_expr(
-            agent_sessions::Column::UpdatedAt,
-            Expr::value(now),
-        )
+        .col_expr(agent_sessions::Column::RuntimeStatus, Expr::value("idle"))
+        .col_expr(agent_sessions::Column::UpdatedAt, Expr::value(now))
         .filter(
             Condition::any()
                 .add(agent_sessions::Column::RuntimeStatus.eq("running"))

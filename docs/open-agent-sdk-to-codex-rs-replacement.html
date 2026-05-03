@@ -1,0 +1,850 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FrogClawClient open-agent-sdk 替换为 codex-rs 设计文档</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --ink: #18202a;
+      --muted: #657080;
+      --line: #d9dee7;
+      --accent: #0f766e;
+      --accent-soft: #e6f5f2;
+      --warn: #9a5b00;
+      --warn-soft: #fff5dc;
+      --danger: #a32626;
+      --danger-soft: #ffe8e8;
+      --code: #f1f3f6;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+      line-height: 1.65;
+    }
+
+    main {
+      width: min(1120px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 36px 0 56px;
+    }
+
+    header {
+      padding: 28px 32px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(28px, 4vw, 42px);
+      line-height: 1.18;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 36px 0 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--line);
+      font-size: 24px;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 24px 0 10px;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 10px 0;
+    }
+
+    a {
+      color: var(--accent);
+    }
+
+    code,
+    pre {
+      font-family: "Cascadia Code", "Consolas", monospace;
+    }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: var(--code);
+      font-size: 0.94em;
+    }
+
+    pre {
+      margin: 12px 0;
+      padding: 14px 16px;
+      overflow: auto;
+      background: #202833;
+      color: #edf2f7;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 18px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    th,
+    td {
+      padding: 11px 12px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #eef1f5;
+      font-weight: 650;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    ul,
+    ol {
+      padding-left: 24px;
+      margin: 10px 0 16px;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .meta div,
+    section,
+    .callout {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .meta div {
+      padding: 12px 14px;
+    }
+
+    section {
+      margin-top: 18px;
+      padding: 24px 28px;
+    }
+
+    .label {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .summary {
+      color: var(--muted);
+      font-size: 17px;
+      max-width: 860px;
+    }
+
+    .callout {
+      margin: 14px 0;
+      padding: 13px 15px;
+    }
+
+    .callout strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .ok {
+      background: var(--accent-soft);
+      border-color: #a9d8d0;
+    }
+
+    .warn {
+      background: var(--warn-soft);
+      border-color: #e8c878;
+      color: #3e2a08;
+    }
+
+    .danger {
+      background: var(--danger-soft);
+      border-color: #efb1b1;
+      color: #421111;
+    }
+
+    .flow {
+      white-space: pre;
+      overflow-x: auto;
+    }
+
+    @media (max-width: 720px) {
+      main {
+        width: min(100% - 24px, 1120px);
+        padding-top: 18px;
+      }
+
+      header,
+      section {
+        padding: 18px;
+      }
+
+      table {
+        display: block;
+        overflow-x: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>open-agent-sdk 替换为 codex-rs 设计文档</h1>
+      <p class="summary">
+        本文定义 FrogClawClient 将当前内嵌 <code>open-agent-sdk</code> Agent 实现替换为本地
+        <code>E:\frogclaw\codex\codex-rs</code> 的方案。替换目标不是再做双后端，而是让 Codex 成为项目唯一 Agent runtime，
+        UI 和业务层只面对 FrogClawClient 自己的稳定事件与命令接口。
+      </p>
+      <div class="meta">
+        <div><span class="label">目标项目</span><strong>E:\frogclaw\frogclawclient</strong></div>
+        <div><span class="label">Codex 源码</span><strong>E:\frogclaw\codex\codex-rs</strong></div>
+        <div><span class="label">当前 SDK</span><strong>src-tauri/crates/open-agent-sdk</strong></div>
+        <div><span class="label">文档日期</span><strong>2026-05-03</strong></div>
+      </div>
+    </header>
+
+    <section>
+      <h2>1. 结论</h2>
+      <div class="callout ok">
+        <strong>采用 Codex app-server / protocol adapter 作为主方案。</strong>
+        FrogClawClient 不应直接把大量 <code>codex-rs</code> 内部 crate 类型暴露给 UI，也不应长期解析 CLI 文本输出。
+        推荐在 Tauri 后端增加 <code>CodexRuntime</code> 适配层，使用 Codex 的 app-server、client、protocol、core 能力，把 Codex 事件转换为现有 Agent UI 可消费的 FrogClaw 事件。
+      </div>
+      <p>
+        <code>open-agent-sdk</code> 的代码和 submodule 最终删除；<code>frogclaw-agent</code> 继续保留，但职责从
+        “包装 open-agent-sdk” 改为 “包装 codex-rs runtime 并输出 FrogClaw 事件”。这能最大限度保留当前前端 Agent UI、
+        数据库会话、权限弹窗、工具卡片和取消逻辑。
+      </p>
+    </section>
+
+    <section>
+      <h2>2. 当前依赖现状</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>位置</th>
+            <th>当前依赖</th>
+            <th>替换动作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>.gitmodules</code></td>
+            <td><code>src-tauri/crates/open-agent-sdk</code> submodule</td>
+            <td>删除该 submodule，新增 codex-rs 获取策略：本地 path、git submodule 或 vendor snapshot 选一种。</td>
+          </tr>
+          <tr>
+            <td><code>src-tauri/Cargo.toml</code></td>
+            <td><code>open-agent-sdk = { path = "crates/open-agent-sdk" }</code></td>
+            <td>移除，改为依赖 Codex 适配层需要的 crate，优先从 <code>E:\frogclaw\codex\codex-rs</code> 以 path dependency 接入。</td>
+          </tr>
+          <tr>
+            <td><code>src-tauri/crates/agent/Cargo.toml</code></td>
+            <td><code>open-agent-sdk = { path = "../open-agent-sdk" }</code></td>
+            <td>移除，新增 <code>codex-app-server-client</code>、<code>codex-app-server-protocol</code>、<code>codex-protocol</code> 等适配层依赖。</td>
+          </tr>
+          <tr>
+            <td><code>src-tauri/src/commands/agent.rs</code></td>
+            <td>直接创建 <code>open_agent_sdk::Agent</code>，匹配 <code>SDKMessage</code></td>
+            <td>拆出 <code>CodexRuntime</code>，命令层只负责请求解析、DB、Tauri event 转发和取消控制。</td>
+          </tr>
+          <tr>
+            <td><code>src-tauri/crates/agent/src/bridge.rs</code></td>
+            <td>把 FrogClaw provider 包装成 <code>open-agent-sdk</code> provider</td>
+            <td>废弃或重写为 Codex provider/config adapter；不要再保留 <code>LLMProvider</code> 语义。</td>
+          </tr>
+          <tr>
+            <td><code>src-tauri/crates/agent/src/security.rs</code></td>
+            <td>使用 <code>open_agent_sdk::PermissionDecision</code></td>
+            <td>替换为 FrogClaw 自定义权限模型，再映射到 Codex approval / sandbox 策略。</td>
+          </tr>
+          <tr>
+            <td><code>src-tauri/src/commands/skills.rs</code></td>
+            <td>使用 <code>open_agent_sdk::skills</code></td>
+            <td>改为 Codex skills/plugin 目录扫描，或先保留 UI 能力但后端返回 Codex skill 状态。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>3. 替换目标</h2>
+      <ol>
+        <li>删除运行时对 <code>open_agent_sdk</code> 的所有 Rust import。</li>
+        <li>保留现有 Tauri command 名称，首期仍使用 <code>agent_query</code>、<code>agent_cancel</code>、权限响应等入口，降低前端改动量。</li>
+        <li>保留现有 Tauri event 名称，例如 <code>agent-stream-text</code>、<code>agent-tool-start</code>、<code>agent-permission-request</code>、<code>agent-done</code>。</li>
+        <li>会话状态从 <code>sdk_context_json</code> 迁移到 <code>codex_session_json</code> 或 <code>runtime_context_json</code>。</li>
+        <li>模型、provider、代理、登录状态、工作目录、权限模式由 FrogClaw 设置层统一生成 Codex runtime config。</li>
+        <li>文件写入、shell、网络、越权目录访问全部走 Codex sandbox / approval 语义，并映射到 FrogClaw 的权限 UI。</li>
+      </ol>
+      <div class="callout warn">
+        <strong>关键约束</strong>
+        Codex 是完整 coding agent runtime，不是 <code>open-agent-sdk</code> 这种轻量 loop 库。替换时不要试图逐个复刻
+        <code>SDKMessage</code>、provider bridge、tool trait；应以 Codex 的 session、turn、event、approval 为中心重新适配。
+      </div>
+    </section>
+
+    <section>
+      <h2>4. 目标架构</h2>
+      <pre class="flow">FrogClawClient UI
+        |
+        | agent_query / agent_cancel / approval response
+        v
+Tauri commands
+        |
+        v
+frogclaw-agent
+        |
+        +-- FrogClawAgentService
+        |       会话、数据库、事件转发、取消 token、附件归一化
+        |
+        +-- CodexRuntime
+        |       启动 / resume Codex session
+        |       发送 user turn
+        |       接收 Codex protocol events
+        |       处理 approval / sandbox / tool events
+        |
+        +-- CodexEventMapper
+        |       Codex event -> FrogClaw Tauri event
+        |
+        +-- CodexConfigResolver
+                FrogClaw provider/model/settings -> Codex config
+
+E:\frogclaw\codex\codex-rs
+        |
+        +-- app-server / app-server-client / app-server-protocol
+        +-- protocol / core / core-api
+        +-- exec / sandboxing / tools / skills</pre>
+      <p>
+        UI 不直接感知 Codex crate 类型。后端可以随 Codex 升级调整内部映射，只要 FrogClaw 的 Tauri commands 和 events 保持兼容。
+      </p>
+    </section>
+
+    <section>
+      <h2>5. Codex 接入方式</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>方式</th>
+            <th>定位</th>
+            <th>结论</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>app-server / client / protocol</td>
+            <td>以结构化协议驱动 Codex，天然支持事件、session、approval、resume。</td>
+            <td>主方案。适合桌面 UI 长期集成。</td>
+          </tr>
+          <tr>
+            <td>CLI 子进程</td>
+            <td>通过 <code>codex</code> 命令快速验证。</td>
+            <td>只用于 PoC 或兜底，不作为最终架构。</td>
+          </tr>
+          <tr>
+            <td>直接调用 core 内部 API</td>
+            <td>把 Codex core 当 library 嵌入。</td>
+            <td>谨慎使用。只在 app-server 协议缺少能力时局部引入。</td>
+          </tr>
+          <tr>
+            <td>复制 Codex 代码到 FrogClawClient</td>
+            <td>把 Codex crate vendor 到当前仓库。</td>
+            <td>不推荐。后续同步成本高，容易产生分叉。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>推荐依赖策略</h3>
+      <p>
+        第一阶段不把 Codex workspace 直接编进 Tauri。FrogClaw 以 sidecar 方式启动
+        <code>codex-app-server --listen stdio://</code>，通过换行分隔 JSON-RPC 通信。这样可以先避免把
+        <code>E:\frogclaw\codex\codex-rs</code> 的大量 workspace 依赖拉入当前工程。
+      </p>
+      <pre>codex-app-server.exe 查找顺序：
+1. FROG_CODEX_RS/target/release 或 target/debug
+2. E:/frogclaw/codex/codex-rs/target/release 或 target/debug
+3. PATH、用户 npm/bin、本地工具目录</pre>
+      <p>
+        发布前应把 <code>codex-app-server</code> 作为 Tauri sidecar 随包发布，或用构建脚本从内部 mirror 编译。
+        第二阶段再评估是否引入 <code>codex-app-server-client</code> 的 in-process client；只有当 sidecar 协议无法满足
+        权限、resume 或性能要求时，才把 Codex crates 作为 path/git dependency 引入。
+      </p>
+    </section>
+
+    <section>
+      <h2>6. Rust 模块设计</h2>
+      <p>建议在 <code>src-tauri/crates/agent/src</code> 下重组模块：</p>
+      <pre>src-tauri/crates/agent/src/
+├── lib.rs
+├── runtime/
+│   ├── mod.rs
+│   ├── codex.rs
+│   ├── config.rs
+│   ├── events.rs
+│   └── session.rs
+├── permission.rs
+└── security.rs</pre>
+
+      <h3>核心 trait</h3>
+      <pre>#[async_trait::async_trait]
+pub trait AgentRuntime: Send + Sync {
+    async fn start_or_resume(&self, request: RuntimeStartRequest) -> AgentResult&lt;RuntimeSession&gt;;
+    async fn send_turn(&self, session: RuntimeSession, turn: UserTurn) -> AgentResult&lt;RuntimeEventStream&gt;;
+    async fn cancel(&self, session_id: &str) -> AgentResult&lt;()&gt;;
+    async fn approve(&self, request_id: &str, decision: ApprovalDecision) -> AgentResult&lt;()&gt;;
+}</pre>
+
+      <h3>CodexRuntime 职责</h3>
+      <ul>
+        <li>创建或连接 Codex app-server。</li>
+        <li>把 FrogClaw 会话 ID 映射为 Codex thread/session ID。</li>
+        <li>调用 <code>CodexConfigResolver</code> 为当前会话动态生成 <code>config.toml</code> 和运行时环境变量。</li>
+        <li>把用户 prompt、附件、cwd、权限模式、模型配置转换为 Codex turn request。</li>
+        <li>监听 Codex protocol event stream。</li>
+        <li>把 Codex approval 请求挂起到 FrogClaw 权限 UI。</li>
+        <li>把 Codex 最终上下文写回数据库。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>7. 动态配置生成与 app-server 启动</h2>
+      <p>
+        FrogClawClient 不应要求用户手工维护 <code>~/.codex/config.toml</code>。替换后由 FrogClaw 设置层动态生成
+        Codex 专用配置目录，并在启动 Codex app-server 前传入 <code>CODEX_HOME</code> 和 provider API key 环境变量。
+      </p>
+
+      <h3>配置目录</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>项目</th>
+            <th>路径</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Codex home</td>
+            <td><code>~/.frogclaw/codex/</code></td>
+            <td>FrogClaw 管理的 Codex 专用 home，启动 app-server 时设置为 <code>CODEX_HOME</code>。</td>
+          </tr>
+          <tr>
+            <td>Codex config</td>
+            <td><code>~/.frogclaw/codex/config.toml</code></td>
+            <td>由 FrogClaw 每次运行前按当前设置原子写入，用户不需要手工编辑。</td>
+          </tr>
+          <tr>
+            <td>Codex sqlite/log/state</td>
+            <td><code>~/.frogclaw/codex/state/</code>、<code>~/.frogclaw/codex/log/</code></td>
+            <td>内部状态，不能放到 Documents root。</td>
+          </tr>
+          <tr>
+            <td>Provider API key</td>
+            <td>进程环境变量</td>
+            <td>不写入 <code>config.toml</code>，用 <code>env_key</code> 间接引用。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>生成的 config.toml 模板</h3>
+      <pre>model = "gpt-4.1"
+model_provider = "frog-provider"
+sandbox_mode = "workspace-write"
+approval_policy = "on-request"
+sqlite_home = "C:/Users/&lt;user&gt;/.frogclaw/codex/state"
+log_dir = "C:/Users/&lt;user&gt;/.frogclaw/codex/log"
+
+[model_providers.frog-provider]
+name = "Frog Provider"
+base_url = "https://api.example.com/v1"
+env_key = "FROG_CODEX_API_KEY"
+wire_api = "responses"
+requires_openai_auth = false</pre>
+
+      <p>
+        <code>base_url</code> 必须来自 FrogClaw 的 provider 设置，并写到 OpenAI-compatible 根路径，例如
+        <code>https://api.example.com/v1</code>。当前 Codex provider 配置使用 Responses API，
+        因此第三方服务需要支持 <code>/v1/responses</code>；只支持 <code>/v1/chat/completions</code> 的服务需要额外 proxy/adapter。
+      </p>
+
+      <h3>API key 注入</h3>
+      <p>
+        首选方式是 <code>env_key</code>，例如配置中写 <code>env_key = "FROG_CODEX_API_KEY"</code>，
+        Tauri 后端启动 app-server 前把用户保存的 key 注入 app-server 进程环境：
+      </p>
+      <pre>CODEX_HOME=C:\Users\&lt;user&gt;\.frogclaw\codex
+FROG_CODEX_API_KEY=&lt;decrypted key from frogclaw.db&gt;</pre>
+      <div class="callout warn">
+        <strong>不要默认使用 experimental_bearer_token。</strong>
+        <code>experimental_bearer_token</code> 会把 key 写进 <code>config.toml</code>，只允许用于调试或受控测试。
+        产品实现必须优先从 FrogClaw 加密存储读取 key，并通过环境变量传给 app-server。
+      </div>
+
+      <h3>配置生成流程</h3>
+      <pre>用户在 Settings 保存 provider/model/key/base_url
+        |
+        v
+frogclaw.db 加密保存 API key，普通字段保存 provider 配置
+        |
+        v
+agent_query 开始前调用 CodexConfigResolver
+        |
+        +-- 创建 ~/.frogclaw/codex/
+        +-- 原子写入 ~/.frogclaw/codex/config.toml
+        +-- 设置 CODEX_HOME
+        +-- 注入 FROG_CODEX_API_KEY 等 env
+        |
+        v
+启动或复用 Codex app-server
+        |
+        v
+app-server 读取 CODEX_HOME/config.toml 并使用 env_key 取 key</pre>
+
+      <h3>app-server 生命周期</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>模式</th>
+            <th>行为</th>
+            <th>建议</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>sidecar app-server</td>
+            <td>FrogClaw 启动随包发布的 app-server 子进程，通过 stdio JSON-RPC 通信。</td>
+            <td>第一阶段推荐，依赖隔离清晰，便于验证。</td>
+          </tr>
+          <tr>
+            <td>in-process app-server</td>
+            <td>把 app-server/runtime crate 编入 Tauri 后端，同进程运行。</td>
+            <td>第二阶段评估，体验更好但依赖冲突和崩溃隔离风险更高。</td>
+          </tr>
+          <tr>
+            <td>用户系统 codex CLI</td>
+            <td>只作为调试或兜底 runtime，不作为本替换方案主路径。</td>
+            <td>不能替代 app-server 的结构化事件和权限集成。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>8. 事件映射</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>FrogClaw 事件</th>
+            <th>Codex 来源</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>agent-message-id</code></td>
+            <td>assistant message / turn item id</td>
+            <td>用于前端绑定消息 ID 和增量文本。</td>
+          </tr>
+          <tr>
+            <td><code>agent-stream-text</code></td>
+            <td>assistant text delta</td>
+            <td>保持当前聊天窗口流式输出。</td>
+          </tr>
+          <tr>
+            <td><code>agent-stream-thinking</code></td>
+            <td>reasoning / thinking summary delta</td>
+            <td>只展示 Codex 协议允许展示的推理摘要，不暴露不可展示内容。</td>
+          </tr>
+          <tr>
+            <td><code>agent-tool-start</code></td>
+            <td>tool call started</td>
+            <td>shell、apply_patch、file read/write、MCP 等都映射为工具卡片。</td>
+          </tr>
+          <tr>
+            <td><code>agent-tool-result</code></td>
+            <td>tool call completed</td>
+            <td>输出要截断和脱敏，避免超大 stdout 卡死 UI。</td>
+          </tr>
+          <tr>
+            <td><code>agent-permission-request</code></td>
+            <td>approval request / sandbox escalation</td>
+            <td>保留当前权限弹窗，但文案改为 Codex 的命令、路径、网络、沙箱上下文。</td>
+          </tr>
+          <tr>
+            <td><code>agent-status</code></td>
+            <td>turn state / progress event</td>
+            <td>用于展示 running、waiting_permission、compacting、resuming 等状态。</td>
+          </tr>
+          <tr>
+            <td><code>agent-done</code></td>
+            <td>turn completed</td>
+            <td>写入 token、费用、最终消息、上下文快照。</td>
+          </tr>
+          <tr>
+            <td><code>agent-error</code></td>
+            <td>runtime error / protocol error</td>
+            <td>记录到 DB，并给 UI 可理解的错误摘要。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>9. 数据库迁移</h2>
+      <p>现有 <code>agent_sessions</code> 里有 <code>sdk_context_json</code> 和 <code>sdk_context_backup_json</code>，替换后建议新增字段：</p>
+      <pre>ALTER TABLE agent_sessions ADD COLUMN runtime_kind TEXT NOT NULL DEFAULT 'codex';
+ALTER TABLE agent_sessions ADD COLUMN codex_session_id TEXT NULL;
+ALTER TABLE agent_sessions ADD COLUMN codex_thread_id TEXT NULL;
+ALTER TABLE agent_sessions ADD COLUMN runtime_context_json TEXT NULL;
+ALTER TABLE agent_sessions ADD COLUMN runtime_context_backup_json TEXT NULL;
+ALTER TABLE agent_sessions ADD COLUMN runtime_status TEXT NOT NULL DEFAULT 'idle';
+ALTER TABLE agent_sessions ADD COLUMN runtime_error TEXT NULL;</pre>
+      <p>兼容策略：</p>
+      <ol>
+        <li>迁移时不删除旧字段，避免旧版本回滚失败。</li>
+        <li>新会话只写 <code>runtime_context_json</code>。</li>
+        <li>旧 <code>sdk_context_json</code> 不尝试强转成 Codex 上下文；首次打开旧会话时创建新的 Codex session，并在 UI 标记为“已切换到 Codex runtime”。</li>
+        <li>确认无回滚需求后，再删除 SDK 字段和相关命令名里的 <code>sdk</code> 语义。</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>10. 设置、存储与路径</h2>
+      <p>替换实现必须遵守 FrogClawClient 双根目录策略：</p>
+      <table>
+        <thead>
+          <tr>
+            <th>内容</th>
+            <th>路径</th>
+            <th>规则</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Codex session metadata、索引、内部缓存</td>
+            <td><code>~/.frogclaw/</code> 下的 runtime 子目录</td>
+            <td>属于应用内部状态，不放进 Documents。</td>
+          </tr>
+          <tr>
+            <td>用户上传图片、文件、备份</td>
+            <td><code>~/Documents/frogclaw/</code></td>
+            <td>数据库继续保存相对 documents root 的路径。</td>
+          </tr>
+          <tr>
+            <td>Codex 工作目录</td>
+            <td>用户选择的项目目录</td>
+            <td>必须在会话级固定，权限策略围绕该 cwd 生成。</td>
+          </tr>
+          <tr>
+            <td>Codex 配置</td>
+            <td><code>~/.frogclaw/codex/config.toml</code></td>
+            <td>由 FrogClaw 设置动态生成，启动 app-server 时通过 <code>CODEX_HOME</code> 指向该目录。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>11. 权限模型</h2>
+      <p>FrogClaw 权限层应成为 UI 协议，Codex 权限层应成为执行协议。两者之间做明确映射：</p>
+      <table>
+        <thead>
+          <tr>
+            <th>FrogClaw 权限模式</th>
+            <th>Codex 映射</th>
+            <th>行为</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>read_only</code></td>
+            <td>只读 sandbox，禁用写文件和危险 shell</td>
+            <td>适合代码问答、review、解释。</td>
+          </tr>
+          <tr>
+            <td><code>workspace_write</code></td>
+            <td>允许 cwd 内写入，越界需要 approval</td>
+            <td>默认 coding agent 模式。</td>
+          </tr>
+          <tr>
+            <td><code>approval_required</code></td>
+            <td>shell、网络、越权路径、破坏性操作都请求 approval</td>
+            <td>适合不信任项目或用户想逐步确认。</td>
+          </tr>
+          <tr>
+            <td><code>full_access</code></td>
+            <td>降低审批频率，但仍记录所有工具调用</td>
+            <td>只能由用户显式选择，不作为默认值。</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout danger">
+        <strong>安全边界</strong>
+        不允许 Codex 默认读写 <code>~/.frogclaw/</code> 中的数据库、master key、SSL key 或 vector DB。
+        如确需访问，必须由 FrogClaw 暴露受控工具，且经用户确认。
+      </div>
+    </section>
+
+    <section>
+      <h2>12. 迁移步骤</h2>
+      <h3>阶段 0：PoC 验证</h3>
+      <ol>
+        <li>确认 <code>E:\frogclaw\codex\codex-rs</code> 可独立构建。</li>
+        <li>在 <code>frogclaw-agent</code> 新增最小 <code>CodexRuntime</code>，只跑通一轮 prompt 并返回文本。</li>
+        <li>用本地 path dependency 验证 Cargo 依赖冲突，重点看 <code>tokio</code>、<code>reqwest</code>、<code>rustls</code>、<code>sea-orm</code>、<code>tauri</code>。</li>
+        <li>验证由 FrogClaw 生成 <code>~/.frogclaw/codex/config.toml</code> 后，app-server 能读取非官方 <code>base_url</code> 和环境变量 key。</li>
+      </ol>
+
+      <h3>阶段 1：事件流替换</h3>
+      <ol>
+        <li>把 <code>agent_query</code> 内直接创建 <code>open_agent_sdk::Agent</code> 的逻辑迁入旧 adapter。</li>
+        <li>新增 <code>CodexConfigResolver</code>，从 FrogClaw provider/model 设置生成 Codex config 和 env。</li>
+        <li>实现 <code>CodexEventMapper</code>，输出现有 Tauri event。</li>
+        <li>前端不改 UI，只验证文本、工具卡片、错误和完成事件。</li>
+      </ol>
+
+      <h3>阶段 2：权限与取消</h3>
+      <ol>
+        <li>把 <code>open_agent_sdk::CancellationToken</code> 替换为 FrogClaw 自有 cancellation handle。</li>
+        <li>把 <code>PermissionDecision</code> 替换为 FrogClaw 自定义 enum。</li>
+        <li>接入 Codex approval response，验证等待权限、同意、拒绝、取消。</li>
+      </ol>
+
+      <h3>阶段 3：会话与上下文</h3>
+      <ol>
+        <li>新增数据库字段并写迁移。</li>
+        <li>实现 Codex session/thread ID 持久化。</li>
+        <li>实现 resume、backup、clear context、restore context 的 Codex 版本。</li>
+      </ol>
+
+      <h3>阶段 4：移除 open-agent-sdk</h3>
+      <ol>
+        <li>删除 <code>src-tauri/crates/open-agent-sdk</code> submodule。</li>
+        <li>删除 <code>.gitmodules</code> 中对应条目。</li>
+        <li>删除所有 <code>open_agent_sdk</code> import 和 dependency。</li>
+        <li>更新 skills 命令和 UI 文案。</li>
+        <li>执行完整构建、关键路径手测和回归测试。</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>13. 验收标准</h2>
+      <ul>
+        <li><code>rg "open_agent_sdk|open-agent-sdk" src-tauri</code> 不再命中运行时代码和 Cargo 依赖。</li>
+        <li><code>src-tauri/crates/open-agent-sdk</code> 不再是 workspace 依赖，也不再是 git submodule。</li>
+        <li>FrogClaw 能根据设置动态生成 <code>~/.frogclaw/codex/config.toml</code>，并通过 <code>CODEX_HOME</code> 启动 app-server。</li>
+        <li>API key 不落入 <code>config.toml</code>；app-server 通过 <code>env_key</code> 对应的环境变量读取 key。</li>
+        <li>非官方 <code>base_url</code> 可用，且对不支持 Responses API 的 provider 给出明确错误或 adapter 提示。</li>
+        <li>Agent 模式可完成：普通问答、代码修改、命令执行、权限请求、拒绝权限、取消运行、继续会话。</li>
+        <li>旧会话不会导致应用崩溃；旧 SDK 上下文字段可被忽略或显示迁移提示。</li>
+        <li>所有附件路径仍按 Documents root 相对路径保存。</li>
+        <li>Codex 不会默认访问 FrogClaw config home 中的敏感文件。</li>
+        <li>Windows 路径、空格路径、中文路径的 cwd 和附件可正常传递给 Codex。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>14. 风险与处理</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>风险</th>
+            <th>影响</th>
+            <th>处理方式</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Codex workspace 依赖多，直接 path dependency 可能引入版本冲突。</td>
+            <td>构建失败或二进制体积增长。</td>
+            <td>PoC 阶段先只引入 protocol/client 层；必要时用 app-server 子进程隔离依赖。</td>
+          </tr>
+          <tr>
+            <td>旧 <code>sdk_context_json</code> 无法转换为 Codex session。</td>
+            <td>旧 Agent 会话不能无缝续跑。</td>
+            <td>保留历史消息，但新建 Codex runtime 上下文；UI 给出一次性提示。</td>
+          </tr>
+          <tr>
+            <td>Codex approval 语义和现有权限 UI 不完全一致。</td>
+            <td>用户可能看不到足够上下文。</td>
+            <td>权限 payload 增加 command、cwd、paths、sandbox、reason 字段。</td>
+          </tr>
+          <tr>
+            <td>CLI fallback 的输出解析不稳定。</td>
+            <td>工具卡片和流式消息错乱。</td>
+            <td>只把 CLI fallback 用于开发验证，正式实现使用结构化协议。</td>
+          </tr>
+          <tr>
+            <td>Codex 默认目录和 FrogClaw 双根目录冲突。</td>
+            <td>状态文件散落或敏感文件暴露。</td>
+            <td>所有 runtime state 都由 FrogClaw 显式指定到 <code>~/.frogclaw/</code> 下。</td>
+          </tr>
+          <tr>
+            <td>动态生成的 <code>config.toml</code> 和 app-server 已加载配置不一致。</td>
+            <td>用户修改设置后，app-server 仍使用旧 provider 或旧 key。</td>
+            <td>给配置生成结果计算 hash；hash 变化时重启 app-server 或调用 app-server 的配置刷新能力。</td>
+          </tr>
+          <tr>
+            <td>把 API key 写入 <code>config.toml</code> 或日志。</td>
+            <td>密钥泄露。</td>
+            <td>只用 <code>env_key</code>；日志中屏蔽 key、Authorization header 和 provider token。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>15. 实施清单</h2>
+      <ul>
+        <li>新增 <code>frogclaw-agent::runtime</code> 模块。</li>
+        <li>新增 <code>CodexRuntime</code> 和 <code>CodexEventMapper</code>。</li>
+        <li>新增 <code>CodexConfigResolver</code>，负责生成 <code>config.toml</code>、<code>CODEX_HOME</code> 和 provider env。</li>
+        <li>新增 app-server lifecycle manager，负责启动、复用、重启、关闭 Codex app-server。</li>
+        <li>新增 FrogClaw 自定义 <code>ApprovalDecision</code>、<code>RuntimeEvent</code>、<code>CancellationHandle</code>。</li>
+        <li>改造 <code>agent_query</code>，从 SDK loop 改为调用 runtime service。</li>
+        <li>改造 <code>agent_cancel</code> 和权限响应命令。</li>
+        <li>新增数据库迁移字段。</li>
+        <li>改造 skills 列表命令。</li>
+        <li>删除 open-agent-sdk dependency 和 submodule。</li>
+        <li>更新 README 或开发文档中的 Agent 后端说明。</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

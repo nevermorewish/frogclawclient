@@ -1,4 +1,4 @@
-use open_agent_sdk::PermissionDecision;
+use crate::permission::PermissionDecision;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 
