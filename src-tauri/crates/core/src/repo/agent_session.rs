@@ -14,6 +14,11 @@ fn model_to_agent_session(model: agent_sessions::Model) -> AgentSession {
         runtime_status: model.runtime_status,
         sdk_context_json: model.sdk_context_json,
         sdk_context_backup_json: model.sdk_context_backup_json,
+        engine_kind: model.engine_kind,
+        engine_session_id: model.engine_session_id,
+        engine_context_json: model.engine_context_json,
+        engine_context_backup_json: model.engine_context_backup_json,
+        engine_error: model.engine_error,
         total_tokens: model.total_tokens,
         total_cost_usd: model.total_cost_usd,
         created_at: model.created_at,
@@ -28,6 +33,7 @@ pub async fn upsert_agent_session(
     conversation_id: &str,
     cwd: Option<&str>,
     permission_mode: Option<&str>,
+    engine_kind: Option<&str>,
 ) -> Result<AgentSession> {
     let existing = agent_sessions::Entity::find()
         .filter(agent_sessions::Column::ConversationId.eq(conversation_id))
@@ -37,12 +43,22 @@ pub async fn upsert_agent_session(
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     if let Some(model) = existing {
+        let current_engine_kind = model.engine_kind.clone();
         let mut am: agent_sessions::ActiveModel = model.into();
         if let Some(cwd) = cwd {
             am.cwd = Set(Some(cwd.to_string()));
         }
         if let Some(pm) = permission_mode {
             am.permission_mode = Set(pm.to_string());
+        }
+        if let Some(engine) = engine_kind {
+            if current_engine_kind != engine {
+                am.engine_kind = Set(engine.to_string());
+                am.engine_session_id = Set(None);
+                am.engine_context_json = Set(None);
+                am.engine_context_backup_json = Set(None);
+                am.engine_error = Set(None);
+            }
         }
         am.updated_at = Set(now);
         let updated = am.update(db).await?;
@@ -57,6 +73,11 @@ pub async fn upsert_agent_session(
             runtime_status: Set("idle".to_string()),
             sdk_context_json: Set(None),
             sdk_context_backup_json: Set(None),
+            engine_kind: Set(engine_kind.unwrap_or("frog_agent").to_string()),
+            engine_session_id: Set(None),
+            engine_context_json: Set(None),
+            engine_context_backup_json: Set(None),
+            engine_error: Set(None),
             total_tokens: Set(0),
             total_cost_usd: Set(0.0),
             created_at: Set(now.clone()),

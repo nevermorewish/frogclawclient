@@ -152,6 +152,8 @@ export interface Conversation {
   is_archived: boolean;
   context_compression: boolean;
   category_id: string | null;
+  working_directory?: string | null;
+  project_name?: string | null;
   parent_conversation_id: string | null;
   mode?: 'chat' | 'agent';
   message_count: number;
@@ -262,6 +264,8 @@ export interface UpdateConversationInput {
   enabled_memory_namespace_ids?: string[];
   context_compression?: boolean;
   category_id?: string | null;
+  working_directory?: string | null;
+  project_name?: string | null;
   mode?: 'chat' | 'agent';
 }
 
@@ -406,7 +410,7 @@ export interface RealtimeConfig {
 }
 
 // === UI State ===
-export type PageKey = 'home' | 'chat' | 'drawing' | 'knowledge' | 'memory' | 'files' | 'settings' | 'skills' | 'im';
+export type PageKey = 'home' | 'chat' | 'drawing' | 'knowledge' | 'memory' | 'files' | 'settings' | 'skills' | 'im' | 'logs';
 
 // === Drawing ===
 export type DrawingModelId = 'gpt-image-2' | 'gpt-image-1.5' | 'gpt-image-1' | 'gpt-image-1-mini';

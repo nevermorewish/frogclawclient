@@ -12,6 +12,8 @@ use sea_orm::DatabaseConnection;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
+    io::{Read, Write},
+    net::{SocketAddr, TcpStream},
     path::{Path, PathBuf},
     pin::Pin,
     process::{Child, Command, Stdio},
@@ -19,8 +21,11 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    time::Instant,
+    time::{Duration, Instant},
 };
+
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 use tauri::State;
 use tokio::sync::{mpsc, Mutex};
 use tokio_stream::wrappers::ReceiverStream;
@@ -29,13 +34,19 @@ use tokio_stream::wrappers::ReceiverStream;
 pub struct ImChannel {
     pub id: String,
     pub platform: String,
-    #[serde(rename = "appId")]
+    #[serde(rename = "appId", alias = "app_id")]
     pub app_id: String,
-    #[serde(rename = "appSecret")]
+    #[serde(rename = "appSecret", alias = "app_secret")]
     pub app_secret: String,
     pub label: Option<String>,
+    #[serde(default = "default_channel_enabled")]
     pub enabled: bool,
     pub assignment: Option<String>,
+    pub sandbox: Option<bool>,
+}
+
+fn default_channel_enabled() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -117,6 +128,28 @@ fn channels_path() -> Result<PathBuf, String> {
 
 fn log_path() -> Result<PathBuf, String> {
     Ok(config_dir()?.join("platform-sidecar.log"))
+}
+
+fn is_platform_port_open() -> bool {
+    let addr = SocketAddr::from(([127, 0, 0, 1], 18788));
+    TcpStream::connect_timeout(&addr, Duration::from_millis(150)).is_ok()
+}
+
+fn request_platform_reload() -> bool {
+    let addr = SocketAddr::from(([127, 0, 0, 1], 18788));
+    let mut stream = match TcpStream::connect_timeout(&addr, Duration::from_millis(300)) {
+        Ok(stream) => stream,
+        Err(_) => return false,
+    };
+    let _ = stream.set_read_timeout(Some(Duration::from_millis(500)));
+    let _ = stream.set_write_timeout(Some(Duration::from_millis(500)));
+    let request = "POST /reload HTTP/1.1\r\nHost: 127.0.0.1:18788\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+    if stream.write_all(request.as_bytes()).is_err() {
+        return false;
+    }
+    let mut response = String::new();
+    let _ = stream.read_to_string(&mut response);
+    response.starts_with("HTTP/1.1 200") || response.starts_with("HTTP/1.0 200")
 }
 
 fn sidecar_path() -> Result<PathBuf, String> {
@@ -256,6 +289,24 @@ async fn get_or_create_session_conversation(
         &model.model_id,
         &provider.id,
         None,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    let default_workspace = crate::paths::default_workspace();
+    let _ = std::fs::create_dir_all(&default_workspace);
+    let project_name = default_workspace
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("workspace")
+        .to_string();
+    let conversation = frogclaw_core::repo::conversation::update_conversation(
+        &runtime.db,
+        &conversation.id,
+        UpdateConversationInput {
+            working_directory: Some(Some(default_workspace.to_string_lossy().to_string())),
+            project_name: Some(Some(project_name)),
+            ..Default::default()
+        },
     )
     .await
     .map_err(|e| e.to_string())?;
@@ -503,9 +554,10 @@ pub async fn save_im_channels(channels: Vec<ImChannel>) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn platform_status(bridge: State<'_, PlatformBridgeState>) -> Result<PlatformStatus, String> {
-    let running = bridge.child.lock().await.as_mut().is_some_and(|child| {
+    let tracked_running = bridge.child.lock().await.as_mut().is_some_and(|child| {
         child.try_wait().ok().flatten().is_none()
     });
+    let running = tracked_running || is_platform_port_open();
     Ok(PlatformStatus {
         running,
         parent_port: *bridge.parent_port.lock().await,
@@ -524,6 +576,9 @@ pub async fn platform_start(
     }) {
         return platform_status(bridge).await;
     }
+    if is_platform_port_open() {
+        return platform_status(bridge).await;
+    }
 
     let port = start_parent_server(&app_state, &bridge).await?;
     let sidecar = sidecar_path()?;
@@ -533,13 +588,16 @@ pub async fn platform_start(
         .open(log_path()?)
         .map_err(|e| e.to_string())?;
     let log_file_err = log_file.try_clone().map_err(|e| e.to_string())?;
-    let child = Command::new("node")
+    let mut command = Command::new("node");
+    command
         .arg(sidecar)
         .arg("--parent")
         .arg(format!("http://127.0.0.1:{port}"))
         .stdout(Stdio::from(log_file))
-        .stderr(Stdio::from(log_file_err))
-        .spawn()
+        .stderr(Stdio::from(log_file_err));
+    #[cfg(target_os = "windows")]
+    command.creation_flags(0x08000000);
+    let child = command.spawn()
         .map_err(|e| format!("Failed to start platform sidecar with node: {e}"))?;
     *bridge.child.lock().await = Some(child);
     platform_status(bridge).await
@@ -563,6 +621,9 @@ pub async fn platform_reload_config(
         let _ = child.kill();
         let _ = child.wait();
     }
+    if is_platform_port_open() && request_platform_reload() {
+        return platform_status(bridge).await;
+    }
     platform_start(app_state, bridge).await
 }
 
@@ -576,7 +637,10 @@ pub async fn platform_connect_feishu(
 
 #[tauri::command]
 pub async fn platform_read_log(max_bytes: Option<u64>) -> Result<String, String> {
-    let path = log_path()?;
+    read_log_file(log_path()?, max_bytes)
+}
+
+fn read_log_file(path: PathBuf, max_bytes: Option<u64>) -> Result<String, String> {
     if !path.exists() {
         return Ok(String::new());
     }
@@ -588,4 +652,19 @@ pub async fn platform_read_log(max_bytes: Option<u64>) -> Result<String, String>
         &bytes[..]
     };
     Ok(String::from_utf8_lossy(slice).to_string())
+}
+
+#[tauri::command]
+pub async fn install_read_log(max_bytes: Option<u64>) -> Result<String, String> {
+    read_log_file(config_dir()?.join("install.log"), max_bytes)
+}
+
+#[tauri::command]
+pub async fn get_log_file_path(source: String) -> Result<String, String> {
+    let file_name = match source.as_str() {
+        "install" => "install.log",
+        "sidecar" | "platform" => "platform-sidecar.log",
+        other => return Err(format!("Unknown log source: {other}")),
+    };
+    Ok(config_dir()?.join(file_name).display().to_string())
 }

@@ -10,6 +10,11 @@ pub fn frogclaw_home() -> PathBuf {
     user_home().join(".frogclaw")
 }
 
+/// Returns the default project workspace under the FrogClaw config home.
+pub fn default_workspace() -> PathBuf {
+    frogclaw_home().join("workspace")
+}
+
 fn user_home() -> PathBuf {
     #[cfg(not(windows))]
     let home = std::env::var("HOME").expect("HOME env var not set");

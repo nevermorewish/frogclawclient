@@ -30,6 +30,8 @@ mod m20260417_000001_add_category_default_templates;
 mod m20260428_000001_add_drawing_history;
 mod m20260430_000001_add_conversation_thinking_level;
 mod m20260501_000001_add_knowledge_base_rerank_settings;
+mod m20260503_000001_add_conversation_projects;
+mod m20260503_000002_add_agent_engine_fields;
 
 pub struct Migrator;
 
@@ -67,6 +69,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20260428_000001_add_drawing_history::Migration),
             Box::new(m20260430_000001_add_conversation_thinking_level::Migration),
             Box::new(m20260501_000001_add_knowledge_base_rerank_settings::Migration),
+            Box::new(m20260503_000001_add_conversation_projects::Migration),
+            Box::new(m20260503_000002_add_agent_engine_fields::Migration),
         ]
     }
 }
@@ -164,6 +168,52 @@ mod tests {
                     .await
                     .expect("check knowledge base rerank column"),
                 "missing knowledge_bases.{column}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn migrator_up_adds_conversation_project_columns_on_sqlite() {
+        let db = sqlite_test_db().await;
+
+        Migrator::up(&db, None)
+            .await
+            .expect("run sqlite migrations");
+
+        let manager = SchemaManager::new(&db);
+        for column in ["working_directory", "project_name"] {
+            assert!(
+                manager
+                    .has_column("conversations", column)
+                    .await
+                    .expect("check conversation project column"),
+                "missing conversations.{column}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn migrator_up_adds_agent_engine_columns_on_sqlite() {
+        let db = sqlite_test_db().await;
+
+        Migrator::up(&db, None)
+            .await
+            .expect("run sqlite migrations");
+
+        let manager = SchemaManager::new(&db);
+        for column in [
+            "engine_kind",
+            "engine_session_id",
+            "engine_context_json",
+            "engine_context_backup_json",
+            "engine_error",
+        ] {
+            assert!(
+                manager
+                    .has_column("agent_sessions", column)
+                    .await
+                    .expect("check agent engine column"),
+                "missing agent_sessions.{column}"
             );
         }
     }

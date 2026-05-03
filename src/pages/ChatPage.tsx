@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { theme } from 'antd';
 import { useConversationStore, useProviderStore } from '@/stores';
-import { ChatSidebar } from '@/components/chat/ChatSidebar';
 import { ChatView } from '@/components/chat/ChatView';
 
 export function ChatPage() {
@@ -22,15 +21,6 @@ export function ChatPage() {
 
   return (
     <div className="flex h-full" style={{ overflow: 'hidden' }}>
-      <div
-        className="w-64 h-full"
-        style={{
-          borderRight: '1px solid var(--border-color)',
-          backgroundColor: token.colorBgContainer,
-        }}
-      >
-        <ChatSidebar />
-      </div>
       <div
         style={{
           flex: 1,

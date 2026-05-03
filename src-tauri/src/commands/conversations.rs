@@ -34,22 +34,7 @@ async fn resolve_system_prompt(
         }
     }
 
-    // 2. Category-level system prompt (middle priority)
-    if let Some(ref cat_id) = conversation.category_id {
-        if let Ok(categories) =
-            frogclaw_core::repo::conversation_category::list_conversation_categories(db).await
-        {
-            if let Some(cat) = categories.iter().find(|c| &c.id == cat_id) {
-                if let Some(ref s) = cat.system_prompt {
-                    if !s.is_empty() {
-                        return Some(s.clone());
-                    }
-                }
-            }
-        }
-    }
-
-    // 3. Global default system prompt (lowest priority)
+    // 2. Global default system prompt (lowest priority)
     let settings = frogclaw_core::repo::settings::get_settings(db)
         .await
         .unwrap_or_default();
@@ -416,8 +401,10 @@ pub async fn create_conversation(
     model_id: String,
     provider_id: String,
     system_prompt: Option<String>,
+    working_directory: Option<String>,
+    project_name: Option<String>,
 ) -> Result<Conversation, String> {
-    frogclaw_core::repo::conversation::create_conversation(
+    let conversation = frogclaw_core::repo::conversation::create_conversation(
         &state.sea_db,
         &title,
         &model_id,
@@ -425,7 +412,30 @@ pub async fn create_conversation(
         system_prompt.as_deref(),
     )
     .await
+    .map_err(|e| e.to_string())?;
+
+    if working_directory.is_none() && project_name.is_none() {
+        return Ok(conversation);
+    }
+
+    frogclaw_core::repo::conversation::update_conversation(
+        &state.sea_db,
+        &conversation.id,
+        UpdateConversationInput {
+            working_directory: Some(working_directory),
+            project_name: Some(project_name),
+            ..Default::default()
+        },
+    )
+    .await
     .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_default_workspace_project() -> Result<String, String> {
+    let path = crate::paths::default_workspace();
+    std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().to_string())
 }
 
 #[tauri::command]

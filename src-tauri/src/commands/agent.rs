@@ -2,7 +2,9 @@ use crate::AppState;
 use frogclaw_agent::permission::{classify_tool_risk, decide_permission, PermissionAction};
 use frogclaw_agent::security::check_path_safety;
 use frogclaw_core::repo::{agent_session, conversation, message, provider, tool_execution};
-use frogclaw_core::types::{AgentSession, MessageRole, ProviderProxyConfig, ProviderType};
+use frogclaw_core::types::{
+    AgentEngineInfo, AgentSession, MessageRole, ProviderProxyConfig, ProviderType,
+};
 use frogclaw_providers::{resolve_base_url_for_type, ProviderAdapter, ProviderRequestContext};
 use open_agent_sdk::{
     Agent, AgentOptions, CanUseToolFn, ContentBlock, PermissionDecision, SDKMessage, Usage,
@@ -10,14 +12,22 @@ use open_agent_sdk::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
+use std::path::PathBuf;
+use std::process::Command;
 use std::sync::{Arc, LazyLock, Mutex};
 use tauri::{Emitter, State};
+use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::RwLock;
 
 /// In-memory map of conversation IDs to actively running agent task IDs.
 /// Used as the source of truth for concurrency checks (more reliable than DB status).
 static RUNNING_AGENTS: LazyLock<Mutex<HashMap<String, String>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
+
+const ENGINE_FROG_AGENT: &str = "frog_agent";
+const ENGINE_CLAUDE_CODE: &str = "claude_code";
+const ENGINE_CODEX_CLI: &str = "codex_cli";
+const ENGINE_GEMINI_CLI: &str = "gemini_cli";
 
 /// RAII guard that removes a conversation ID from RUNNING_AGENTS on drop.
 /// Ensures cleanup even if the spawned task panics.
@@ -272,6 +282,136 @@ fn provider_type_to_registry_key(pt: &ProviderType) -> &'static str {
     }
 }
 
+fn is_supported_engine_kind(kind: &str) -> bool {
+    matches!(
+        kind,
+        ENGINE_FROG_AGENT | ENGINE_CLAUDE_CODE | ENGINE_CODEX_CLI | ENGINE_GEMINI_CLI
+    )
+}
+
+fn path_entries() -> Vec<PathBuf> {
+    std::env::var_os("PATH")
+        .map(|paths| std::env::split_paths(&paths).collect())
+        .unwrap_or_default()
+}
+
+fn home_dir() -> Option<PathBuf> {
+    std::env::var_os("USERPROFILE")
+        .or_else(|| std::env::var_os("HOME"))
+        .map(PathBuf::from)
+}
+
+fn candidate_binary_names(base: &str) -> Vec<String> {
+    if cfg!(windows) {
+        vec![
+            format!("{base}.exe"),
+            format!("{base}.cmd"),
+            format!("{base}.bat"),
+            base.to_string(),
+        ]
+    } else {
+        vec![base.to_string()]
+    }
+}
+
+fn find_binary(base: &str, extra_dirs: &[PathBuf]) -> Option<PathBuf> {
+    let names = candidate_binary_names(base);
+    let mut dirs = Vec::new();
+    dirs.extend(extra_dirs.iter().cloned());
+    dirs.extend(path_entries());
+
+    for dir in dirs {
+        for name in &names {
+            let path = dir.join(name);
+            if path.is_file() {
+                return Some(path);
+            }
+        }
+    }
+    None
+}
+
+fn claude_candidate_dirs() -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    if let Some(home) = home_dir() {
+        dirs.push(home.join(".local").join("bin"));
+        dirs.push(home.join(".claude").join("bin"));
+        dirs.push(home.join(".bun").join("bin"));
+        dirs.push(home.join(".npm-global").join("bin"));
+    }
+    if cfg!(windows) {
+        if let Some(appdata) = std::env::var_os("APPDATA") {
+            dirs.push(PathBuf::from(appdata).join("npm"));
+        }
+        if let Some(localappdata) = std::env::var_os("LOCALAPPDATA") {
+            dirs.push(PathBuf::from(localappdata).join("npm"));
+        }
+    } else {
+        dirs.push(PathBuf::from("/opt/homebrew/bin"));
+        dirs.push(PathBuf::from("/usr/local/bin"));
+        dirs.push(PathBuf::from("/usr/bin"));
+    }
+    dirs
+}
+
+fn command_version(path: &PathBuf) -> Option<String> {
+    Command::new(path)
+        .arg("--version")
+        .output()
+        .ok()
+        .and_then(|output| {
+            let text = if output.stdout.is_empty() {
+                String::from_utf8_lossy(&output.stderr).trim().to_string()
+            } else {
+                String::from_utf8_lossy(&output.stdout).trim().to_string()
+            };
+            if text.is_empty() {
+                None
+            } else {
+                Some(text.lines().next().unwrap_or_default().to_string())
+            }
+        })
+}
+
+fn cli_engine_info(
+    kind: &str,
+    display_name: &str,
+    description: &str,
+    binary_name: &str,
+    extra_dirs: &[PathBuf],
+    experimental: bool,
+) -> AgentEngineInfo {
+    let binary_path = find_binary(binary_name, extra_dirs);
+    let version = binary_path.as_ref().and_then(command_version);
+    let installed = binary_path.is_some();
+    AgentEngineInfo {
+        kind: kind.to_string(),
+        display_name: display_name.to_string(),
+        description: description.to_string(),
+        available: installed && !experimental,
+        installed,
+        version,
+        binary_path: binary_path
+            .as_ref()
+            .map(|path| path.to_string_lossy().to_string()),
+        status: if installed {
+            if experimental {
+                "experimental".to_string()
+            } else {
+                "available".to_string()
+            }
+        } else {
+            "not_installed".to_string()
+        },
+        message: if installed {
+            None
+        } else {
+            Some(format!("{display_name} CLI not found"))
+        },
+        experimental,
+    }
+}
+
 /// Create an `Arc<dyn ProviderAdapter>` directly (avoids borrow-lifetime issues
 /// with the registry returning `&dyn ProviderAdapter`).
 fn create_adapter_arc(pt: &ProviderType) -> Result<Arc<dyn ProviderAdapter>, String> {
@@ -416,6 +556,41 @@ pub async fn agent_query(
                 },
             );
         }
+    }
+
+    if session.engine_kind == ENGINE_CLAUDE_CODE {
+        let db = state.sea_db.clone();
+        let tokens = state.agent_cancel_tokens.clone();
+        let session_id = session.id.clone();
+        let user_msg_id = user_message.id.clone();
+        let cwd = session.cwd.clone();
+        let permission_mode = session.permission_mode.clone();
+        let conv_id = conversation_id.clone();
+        let prompt_for_task = prompt.clone();
+        tokio::spawn(async move {
+            run_claude_code_cli_query(
+                app,
+                db,
+                tokens,
+                conv_id,
+                session_id,
+                user_msg_id,
+                prompt_for_task,
+                cwd,
+                permission_mode,
+                is_first_message,
+            )
+            .await;
+        });
+        return Ok(());
+    }
+
+    if session.engine_kind != ENGINE_FROG_AGENT {
+        let _ = agent_session::update_agent_session_status(&state.sea_db, &session.id, "idle").await;
+        return Err(format!(
+            "Agent engine '{}' is registered but not implemented yet",
+            session.engine_kind
+        ));
     }
 
     // 5. Get provider + key
@@ -1448,15 +1623,333 @@ pub async fn agent_update_session(
     conversation_id: String,
     cwd: Option<String>,
     permission_mode: Option<String>,
+    engine_kind: Option<String>,
 ) -> Result<AgentSession, String> {
+    if let Some(engine) = engine_kind.as_deref() {
+        if !is_supported_engine_kind(engine) {
+            return Err(format!("Unsupported agent engine: {engine}"));
+        }
+    }
+
     agent_session::upsert_agent_session(
         &state.sea_db,
         &conversation_id,
         cwd.as_deref(),
         permission_mode.as_deref(),
+        engine_kind.as_deref(),
     )
     .await
     .map_err(|e| e.to_string())
+}
+
+fn extract_claude_texts(value: &Value) -> Vec<String> {
+    let mut texts = Vec::new();
+    if let Some(content) = value.pointer("/message/content").and_then(|v| v.as_array()) {
+        for block in content {
+            if block.get("type").and_then(|v| v.as_str()) == Some("text") {
+                if let Some(text) = block.get("text").and_then(|v| v.as_str()) {
+                    if !text.trim().is_empty() {
+                        texts.push(text.to_string());
+                    }
+                }
+            }
+        }
+    }
+    texts
+}
+
+async fn run_claude_code_cli_query(
+    app: tauri::AppHandle,
+    db: sea_orm::DatabaseConnection,
+    state_tokens: Arc<tokio::sync::Mutex<HashMap<String, open_agent_sdk::CancellationToken>>>,
+    conversation_id: String,
+    session_id: String,
+    user_msg_id: String,
+    prompt: String,
+    cwd: Option<String>,
+    permission_mode: String,
+    is_first_message: bool,
+) {
+    let run_id = format!("claude_{}", frogclaw_core::utils::gen_id());
+    if let Ok(mut running) = RUNNING_AGENTS.lock() {
+        running.insert(conversation_id.clone(), run_id.clone());
+    }
+    let _guard = RunningAgentGuard {
+        conversation_id: conversation_id.clone(),
+        run_id,
+    };
+
+    let cancel_token = open_agent_sdk::CancellationToken::new();
+    state_tokens
+        .lock()
+        .await
+        .insert(conversation_id.clone(), cancel_token.clone());
+    let _cancel_guard = AgentCancelTokenGuard {
+        conversation_id: conversation_id.clone(),
+        tokens: state_tokens.clone(),
+    };
+
+    let claude_path = match find_binary("claude", &claude_candidate_dirs()) {
+        Some(path) => path,
+        None => {
+            let _ = app.emit(
+                "agent-error",
+                AgentErrorPayload {
+                    conversation_id: conversation_id.clone(),
+                    assistant_message_id: None,
+                    message: "Claude Code CLI not found. Install and login to Claude Code first."
+                        .to_string(),
+                },
+            );
+            let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+            return;
+        }
+    };
+
+    let mut current_assistant_msg_id: Option<String> = None;
+    let assistant_id_for_task: Arc<RwLock<Option<String>>> = Arc::new(RwLock::new(None));
+    let mut accumulated_text = String::new();
+
+    let mut cmd = tokio::process::Command::new(&claude_path);
+    cmd.arg("-p")
+        .arg("--output-format")
+        .arg("stream-json")
+        .arg("--verbose")
+        .arg(&prompt)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+
+    if permission_mode == "accept_edits" {
+        cmd.arg("--permission-mode").arg("acceptEdits");
+    }
+    if let Some(cwd) = cwd.as_deref() {
+        cmd.current_dir(cwd);
+    }
+
+    let mut child = match cmd.spawn() {
+        Ok(child) => child,
+        Err(err) => {
+            let _ = app.emit(
+                "agent-error",
+                AgentErrorPayload {
+                    conversation_id: conversation_id.clone(),
+                    assistant_message_id: None,
+                    message: format!("Failed to start Claude Code CLI: {err}"),
+                },
+            );
+            let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+            return;
+        }
+    };
+
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+
+    let _ = app.emit(
+        "agent-status",
+        AgentStatusPayload {
+            conversation_id: conversation_id.clone(),
+            message: "Claude Code running".to_string(),
+        },
+    );
+
+    let mut stdout_lines = stdout.map(|out| BufReader::new(out).lines());
+    let mut stderr_lines = stderr.map(|err| BufReader::new(err).lines());
+
+    loop {
+        tokio::select! {
+            _ = async {
+                while !cancel_token.is_cancelled() {
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                }
+            } => {
+                let _ = child.kill().await;
+                let _ = app.emit(
+                    "agent-error",
+                    AgentErrorPayload {
+                        conversation_id: conversation_id.clone(),
+                        assistant_message_id: current_assistant_msg_id.clone(),
+                        message: "Claude Code run cancelled".to_string(),
+                    },
+                );
+                let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+                return;
+            }
+            line = async {
+                match stdout_lines.as_mut() {
+                    Some(lines) => lines.next_line().await,
+                    None => Ok(None),
+                }
+            } => {
+                match line {
+                    Ok(Some(line)) => {
+                        if line.trim().is_empty() {
+                            continue;
+                        }
+                        if let Ok(value) = serde_json::from_str::<Value>(&line) {
+                            let event_type = value.get("type").and_then(|v| v.as_str()).unwrap_or_default();
+                            if event_type == "system" {
+                                if let Some(subtype) = value.get("subtype").and_then(|v| v.as_str()) {
+                                    let _ = app.emit(
+                                        "agent-status",
+                                        AgentStatusPayload {
+                                            conversation_id: conversation_id.clone(),
+                                            message: format!("Claude Code: {subtype}"),
+                                        },
+                                    );
+                                }
+                            }
+                            let mut texts = extract_claude_texts(&value);
+                            if texts.is_empty() && event_type == "result" && accumulated_text.is_empty() {
+                                if let Some(result) = value.get("result").and_then(|v| v.as_str()) {
+                                    if !result.trim().is_empty() {
+                                        texts.push(result.to_string());
+                                    }
+                                }
+                            }
+                            for text in texts {
+                                if !accumulated_text.is_empty() {
+                                    accumulated_text.push_str("\n\n");
+                                }
+                                accumulated_text.push_str(&text);
+                                let assistant_message_id = persist_agent_partial_content(
+                                    &db,
+                                    &app,
+                                    &conversation_id,
+                                    &user_msg_id,
+                                    &accumulated_text,
+                                    &mut current_assistant_msg_id,
+                                    &assistant_id_for_task,
+                                )
+                                .await
+                                .unwrap_or_default();
+                                let _ = app.emit(
+                                    "agent-stream-text",
+                                    AgentTextPayload {
+                                        conversation_id: conversation_id.clone(),
+                                        assistant_message_id,
+                                        text,
+                                    },
+                                );
+                            }
+                        } else {
+                            let assistant_message_id = persist_agent_partial_content(
+                                &db,
+                                &app,
+                                &conversation_id,
+                                &user_msg_id,
+                                &line,
+                                &mut current_assistant_msg_id,
+                                &assistant_id_for_task,
+                            )
+                            .await
+                            .unwrap_or_default();
+                            let _ = app.emit(
+                                "agent-stream-text",
+                                AgentTextPayload {
+                                    conversation_id: conversation_id.clone(),
+                                    assistant_message_id,
+                                    text: line,
+                                },
+                            );
+                        }
+                    }
+                    Ok(None) => break,
+                    Err(err) => {
+                        tracing::warn!("[agent:claude_code] stdout read error: {}", err);
+                        break;
+                    }
+                }
+            }
+            line = async {
+                match stderr_lines.as_mut() {
+                    Some(lines) => lines.next_line().await,
+                    None => Ok(None),
+                }
+            } => {
+                if let Ok(Some(line)) = line {
+                    if !line.trim().is_empty() {
+                        let _ = app.emit(
+                            "agent-status",
+                            AgentStatusPayload {
+                                conversation_id: conversation_id.clone(),
+                                message: line.chars().take(160).collect(),
+                            },
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    match child.wait().await {
+        Ok(status) if status.success() => {
+            let assistant_message_id = if let Some(id) = current_assistant_msg_id.clone() {
+                id
+            } else {
+                let fallback = if accumulated_text.is_empty() {
+                    "Claude Code completed without text output.".to_string()
+                } else {
+                    accumulated_text.clone()
+                };
+                match message::create_message(
+                    &db,
+                    &conversation_id,
+                    MessageRole::Assistant,
+                    &fallback,
+                    &[],
+                    Some(&user_msg_id),
+                    0,
+                )
+                .await
+                {
+                    Ok(msg) => {
+                        let _ = conversation::increment_message_count(&db, &conversation_id).await;
+                        msg.id
+                    }
+                    Err(_) => String::new(),
+                }
+            };
+
+            let _ = app.emit(
+                "agent-done",
+                AgentDonePayload {
+                    conversation_id: conversation_id.clone(),
+                    assistant_message_id,
+                    text: accumulated_text,
+                    usage: None,
+                    num_turns: None,
+                    cost_usd: None,
+                },
+            );
+            let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+            if is_first_message {
+                tracing::info!("[agent:claude_code] first message completed; title fallback already set");
+            }
+        }
+        Ok(status) => {
+            let _ = app.emit(
+                "agent-error",
+                AgentErrorPayload {
+                    conversation_id: conversation_id.clone(),
+                    assistant_message_id: current_assistant_msg_id,
+                    message: format!("Claude Code exited with status: {status}"),
+                },
+            );
+            let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+        }
+        Err(err) => {
+            let _ = app.emit(
+                "agent-error",
+                AgentErrorPayload {
+                    conversation_id: conversation_id.clone(),
+                    assistant_message_id: current_assistant_msg_id,
+                    message: format!("Failed to wait for Claude Code: {err}"),
+                },
+            );
+            let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+        }
+    }
 }
 
 #[tauri::command]
@@ -1467,6 +1960,53 @@ pub async fn agent_get_session(
     agent_session::get_agent_session_by_conversation_id(&state.sea_db, &conversation_id)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn agent_list_engines() -> Result<Vec<AgentEngineInfo>, String> {
+    let claude_dirs = claude_candidate_dirs();
+    let codex_dirs = Vec::new();
+    let gemini_dirs = Vec::new();
+
+    Ok(vec![
+        AgentEngineInfo {
+            kind: ENGINE_FROG_AGENT.to_string(),
+            display_name: "Frog Agent".to_string(),
+            description: "Built-in FrogClaw agent powered by the configured model provider."
+                .to_string(),
+            available: true,
+            installed: true,
+            version: None,
+            binary_path: None,
+            status: "available".to_string(),
+            message: None,
+            experimental: false,
+        },
+        cli_engine_info(
+            ENGINE_CLAUDE_CODE,
+            "Claude Code",
+            "Claude Code CLI engine with local coding-agent capabilities.",
+            "claude",
+            &claude_dirs,
+            false,
+        ),
+        cli_engine_info(
+            ENGINE_CODEX_CLI,
+            "Codex CLI",
+            "Experimental Codex CLI engine placeholder.",
+            "codex",
+            &codex_dirs,
+            true,
+        ),
+        cli_engine_info(
+            ENGINE_GEMINI_CLI,
+            "Gemini CLI",
+            "Experimental Gemini CLI engine placeholder.",
+            "gemini",
+            &gemini_dirs,
+            true,
+        ),
+    ])
 }
 
 /// Create default workspace directory under config home and return its path.

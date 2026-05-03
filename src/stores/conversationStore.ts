@@ -14,10 +14,8 @@ import { formatSearchContent, buildSearchTag } from '@/lib/searchUtils';
 import { buildKnowledgeTag, buildMemoryTag, type RagContextRetrievedEvent } from '@/lib/memoryUtils';
 import { useProviderStore } from '@/stores/providerStore';
 import { useSearchStore } from '@/stores/searchStore';
-import { useCategoryStore } from './categoryStore';
 import type {
   Conversation,
-  ConversationCategory,
   Message,
   MessagePage,
   AttachmentInput,
@@ -139,31 +137,6 @@ function conversationPreferenceUpdateFromState(
   };
 }
 
-function categoryTemplateUpdateFromCategory(
-  category?: ConversationCategory | null,
-): Pick<
-  UpdateConversationInput,
-  | 'category_id'
-  | 'system_prompt'
-  | 'temperature'
-  | 'max_tokens'
-  | 'top_p'
-  | 'frequency_penalty'
-> {
-  if (!category) {
-    return {};
-  }
-
-  return {
-    category_id: category.id,
-    system_prompt: category.system_prompt ?? undefined,
-    temperature: category.default_temperature,
-    max_tokens: category.default_max_tokens,
-    top_p: category.default_top_p,
-    frequency_penalty: category.default_frequency_penalty,
-  };
-}
-
 function nextConversationPreferenceSaveSeq(conversationId: string): number {
   const next = (_conversationPreferenceSaveSeq.get(conversationId) ?? 0) + 1;
   _conversationPreferenceSaveSeq.set(conversationId, next);
@@ -172,6 +145,10 @@ function nextConversationPreferenceSaveSeq(conversationId: string): number {
 
 function isLatestConversationPreferenceSave(conversationId: string, seq: number): boolean {
   return (_conversationPreferenceSaveSeq.get(conversationId) ?? 0) === seq;
+}
+
+function basename(path: string): string {
+  return path.replace(/[\\/]+$/, '').split(/[\\/]/).filter(Boolean).pop() || path;
 }
 
 function getEffectiveThinkingBudget(get: () => ConversationState, conversationId: string): number | undefined {
@@ -566,7 +543,7 @@ interface ConversationState {
     title: string,
     modelId: string,
     providerId: string,
-    options?: { categoryId?: string | null },
+    options?: { workingDirectory?: string | null; projectName?: string | null; categoryId?: string | null },
   ) => Promise<Conversation>;
   updateConversation: (id: string, input: UpdateConversationInput) => Promise<void>;
   renameConversation: (id: string, title: string) => Promise<void>;
@@ -1196,24 +1173,27 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
 
   createConversation: async (title, modelId, providerId, options) => {
     try {
-      const category = options?.categoryId
-        ? useCategoryStore.getState().categories.find((item) => item.id === options.categoryId) ?? null
-        : null;
-      const templateProviderId = category?.default_provider_id ?? providerId;
-      const templateModelId = category?.default_model_id ?? modelId;
+      const workingDirectory = options?.workingDirectory === undefined
+        ? await invoke<string>('get_default_workspace_project').catch(() => null)
+        : options.workingDirectory;
+      const projectName = options?.projectName === undefined && workingDirectory
+        ? basename(workingDirectory)
+        : (options?.projectName ?? null);
       const createdConversation = await invoke<Conversation>('create_conversation', {
         title,
-        modelId: templateModelId,
-        providerId: templateProviderId,
-        systemPrompt: category?.system_prompt ?? undefined,
+        modelId,
+        providerId,
+        workingDirectory,
+        projectName,
       });
       let conversation = createdConversation;
       try {
         conversation = await invoke<Conversation>('update_conversation', {
           id: createdConversation.id,
           input: {
-            ...categoryTemplateUpdateFromCategory(category),
             ...conversationPreferenceUpdateFromState(get()),
+            working_directory: workingDirectory,
+            project_name: projectName,
           },
         });
       } catch (preferenceError) {

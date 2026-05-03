@@ -116,7 +116,7 @@ function AppInner() {
       <Layout className="flex-1 overflow-hidden" style={{ backgroundColor: 'transparent' }}>
         {!isInSettings && (
           <Sider
-            width={148}
+            width={280}
             style={{
               backgroundColor: 'transparent',
               borderRight: '1px solid var(--border-color)',

@@ -110,6 +110,8 @@ pub fn run() {
             commands::platform_bridge::platform_reload_config,
             commands::platform_bridge::platform_connect_feishu,
             commands::platform_bridge::platform_read_log,
+            commands::platform_bridge::install_read_log,
+            commands::platform_bridge::get_log_file_path,
             // drawing
             commands::drawing::list_drawing_generations,
             commands::drawing::upload_drawing_reference,
@@ -119,6 +121,7 @@ pub fn run() {
             commands::drawing::delete_drawing_generation,
             // conversations
             commands::conversations::list_conversations,
+            commands::conversations::get_default_workspace_project,
             commands::conversations::create_conversation,
             commands::conversations::update_conversation,
             commands::conversations::delete_conversation,
@@ -277,6 +280,7 @@ pub fn run() {
             commands::storage::reset_documents_root,
             // agent
             commands::agent::agent_query,
+            commands::agent::agent_list_engines,
             commands::agent::agent_cancel,
             commands::agent::agent_update_session,
             commands::agent::agent_get_session,
@@ -329,6 +333,8 @@ pub fn run() {
             // %USERPROFILE%\.frogclaw\ on Windows).
             let app_dir = paths::frogclaw_home();
             std::fs::create_dir_all(&app_dir).expect("failed to create FrogClawClient home dir");
+            std::fs::create_dir_all(paths::default_workspace())
+                .expect("failed to create default workspace dir");
 
             // Ensure ~/Documents/frogclaw/{images,files,backups}/ exist
             frogclaw_core::storage_paths::ensure_documents_dirs()
@@ -458,6 +464,17 @@ pub fn run() {
                 agent_always_allowed: Arc::new(Mutex::new(std::collections::HashMap::new())),
             });
             app.manage(commands::platform_bridge::PlatformBridgeState::default());
+
+            {
+                let app_handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    let app_state = app_handle.state::<AppState>();
+                    let bridge_state = app_handle.state::<commands::platform_bridge::PlatformBridgeState>();
+                    if let Err(err) = commands::platform_bridge::platform_start(app_state, bridge_state).await {
+                        tracing::warn!("Platform sidecar auto-start failed: {}", err);
+                    }
+                });
+            }
 
             // Reset any agent sessions that were running when app crashed/closed
             {

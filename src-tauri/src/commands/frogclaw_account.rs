@@ -189,6 +189,9 @@ fn provider_type_name(provider_type: &ProviderType) -> &'static str {
 }
 
 fn model_supports_provider(model: &FrogclawPricingModel, provider_type: &ProviderType) -> bool {
+    if !model_name_matches_provider_family(&model.model_name, provider_type) {
+        return false;
+    }
     if model.supported_endpoint_types.is_empty() {
         return true;
     }
@@ -200,6 +203,37 @@ fn model_supports_provider(model: &FrogclawPricingModel, provider_type: &Provide
         }
         _ => true,
     })
+}
+
+fn model_name_matches_provider_family(model_name: &str, provider_type: &ProviderType) -> bool {
+    let model = model_name.to_lowercase();
+    let is_claude = model.starts_with("claude-")
+        || model.starts_with("anthropic/")
+        || model.contains("/claude-");
+    let is_gemini = model.starts_with("gemini-")
+        || model.starts_with("google/")
+        || model.contains("/gemini-");
+
+    match provider_type {
+        ProviderType::Anthropic => !is_gemini && (is_claude || !is_openai_family_model(&model)),
+        ProviderType::Gemini => !is_claude && (is_gemini || !is_openai_family_model(&model)),
+        ProviderType::OpenAI | ProviderType::OpenAIResponses => !is_claude && !is_gemini,
+        _ => true,
+    }
+}
+
+fn is_openai_family_model(model: &str) -> bool {
+    model.starts_with("gpt-")
+        || model.starts_with("o1")
+        || model.starts_with("o3")
+        || model.starts_with("o4")
+        || model.starts_with("o5")
+        || model.starts_with("codex")
+        || model.starts_with("text-embedding-")
+        || model.starts_with("tts-")
+        || model.starts_with("whisper-")
+        || model.starts_with("dall-e-")
+        || model.starts_with("gpt-image-")
 }
 
 fn capabilities_for_model(model_id: &str, provider_type: &ProviderType) -> Vec<ModelCapability> {
@@ -533,6 +567,7 @@ async fn configure_system_providers(
         .await?;
         let models: Vec<Model> = available_models
             .iter()
+            .filter(|model| model_supports_provider(model, &ProviderType::OpenAIResponses))
             .map(|model| Model {
                 provider_id: provider_id.clone(),
                 model_id: model.model_name.clone(),

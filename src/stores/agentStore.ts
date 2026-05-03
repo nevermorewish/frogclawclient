@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { invoke, listen, type UnlistenFn } from '@/lib/invoke';
 import type {
   AgentSession,
+  AgentEngineKind,
   ToolCallState,
   ToolUseEvent,
   ToolStartEvent,
@@ -36,6 +37,7 @@ interface AgentStore {
   fetchSession: (conversationId: string) => Promise<AgentSession | null>;
   updateCwd: (conversationId: string, cwd: string) => Promise<void>;
   updatePermissionMode: (conversationId: string, mode: string) => Promise<void>;
+  updateEngine: (conversationId: string, engineKind: AgentEngineKind) => Promise<AgentSession | null>;
   approveToolUse: (conversationId: string, toolUseId: string, decision: string) => Promise<void>;
 
   // Event handlers
@@ -109,6 +111,22 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
       }));
     } catch (e) {
       console.error('[agentStore] updatePermissionMode failed:', e);
+    }
+  },
+
+  updateEngine: async (conversationId, engineKind) => {
+    try {
+      const session = await invoke<AgentSession>('agent_update_session', {
+        conversationId,
+        engineKind,
+      });
+      set((s) => ({
+        sessions: { ...s.sessions, [conversationId]: session },
+      }));
+      return session;
+    } catch (e) {
+      console.error('[agentStore] updateEngine failed:', e);
+      return null;
     }
   },
 

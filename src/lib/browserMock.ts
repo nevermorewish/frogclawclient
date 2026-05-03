@@ -421,8 +421,10 @@ export async function handleCommand<T>(cmd: string, args?: Record<string, unknow
       return getStore('conversations', []).filter((c: any) => !c.is_archived) as T;
     case 'list_archived_conversations':
       return getStore('conversations', []).filter((c: any) => c.is_archived) as T;
+    case 'get_default_workspace_project':
+      return 'C:\\Users\\Administrator\\.frogclaw\\workspace' as T;
     case 'create_conversation': {
-      const { title, modelId, providerId } = args as any;
+      const { title, modelId, providerId, workingDirectory, projectName } = args as any;
       const conv = {
         id: genId(),
         title,
@@ -443,6 +445,12 @@ export async function handleCommand<T>(cmd: string, args?: Record<string, unknow
         message_count: 0,
         is_pinned: false,
         is_archived: false,
+        context_compression: false,
+        category_id: null,
+        working_directory: workingDirectory ?? null,
+        project_name: projectName ?? null,
+        parent_conversation_id: null,
+        mode: 'chat',
         created_at: nowTs(),
         updated_at: nowTs(),
       };

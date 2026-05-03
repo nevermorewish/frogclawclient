@@ -1,6 +1,7 @@
 export type AgentPermissionMode = 'default' | 'accept_edits' | 'full_access';
 export type AgentRuntimeStatus = 'idle' | 'running' | 'waiting_approval' | 'completed' | 'error';
 export type ApprovalStatus = 'pending' | 'approved' | 'denied';
+export type AgentEngineKind = 'frog_agent' | 'claude_code' | 'codex_cli' | 'gemini_cli';
 
 export interface AgentSession {
   id: string;
@@ -8,8 +9,27 @@ export interface AgentSession {
   cwd?: string;
   permission_mode: AgentPermissionMode;
   runtime_status: AgentRuntimeStatus;
+  engine_kind?: AgentEngineKind;
+  engineKind?: AgentEngineKind;
+  engine_session_id?: string | null;
+  engineSessionId?: string | null;
+  engine_error?: string | null;
+  engineError?: string | null;
   total_tokens: number;
   total_cost_usd: number;
+}
+
+export interface AgentEngineInfo {
+  kind: AgentEngineKind;
+  displayName: string;
+  description: string;
+  available: boolean;
+  installed: boolean;
+  version?: string | null;
+  binaryPath?: string | null;
+  status: 'available' | 'not_installed' | 'experimental' | string;
+  message?: string | null;
+  experimental: boolean;
 }
 
 // --- Event payload types (all tool-related events carry assistantMessageId anchor) ---

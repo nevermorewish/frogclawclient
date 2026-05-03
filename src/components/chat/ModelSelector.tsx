@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
-import { Tag, Modal, Input, theme, Tooltip, Button, Checkbox } from 'antd';
+import { Tag, Modal, Input, theme, Tooltip, Button, Checkbox, Popover } from 'antd';
 import { Search, Settings, Pin, PinOff, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Eye, Wrench, Lightbulb, Mic, MessageSquare, Check, GitCompareArrows } from 'lucide-react';
 import { ModelIcon } from '@lobehub/icons';
 import { useTranslation } from 'react-i18next';
@@ -74,6 +74,7 @@ export function ModelSelector({ style, onSelect, overrideCurrentModel, children,
 
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = controlledOpen !== undefined;
+  const useModalSelector = Boolean(children || multiSelect || onSelect || isControlled);
   const open = isControlled ? controlledOpen : internalOpen;
   const setOpen = useCallback((v: boolean) => {
     if (onOpenChange) onOpenChange(v);
@@ -181,6 +182,23 @@ export function ModelSelector({ style, onSelect, overrideCurrentModel, children,
       }))
       .filter((p) => p.models.length > 0);
   }, [providers, search, excludeModelKeys]);
+
+  const dropdownModels = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    return allEnabledModels
+      .filter((item) =>
+        !q
+        || item.name.toLowerCase().includes(q)
+        || item.mid.toLowerCase().includes(q)
+        || item.providerName.toLowerCase().includes(q),
+      )
+      .sort((left, right) => {
+        const leftPinned = pinnedModels.includes(`${left.pid}::${left.mid}`);
+        const rightPinned = pinnedModels.includes(`${right.pid}::${right.mid}`);
+        if (leftPinned !== rightPinned) return leftPinned ? -1 : 1;
+        return left.name.localeCompare(right.name);
+      });
+  }, [allEnabledModels, pinnedModels, search]);
 
   const handleSelect = useCallback(
     (providerId: string, modelId: string) => {
@@ -433,10 +451,145 @@ export function ModelSelector({ style, onSelect, overrideCurrentModel, children,
     );
   };
 
+  const dropdownContent = (
+    <div style={{ width: 280, padding: 8 }}>
+      <Input
+        prefix={<Search size={14} style={{ color: token.colorTextSecondary }} />}
+        placeholder={t('chat.searchModelOrProvider')}
+        variant="borderless"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            setOpen(false);
+            setSearch('');
+          }
+        }}
+        autoFocus
+        style={{
+          marginBottom: 6,
+          borderRadius: 8,
+          backgroundColor: token.colorFillTertiary,
+        }}
+      />
+      <div style={{ maxHeight: 320, overflowY: 'auto', padding: '2px 0' }}>
+        {dropdownModels.length === 0 ? (
+          <div style={{ padding: '18px 8px', textAlign: 'center', color: token.colorTextSecondary, fontSize: 12 }}>
+            {t('common.noData', '暂无数据')}
+          </div>
+        ) : (
+          dropdownModels.map((item) => {
+            const key = `${item.pid}::${item.mid}`;
+            const isActive = currentValue === key;
+            const isPinned = pinnedModels.includes(key);
+            return (
+              <div
+                key={key}
+                className="flex items-center gap-2 cursor-pointer"
+                style={{
+                  minHeight: 32,
+                  borderRadius: 6,
+                  padding: '5px 8px',
+                  backgroundColor: isActive ? token.colorPrimaryBg : undefined,
+                  color: isActive ? token.colorPrimary : token.colorText,
+                }}
+                onClick={() => handleSelect(item.pid, item.mid)}
+              >
+                <ModelIcon model={item.mid} size={18} type="avatar" />
+                <span className="truncate" style={{ flex: 1, fontSize: 12.5, fontFamily: 'var(--code-font-family, inherit)' }}>
+                  {item.name}
+                </span>
+                <span
+                  style={{ color: isPinned ? token.colorPrimary : token.colorTextQuaternary, display: 'inline-flex' }}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    togglePin(key);
+                  }}
+                >
+                  {isPinned ? <PinOff size={13} /> : <Pin size={13} />}
+                </span>
+                {isActive && <Check size={14} style={{ color: token.colorPrimary }} />}
+              </div>
+            );
+          })
+        )}
+      </div>
+      <div style={{ borderTop: `1px solid ${token.colorBorderSecondary}`, marginTop: 6, paddingTop: 6 }}>
+        <Button
+          type="text"
+          size="small"
+          icon={<Settings size={14} />}
+          style={{ width: '100%', justifyContent: 'flex-start' }}
+          onClick={() => {
+            setOpen(false);
+            setSearch('');
+            setActivePage('settings');
+            setSettingsSection('providers');
+          }}
+        >
+          {t('composer.manageProviders', '管理模型服务商')}
+        </Button>
+      </div>
+    </div>
+  );
+
   return (
     <>
       {children ? (
         <span onClick={() => setOpen(true)}>{children}</span>
+      ) : !useModalSelector ? (
+        <Popover
+          trigger="click"
+          placement="topLeft"
+          arrow={false}
+          open={open}
+          onOpenChange={(value) => {
+            setOpen(value);
+            if (!value) setSearch('');
+          }}
+          content={dropdownContent}
+        >
+          <Tooltip title={`${t('chat.switchModel')} (${formatShortcutForDisplay(getShortcutBinding(settings, 'toggleModelSelector'))})`} placement="top">
+            <Button
+              type="text"
+              size="small"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                flexWrap: 'nowrap',
+                gap: 7,
+                fontSize: 12,
+                fontFamily: 'var(--code-font-family, inherit)',
+                height: 28,
+                maxWidth: 220,
+                whiteSpace: 'nowrap',
+                ...style,
+              }}
+            >
+              {currentModel && (
+                <>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, marginRight: 2 }}>
+                    <ModelIcon model={currentModel.mid} size={15} type="avatar" />
+                  </span>
+                  <span
+                    className="truncate"
+                    style={{
+                      display: 'inline-block',
+                      maxWidth: 170,
+                      minWidth: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {currentModel.name}
+                  </span>
+                </>
+              )}
+              <ChevronDown size={12} style={{ flexShrink: 0 }} />
+            </Button>
+          </Tooltip>
+        </Popover>
       ) : (
         <Tooltip title={`${t('chat.switchModel')} (${formatShortcutForDisplay(getShortcutBinding(settings, 'toggleModelSelector'))})`} placement="bottom">
         <Tag
@@ -455,9 +608,6 @@ export function ModelSelector({ style, onSelect, overrideCurrentModel, children,
           {currentModel && (
             <>
               <ModelIcon model={currentModel.mid} size={16} type="avatar" />
-              {currentModel.providerName && (
-                <Tag style={{ fontSize: 11, margin: 0, padding: '0 4px', lineHeight: '16px', color: token.colorPrimary, backgroundColor: token.colorPrimaryBg, border: 'none' }}>{currentModel.providerName}</Tag>
-              )}
               <span>{currentModel.name}</span>
             </>
           )}
@@ -465,6 +615,7 @@ export function ModelSelector({ style, onSelect, overrideCurrentModel, children,
         </Tooltip>
       )}
 
+      {useModalSelector && (
       <Modal
         open={open}
         onCancel={() => { setOpen(false); setSearch(''); }}
@@ -559,7 +710,7 @@ export function ModelSelector({ style, onSelect, overrideCurrentModel, children,
                       transform: `translateY(${virtualRow.start}px)`,
                     }}
                   >
-                    {renderModelItem(row.pid, row.mid, row.name, row.providerName, true, true, row.model, virtualRow.index === activeIndex)}
+                    {renderModelItem(row.pid, row.mid, row.name, row.providerName, true, false, row.model, virtualRow.index === activeIndex)}
                   </div>
                 );
               }
@@ -640,6 +791,7 @@ export function ModelSelector({ style, onSelect, overrideCurrentModel, children,
           </div>
         </div>
       </Modal>
+      )}
     </>
   );
 }

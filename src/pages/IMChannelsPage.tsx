@@ -1,17 +1,48 @@
 import { useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { App, Button, Card, Empty, Form, Input, Modal, Space, Switch, Table, Tag, Typography, theme } from 'antd';
+import { openUrl } from '@tauri-apps/plugin-opener';
+import {
+  App,
+  Button,
+  Card,
+  Empty,
+  Form,
+  Input,
+  Modal,
+  Select,
+  Space,
+  Switch,
+  Table,
+  Tag,
+  Tooltip,
+  Typography,
+  theme,
+} from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { MessageCircle, Play, Plus, RefreshCw, Save, Square, Trash2 } from 'lucide-react';
+import {
+  Bot,
+  CircleOff,
+  Edit3,
+  ExternalLink,
+  MessageCircle,
+  Plus,
+  RefreshCw,
+  Save,
+  Trash2,
+} from 'lucide-react';
+
+type ImPlatform = 'feishu' | 'qq';
+type Assignment = 'frogclaw' | 'none';
 
 type ImChannel = {
   id: string;
-  platform: string;
+  platform: ImPlatform;
   appId: string;
   appSecret: string;
   label?: string | null;
   enabled: boolean;
-  assignment?: string | null;
+  assignment?: Assignment | null;
+  sandbox?: boolean | null;
 };
 
 type PlatformStatus = {
@@ -22,47 +53,87 @@ type PlatformStatus = {
 };
 
 type ChannelFormValue = {
+  platform: ImPlatform;
   label?: string;
   appId: string;
   appSecret: string;
   enabled: boolean;
+  assignment: Assignment;
+  sandbox?: boolean;
 };
 
-function newChannel(): ImChannel {
+const PLATFORM_META: Record<ImPlatform, { label: string; color: string; appIdPlaceholder: string; secretPlaceholder: string; docsUrl: string }> = {
+  feishu: {
+    label: '飞书',
+    color: 'blue',
+    appIdPlaceholder: 'cli_xxxxxxxxxxxxxxxx',
+    secretPlaceholder: '飞书应用 App Secret',
+    docsUrl: 'https://open.feishu.cn/app',
+  },
+  qq: {
+    label: 'QQ',
+    color: 'cyan',
+    appIdPlaceholder: '1020xxxxxx',
+    secretPlaceholder: 'QQ 机器人 App Secret',
+    docsUrl: 'https://q.qq.com',
+  },
+};
+
+function createChannel(platform: ImPlatform = 'feishu'): ImChannel {
   return {
-    id: `feishu-${crypto.randomUUID()}`,
-    platform: 'feishu',
+    id: `${platform}-${crypto.randomUUID()}`,
+    platform,
     appId: '',
     appSecret: '',
-    label: '飞书',
+    label: '',
     enabled: true,
     assignment: 'frogclaw',
+    sandbox: false,
   };
 }
 
+function platformTag(platform: ImPlatform) {
+  const meta = PLATFORM_META[platform];
+  return <Tag color={meta.color}>{meta.label}</Tag>;
+}
+
+function maskSecret(secret: string) {
+  if (!secret) return '未填写 App Secret';
+  if (secret.length <= 8) return '********';
+  return `${secret.slice(0, 4)}****${secret.slice(-4)}`;
+}
+
 export function IMChannelsPage() {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const { token } = theme.useToken();
   const [channels, setChannels] = useState<ImChannel[]>([]);
   const [status, setStatus] = useState<PlatformStatus | null>(null);
-  const [logs, setLogs] = useState('');
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<ImChannel | null>(null);
   const [form] = Form.useForm<ChannelFormValue>();
+  const selectedPlatform = Form.useWatch('platform', form) ?? 'feishu';
 
-  const enabledCount = useMemo(() => channels.filter((ch) => ch.enabled).length, [channels]);
+  const activeCount = useMemo(
+    () => channels.filter((ch) => ch.enabled && ch.assignment !== 'none').length,
+    [channels],
+  );
 
   const load = async () => {
     setLoading(true);
     try {
-      const [remoteChannels, remoteStatus, remoteLogs] = await Promise.all([
+      const [remoteChannels, remoteStatus] = await Promise.all([
         invoke<ImChannel[]>('get_im_channels'),
         invoke<PlatformStatus>('platform_status'),
-        invoke<string>('platform_read_log', { maxBytes: 48000 }),
       ]);
-      setChannels(remoteChannels);
+      setChannels(remoteChannels.map((ch) => ({
+        ...ch,
+        platform: ch.platform === 'qq' ? 'qq' : 'feishu',
+        enabled: ch.enabled !== false,
+        assignment: ch.assignment === 'none' ? 'none' : 'frogclaw',
+        sandbox: Boolean(ch.sandbox),
+      })));
       setStatus(remoteStatus);
-      setLogs(remoteLogs);
     } catch (err) {
       message.error(String(err));
     } finally {
@@ -74,64 +145,88 @@ export function IMChannelsPage() {
     void load();
   }, []);
 
+  const applySidecarConfig = async () => {
+    try {
+      const remoteStatus = await invoke<PlatformStatus>('platform_status');
+      if (remoteStatus.running) {
+        await invoke('platform_reload_config');
+      } else {
+        await invoke('platform_start');
+      }
+      setStatus(await invoke<PlatformStatus>('platform_status'));
+    } catch (err) {
+      message.warning(`通道已保存，但 sidecar 刷新失败：${String(err)}`);
+    }
+  };
+
   const saveChannels = async (next: ImChannel[]) => {
     await invoke('save_im_channels', { channels: next });
     setChannels(next);
+    await applySidecarConfig();
   };
 
-  const openEditor = (record?: ImChannel) => {
-    const value = record ?? newChannel();
+  const openEditor = (record?: ImChannel, platform: ImPlatform = 'feishu') => {
+    const value = record ?? createChannel(platform);
     setEditing(value);
     form.setFieldsValue({
+      platform: value.platform,
       label: value.label ?? '',
       appId: value.appId,
       appSecret: value.appSecret,
-      enabled: value.enabled,
+      enabled: value.enabled !== false,
+      assignment: value.assignment === 'none' ? 'none' : 'frogclaw',
+      sandbox: Boolean(value.sandbox),
     });
   };
 
   const submitEditor = async () => {
     const values = await form.validateFields();
     if (!editing) return;
-    const nextChannel: ImChannel = {
-      ...editing,
-      platform: 'feishu',
-      label: values.label?.trim() || '飞书',
-      appId: values.appId.trim(),
-      appSecret: values.appSecret.trim(),
-      enabled: values.enabled,
-      assignment: 'frogclaw',
-    };
-    const exists = channels.some((ch) => ch.id === nextChannel.id);
-    const next = exists
-      ? channels.map((ch) => (ch.id === nextChannel.id ? nextChannel : ch))
-      : [...channels, nextChannel];
-    await saveChannels(next);
-    setEditing(null);
-    message.success('IM 通道已保存');
-  };
 
-  const removeChannel = async (record: ImChannel) => {
-    await saveChannels(channels.filter((ch) => ch.id !== record.id));
-    message.success('IM 通道已删除');
-  };
-
-  const toggleEnabled = async (record: ImChannel, enabled: boolean) => {
-    await saveChannels(channels.map((ch) => (ch.id === record.id ? { ...ch, enabled } : ch)));
-  };
-
-  const runCommand = async (command: 'platform_start' | 'platform_stop' | 'platform_reload_config') => {
-    setLoading(true);
+    setSaving(true);
     try {
-      const nextStatus = await invoke<PlatformStatus>(command);
-      setStatus(nextStatus);
-      setLogs(await invoke<string>('platform_read_log', { maxBytes: 48000 }));
-      message.success(command === 'platform_stop' ? 'IM 通道已停止' : 'IM 通道已启动');
-    } catch (err) {
-      message.error(String(err));
+      const platform = values.platform;
+      const appId = values.appId.trim();
+      const nextChannel: ImChannel = {
+        ...editing,
+        id: editing.appId && editing.platform === platform ? editing.id : `${platform}-${appId}`,
+        platform,
+        label: values.label?.trim() || '',
+        appId,
+        appSecret: values.appSecret.trim(),
+        enabled: values.enabled,
+        assignment: values.assignment,
+        sandbox: platform === 'qq' ? Boolean(values.sandbox) : false,
+      };
+
+      const next = channels.some((ch) => ch.id === editing.id)
+        ? channels.map((ch) => (ch.id === editing.id ? nextChannel : ch))
+        : [...channels, nextChannel];
+
+      await saveChannels(next);
+      setEditing(null);
+      message.success('IM 通道已保存');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
+  };
+
+  const confirmRemove = (record: ImChannel) => {
+    modal.confirm({
+      title: `删除 ${PLATFORM_META[record.platform].label} 通道？`,
+      content: record.appId,
+      okText: '删除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: async () => {
+        await saveChannels(channels.filter((ch) => ch.id !== record.id));
+        message.success('IM 通道已删除');
+      },
+    });
+  };
+
+  const patchChannel = async (record: ImChannel, patch: Partial<ImChannel>) => {
+    await saveChannels(channels.map((ch) => (ch.id === record.id ? { ...ch, ...patch } : ch)));
   };
 
   const columns: ColumnsType<ImChannel> = [
@@ -140,44 +235,57 @@ export function IMChannelsPage() {
       dataIndex: 'label',
       render: (_value, record) => (
         <Space direction="vertical" size={0}>
-          <Typography.Text strong>{record.label || '飞书'}</Typography.Text>
+          <Space size={8}>
+            <Typography.Text strong>{record.label || `${PLATFORM_META[record.platform].label} 机器人`}</Typography.Text>
+            {platformTag(record.platform)}
+            {record.platform === 'qq' && record.sandbox ? <Tag color="orange">沙箱</Tag> : null}
+          </Space>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            {record.appId || '未填写 App ID'}
+            {record.appId || '未填写 App ID'} · {maskSecret(record.appSecret)}
           </Typography.Text>
         </Space>
       ),
     },
     {
-      title: '平台',
-      width: 110,
-      render: () => <Tag color="blue">飞书</Tag>,
-    },
-    {
-      title: '连接',
-      width: 120,
+      title: '状态',
+      width: 130,
       render: (_, record) => (
         <Switch
           checked={record.enabled}
           checkedChildren="启用"
           unCheckedChildren="停用"
-          onChange={(checked) => void toggleEnabled(record, checked)}
+          onChange={(checked) => void patchChannel(record, { enabled: checked })}
         />
       ),
     },
     {
-      title: '目标',
-      width: 150,
-      render: () => <Tag color="green">项目对话</Tag>,
+      title: '后端',
+      width: 170,
+      render: (_, record) => (
+        <Select<Assignment>
+          size="small"
+          value={record.assignment === 'none' ? 'none' : 'frogclaw'}
+          style={{ width: 130 }}
+          options={[
+            { value: 'frogclaw', label: 'FrogClaw 对话' },
+            { value: 'none', label: '未分配' },
+          ]}
+          onChange={(assignment) => void patchChannel(record, { assignment })}
+        />
+      ),
     },
     {
       title: '操作',
-      width: 190,
+      width: 130,
+      align: 'right',
       render: (_, record) => (
         <Space>
-          <Button size="small" onClick={() => openEditor(record)}>
-            编辑
-          </Button>
-          <Button size="small" danger icon={<Trash2 size={14} />} onClick={() => void removeChannel(record)} />
+          <Tooltip title="编辑">
+            <Button size="small" icon={<Edit3 size={14} />} onClick={() => openEditor(record)} />
+          </Tooltip>
+          <Tooltip title="删除">
+            <Button size="small" danger icon={<Trash2 size={14} />} onClick={() => confirmRemove(record)} />
+          </Tooltip>
         </Space>
       ),
     },
@@ -185,7 +293,7 @@ export function IMChannelsPage() {
 
   return (
     <div style={{ height: '100%', overflow: 'auto', background: token.colorBgLayout }}>
-      <div style={{ maxWidth: 1180, margin: '0 auto', padding: 24 }}>
+      <div style={{ maxWidth: 1120, margin: '0 auto', padding: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <Space align="center">
             <span style={{ width: 34, height: 34, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: token.borderRadius, background: token.colorPrimaryBg, color: token.colorPrimary }}>
@@ -193,73 +301,90 @@ export function IMChannelsPage() {
             </span>
             <div>
               <Typography.Title level={4} style={{ margin: 0 }}>IM 通道</Typography.Title>
-              <Typography.Text type="secondary">飞书消息会进入 FrogClawClient 项目对话，回复通过飞书流动卡片持续更新。</Typography.Text>
+              <Typography.Text type="secondary">配置飞书和 QQ 机器人，消息会进入 FrogClawClient 项目对话。</Typography.Text>
             </div>
           </Space>
           <Space>
+            {status?.running ? <Tag color="green">Sidecar 已自动运行</Tag> : <Tag color="red">Sidecar 未运行</Tag>}
+            <Typography.Text type="secondary">已启用 {activeCount} 个通道</Typography.Text>
             <Button icon={<RefreshCw size={16} />} onClick={() => void load()} loading={loading}>刷新</Button>
-            <Button type="primary" icon={<Plus size={16} />} onClick={() => openEditor()}>添加飞书</Button>
+            <Button icon={<Bot size={16} />} onClick={() => openEditor(undefined, 'qq')}>添加 QQ</Button>
+            <Button type="primary" icon={<Plus size={16} />} onClick={() => openEditor(undefined, 'feishu')}>添加飞书</Button>
           </Space>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16, alignItems: 'start' }}>
-          <Card styles={{ body: { padding: 0 } }}>
-            <Table
-              rowKey="id"
-              columns={columns}
-              dataSource={channels}
-              loading={loading}
-              pagination={false}
-              locale={{ emptyText: <Empty description="还没有 IM 通道" /> }}
-            />
-          </Card>
-
-          <Card title="运行状态" extra={status?.running ? <Tag color="green">运行中</Tag> : <Tag>已停止</Tag>}>
-            <Space direction="vertical" style={{ width: '100%' }} size={12}>
-              <Typography.Text type="secondary">启用通道：{enabledCount}</Typography.Text>
-              <Typography.Text type="secondary" copyable={{ text: status?.config_path || '' }}>配置：{status?.config_path || '-'}</Typography.Text>
-              <Typography.Text type="secondary" copyable={{ text: status?.log_path || '' }}>日志：{status?.log_path || '-'}</Typography.Text>
-              <Space>
-                <Button type="primary" icon={<Play size={15} />} onClick={() => void runCommand('platform_start')} loading={loading}>启动</Button>
-                <Button icon={<Square size={15} />} onClick={() => void runCommand('platform_stop')} loading={loading}>停止</Button>
-                <Button icon={<RefreshCw size={15} />} onClick={() => void runCommand('platform_reload_config')} loading={loading}>重载</Button>
-              </Space>
-              <Typography.Paragraph type="secondary" style={{ margin: 0, fontSize: 12 }}>
-                飞书卡片支持 Markdown 风格内容和交互卡片块，不能直接嵌入项目内的完整富文本 React 渲染器；当前会把对话内容转换为飞书卡片 Markdown。
-              </Typography.Paragraph>
-            </Space>
-          </Card>
-        </div>
-
-        <Card title="Sidecar 日志" style={{ marginTop: 16 }} extra={<Button size="small" icon={<RefreshCw size={14} />} onClick={() => void load()}>刷新日志</Button>}>
-          <pre style={{ margin: 0, minHeight: 220, maxHeight: 360, overflow: 'auto', whiteSpace: 'pre-wrap', fontSize: 12, color: token.colorTextSecondary }}>
-            {logs || '暂无日志'}
-          </pre>
+        <Card styles={{ body: { padding: 0 } }}>
+          <Table
+            rowKey="id"
+            columns={columns}
+            dataSource={channels}
+            loading={loading}
+            pagination={false}
+            locale={{ emptyText: <Empty description="还没有 IM 通道" /> }}
+          />
         </Card>
       </div>
 
       <Modal
-        title={editing?.id && channels.some((ch) => ch.id === editing.id) ? '编辑飞书通道' : '添加飞书通道'}
+        title={editing?.appId ? '编辑 IM 通道' : `添加 ${PLATFORM_META[selectedPlatform].label} 通道`}
         open={!!editing}
         onCancel={() => setEditing(null)}
         onOk={() => void submitEditor()}
         okText="保存"
+        confirmLoading={saving}
         okButtonProps={{ icon: <Save size={15} /> }}
         destroyOnHidden
       >
-        <Form form={form} layout="vertical" initialValues={{ enabled: true }}>
+        <Form form={form} layout="vertical" initialValues={{ platform: 'feishu', enabled: true, assignment: 'frogclaw', sandbox: false }}>
+          <Form.Item label="平台" name="platform" rules={[{ required: true }]}>
+            <Select
+              options={[
+                { value: 'feishu', label: '飞书' },
+                { value: 'qq', label: 'QQ' },
+              ]}
+            />
+          </Form.Item>
           <Form.Item label="名称" name="label">
-            <Input placeholder="飞书机器人" />
+            <Input placeholder={`${PLATFORM_META[selectedPlatform].label} 机器人`} />
           </Form.Item>
-          <Form.Item label="App ID" name="appId" rules={[{ required: true, message: '请输入飞书 App ID' }]}>
-            <Input placeholder="cli_xxx" />
+          <Form.Item label="App ID" name="appId" rules={[{ required: true, message: '请输入 App ID' }]}>
+            <Input placeholder={PLATFORM_META[selectedPlatform].appIdPlaceholder} />
           </Form.Item>
-          <Form.Item label="App Secret" name="appSecret" rules={[{ required: true, message: '请输入飞书 App Secret' }]}>
-            <Input.Password placeholder="飞书应用密钥" />
+          <Form.Item label="App Secret" name="appSecret" rules={[{ required: true, message: '请输入 App Secret' }]}>
+            <Input.Password placeholder={PLATFORM_META[selectedPlatform].secretPlaceholder} />
+          </Form.Item>
+          {selectedPlatform === 'qq' ? (
+            <Form.Item label="沙箱模式" name="sandbox" valuePropName="checked">
+              <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+            </Form.Item>
+          ) : null}
+          <Form.Item label="后端" name="assignment" rules={[{ required: true }]}>
+            <Select
+              options={[
+                { value: 'frogclaw', label: 'FrogClaw 对话' },
+                { value: 'none', label: '未分配' },
+              ]}
+            />
           </Form.Item>
           <Form.Item label="启用" name="enabled" valuePropName="checked">
             <Switch checkedChildren="启用" unCheckedChildren="停用" />
           </Form.Item>
+
+          <Space direction="vertical" size={4}>
+            <Button
+              type="link"
+              size="small"
+              icon={<ExternalLink size={13} />}
+              style={{ padding: 0 }}
+              onClick={() => void openUrl(PLATFORM_META[selectedPlatform].docsUrl)}
+            >
+              打开 {PLATFORM_META[selectedPlatform].label} 开放平台
+            </Button>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              <CircleOff size={12} style={{ verticalAlign: -2, marginRight: 4 }} />
+              选择“未分配”会保留凭证但不接入对话。
+            </Typography.Text>
+          </Space>
         </Form>
       </Modal>
     </div>

@@ -3646,7 +3646,6 @@ export function ChatView() {
 
             <div className="flex-1" />
 
-            <ModelSelector />
             <Popover
               content={<StatsPopoverContent stats={stats} t={t} token={token} />}
               trigger="click"
@@ -3666,7 +3665,6 @@ export function ChatView() {
           <>
             <Typography.Text type="secondary">{t('chat.welcome')}</Typography.Text>
             <div className="flex-1" />
-            <ModelSelector />
           </>
         )}
       </div>

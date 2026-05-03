@@ -32,6 +32,8 @@ pub struct Model {
     pub research_mode: i32,
     pub context_compression: i32,
     pub category_id: Option<String>,
+    pub working_directory: Option<String>,
+    pub project_name: Option<String>,
     pub parent_conversation_id: Option<String>,
     pub mode: String,
 }

@@ -289,6 +289,8 @@ pub struct Conversation {
     pub is_archived: bool,
     pub context_compression: bool,
     pub category_id: Option<String>,
+    pub working_directory: Option<String>,
+    pub project_name: Option<String>,
     pub parent_conversation_id: Option<String>,
     pub mode: String,
     pub created_at: i64,
@@ -388,7 +390,7 @@ pub struct ConversationSummary {
     pub updated_at: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct UpdateConversationInput {
     pub title: Option<String>,
     pub provider_id: Option<String>,
@@ -417,6 +419,10 @@ pub struct UpdateConversationInput {
     pub context_compression: Option<bool>,
     #[serde(default, deserialize_with = "deserialize_double_option")]
     pub category_id: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_double_option")]
+    pub working_directory: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_double_option")]
+    pub project_name: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_double_option")]
     pub parent_conversation_id: Option<Option<String>>,
     pub mode: Option<String>,
@@ -1147,10 +1153,30 @@ pub struct AgentSession {
     pub runtime_status: String,
     pub sdk_context_json: Option<String>,
     pub sdk_context_backup_json: Option<String>,
+    pub engine_kind: String,
+    pub engine_session_id: Option<String>,
+    pub engine_context_json: Option<String>,
+    pub engine_context_backup_json: Option<String>,
+    pub engine_error: Option<String>,
     pub total_tokens: i32,
     pub total_cost_usd: f64,
     pub created_at: String,
     pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentEngineInfo {
+    pub kind: String,
+    pub display_name: String,
+    pub description: String,
+    pub available: bool,
+    pub installed: bool,
+    pub version: Option<String>,
+    pub binary_path: Option<String>,
+    pub status: String,
+    pub message: Option<String>,
+    pub experimental: bool,
 }
 
 // Knowledge

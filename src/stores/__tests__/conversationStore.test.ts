@@ -1131,32 +1131,28 @@ describe('conversationStore pagination', () => {
     vi.useRealTimers();
   });
 
-  it('creates a new conversation from a category template when a category id is supplied', async () => {
+  it('creates a new conversation bound to a project folder when a working directory is supplied', async () => {
     invokeMock.mockImplementation((cmd: string, args?: Record<string, unknown>) => {
       if (cmd === 'create_conversation') {
         expect(args).toEqual({
-          title: 'template-conversation',
-          modelId: 'template-model',
-          providerId: 'template-provider',
-          systemPrompt: 'Category prompt',
+          title: 'project-conversation',
+          modelId: 'fallback-model',
+          providerId: 'fallback-provider',
+          workingDirectory: 'D:\\projects\\frog',
+          projectName: 'frog',
         });
-        return Promise.resolve(makeConversation('conv-template', {
-          provider_id: 'template-provider',
-          model_id: 'template-model',
-          system_prompt: 'Category prompt',
+        return Promise.resolve(makeConversation('conv-project', {
+          provider_id: 'fallback-provider',
+          model_id: 'fallback-model',
+          working_directory: 'D:\\projects\\frog',
+          project_name: 'frog',
         }));
       }
 
       if (cmd === 'update_conversation') {
         expect(args).toEqual({
-          id: 'conv-template',
+          id: 'conv-project',
           input: {
-            category_id: 'cat-template',
-            system_prompt: 'Category prompt',
-            temperature: 0.2,
-            max_tokens: 8192,
-            top_p: 0.95,
-            frequency_penalty: 0.4,
             search_enabled: false,
             search_provider_id: null,
             thinking_budget: null,
@@ -1164,18 +1160,16 @@ describe('conversationStore pagination', () => {
             enabled_mcp_server_ids: [],
             enabled_knowledge_base_ids: [],
             enabled_memory_namespace_ids: [],
+            working_directory: 'D:\\projects\\frog',
+            project_name: 'frog',
           },
         });
 
-        return Promise.resolve(makeConversation('conv-template', {
-          provider_id: 'template-provider',
-          model_id: 'template-model',
-          category_id: 'cat-template',
-          system_prompt: 'Category prompt',
-          temperature: 0.2,
-          max_tokens: 8192,
-          top_p: 0.95,
-          frequency_penalty: 0.4,
+        return Promise.resolve(makeConversation('conv-project', {
+          provider_id: 'fallback-provider',
+          model_id: 'fallback-model',
+          working_directory: 'D:\\projects\\frog',
+          project_name: 'frog',
         }));
       }
 
@@ -1187,40 +1181,17 @@ describe('conversationStore pagination', () => {
     });
 
     const { useConversationStore } = await import('../conversationStore');
-    const { useCategoryStore } = await import('../categoryStore');
-
-    useCategoryStore.setState({
-      categories: [{
-        id: 'cat-template',
-        name: 'Template',
-        icon_type: null,
-        icon_value: null,
-        system_prompt: 'Category prompt',
-        default_provider_id: 'template-provider',
-        default_model_id: 'template-model',
-        default_temperature: 0.2,
-        default_max_tokens: 8192,
-        default_top_p: 0.95,
-        default_frequency_penalty: 0.4,
-        sort_order: 0,
-        is_collapsed: false,
-        created_at: 1,
-        updated_at: 1,
-      }] as never[],
-      loading: false,
-    });
 
     const conversation = await useConversationStore.getState().createConversation(
-      'template-conversation',
+      'project-conversation',
       'fallback-model',
       'fallback-provider',
-      { categoryId: 'cat-template' },
+      { workingDirectory: 'D:\\projects\\frog', projectName: 'frog' },
     );
 
-    expect(conversation.category_id).toBe('cat-template');
-    expect(conversation.provider_id).toBe('template-provider');
-    expect(conversation.model_id).toBe('template-model');
-    expect(conversation.temperature).toBe(0.2);
-    expect(conversation.max_tokens).toBe(8192);
+    expect(conversation.working_directory).toBe('D:\\projects\\frog');
+    expect(conversation.project_name).toBe('frog');
+    expect(conversation.provider_id).toBe('fallback-provider');
+    expect(conversation.model_id).toBe('fallback-model');
   });
 });

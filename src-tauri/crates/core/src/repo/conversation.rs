@@ -31,6 +31,8 @@ fn conversation_from_entity(m: conversations::Model) -> Conversation {
         is_archived: m.is_archived != 0,
         context_compression: m.context_compression != 0,
         category_id: m.category_id,
+        working_directory: m.working_directory,
+        project_name: m.project_name,
         parent_conversation_id: m.parent_conversation_id,
         mode: m.mode,
         created_at: m.created_at,
@@ -175,6 +177,12 @@ pub async fn update_conversation(
     }
     if let Some(category_id) = input.category_id {
         am.category_id = Set(category_id);
+    }
+    if let Some(working_directory) = input.working_directory {
+        am.working_directory = Set(working_directory);
+    }
+    if let Some(project_name) = input.project_name {
+        am.project_name = Set(project_name);
     }
     if let Some(parent_conversation_id) = input.parent_conversation_id {
         am.parent_conversation_id = Set(parent_conversation_id);
@@ -335,6 +343,8 @@ pub async fn branch_conversation(
         is_archived: Set(0),
         context_compression: Set(source.context_compression),
         category_id: Set(source.category_id.clone()),
+        working_directory: Set(source.working_directory.clone()),
+        project_name: Set(source.project_name.clone()),
         parent_conversation_id: Set(parent_id),
         research_mode: Set(source.research_mode),
         created_at: Set(now),

@@ -1,9 +1,9 @@
-import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { Button, Tooltip, App, theme, Dropdown, Tag, Popover, Checkbox, Badge, Popconfirm } from 'antd';
+﻿import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { Button, Tooltip, App, theme, Dropdown, Tag, Popover } from 'antd';
 import type { MenuProps } from 'antd';
-import { Paperclip, Trash2, Mic, Eraser, Scissors, Globe, Brain, Atom, Plug, SlidersHorizontal, ArrowUp, Square, Check, Zap, ZapOff, Shrink, Upload, GitCompareArrows, X, GripHorizontal, CircleOff, SignalLow, SignalMedium, SignalHigh, Signal, Bot, MessageSquare, Shield, ShieldCheck, ShieldAlert, FolderOpen, ExternalLink } from 'lucide-react';
+import { Paperclip, Trash2, Mic, Eraser, Scissors, Globe, Atom, Plug, ArrowUp, Square, Check, Zap, ZapOff, Shrink, Upload, X, GripHorizontal, CircleOff, SignalLow, SignalMedium, SignalHigh, Signal, Bot, MessageSquare, Shield, ShieldCheck, ShieldAlert, FolderOpen, ExternalLink, ChevronDown, Terminal } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useConversationStore, useProviderStore, useSettingsStore, useSearchStore, useMcpStore, useMemoryStore } from '@/stores';
+import { useAgentStore, useConversationStore, useProviderStore, useSettingsStore, useSearchStore, useMcpStore } from '@/stores';
 import { useUIStore } from '@/stores/uiStore';
 import { findModelByIds, supportsReasoning, modelHasCapability } from '@/lib/modelCapabilities';
 import {
@@ -12,16 +12,14 @@ import {
   resolveReasoningProfile,
 } from '@/lib/reasoningProfile';
 import { estimateMessageTokens, estimateTokens } from '@/lib/tokenEstimator';
-import { McpServerIcon } from '@/components/shared/McpServerIcon';
-import { NamespaceIcon } from '@/components/shared/NamespaceIcon';
 import { getShortcutBinding, formatShortcutForDisplay, matchesShortcutEvent } from '@/lib/shortcuts';
 import type { ShortcutAction } from '@/lib/shortcuts';
 import { VoiceCall } from './VoiceCall';
-import { ConversationSettingsModal } from './ConversationSettingsModal';
 import { ModelSelector } from './ModelSelector';
 import { SearchProviderTypeIcon, PROVIDER_TYPE_LABELS } from '@/components/shared/SearchProviderIcon';
 import { ModelIcon } from '@lobehub/icons';
 import type { AttachmentInput, ProviderType, RealtimeConfig } from '@/types';
+import type { AgentEngineInfo, AgentEngineKind } from '@/types/agent';
 import { invoke } from '@/lib/invoke';
 import { open } from '@tauri-apps/plugin-dialog';
 
@@ -43,6 +41,49 @@ async function fileToAttachmentInput(file: File): Promise<AttachmentInput> {
 
 // In-memory draft cache: persists input text per-conversation across component unmounts
 const _draftCache = new Map<string, string>();
+const DEFAULT_AGENT_ENGINE_KEY = 'frogclaw:default-agent-engine';
+const SUPPORTED_AGENT_ENGINE_KINDS: AgentEngineKind[] = ['frog_agent', 'claude_code', 'codex_cli', 'gemini_cli'];
+
+function readDefaultAgentEngine(): AgentEngineKind {
+  try {
+    const stored = localStorage.getItem(DEFAULT_AGENT_ENGINE_KEY) as AgentEngineKind | null;
+    return stored && SUPPORTED_AGENT_ENGINE_KINDS.includes(stored) ? stored : 'frog_agent';
+  } catch {
+    return 'frog_agent';
+  }
+}
+
+function writeDefaultAgentEngine(engine: AgentEngineKind) {
+  try {
+    localStorage.setItem(DEFAULT_AGENT_ENGINE_KEY, engine);
+  } catch {
+    // localStorage can be unavailable in tests or restricted webviews.
+  }
+}
+
+function resolveNativeCliEngine(providerType?: ProviderType, modelId?: string | null): AgentEngineKind {
+  const model = (modelId || '').toLowerCase();
+  if (providerType === 'gemini' || model.includes('gemini')) return 'gemini_cli';
+  if (
+    providerType === 'openai'
+    || providerType === 'openai_responses'
+    || model.includes('gpt')
+    || model.includes('codex')
+    || /^o\d/.test(model)
+  ) {
+    return 'codex_cli';
+  }
+  return 'claude_code';
+}
+
+function formatAgentEngineLabel(engine: AgentEngineKind): string {
+  switch (engine) {
+    case 'claude_code': return 'Claude Code';
+    case 'codex_cli': return 'Codex CLI';
+    case 'gemini_cli': return 'Gemini CLI';
+    default: return 'AIAgent';
+  }
+}
 
 export function InputArea() {
   const { t } = useTranslation();
@@ -53,8 +94,6 @@ export function InputArea() {
   });
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [voiceCallVisible, setVoiceCallVisible] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [mcpPopoverOpen, setMcpPopoverOpen] = useState(false);
   const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -76,7 +115,6 @@ export function InputArea() {
 
   // Multi-model companion state
   const [companionModels, setCompanionModels] = useState<Array<{ providerId: string; modelId: string }>>([]);
-  const [multiModelOpen, setMultiModelOpen] = useState(false);
   const sendMultiModelMessage = useConversationStore((s) => s.sendMultiModelMessage);
 
   const { message: messageApi, modal } = App.useApp();
@@ -134,20 +172,16 @@ export function InputArea() {
   const setThinkingBudget = useConversationStore((s) => s.setThinkingBudget);
   const thinkingLevel = useConversationStore((s) => s.thinkingLevel);
   const setThinkingLevel = useConversationStore((s) => s.setThinkingLevel);
-  const [thinkingDropdownOpen, setThinkingDropdownOpen] = useState(false);
 
   // Agent permission mode state
   const [agentPermissionMode, setAgentPermissionMode] = useState<string>('default');
+  const updateAgentEngine = useAgentStore((s) => s.updateEngine);
 
   // Agent working directory state
   const [agentCwd, setAgentCwd] = useState<string | null>(null);
-
-  // Memory state
-  const memoryNamespaces = useMemoryStore((s) => s.namespaces);
-  const loadMemoryNamespaces = useMemoryStore((s) => s.loadNamespaces);
-  const enabledMemoryNamespaceIds = useConversationStore((s) => s.enabledMemoryNamespaceIds);
-  const toggleMemoryNamespace = useConversationStore((s) => s.toggleMemoryNamespace);
-  const [memoryPopoverOpen, setMemoryPopoverOpen] = useState(false);
+  const [agentEngine, setAgentEngine] = useState<AgentEngineKind>(() => readDefaultAgentEngine());
+  const [agentEngines, setAgentEngines] = useState<AgentEngineInfo[]>([]);
+  const [loadingAgentEngines, setLoadingAgentEngines] = useState(false);
 
   // Context clear
   const insertContextClear = useConversationStore((s) => s.insertContextClear);
@@ -157,6 +191,24 @@ export function InputArea() {
 
   const activeConversation = conversations.find((c) => c.id === activeConversationId);
   const currentMode = activeConversation?.mode || 'chat';
+  const toolbarIconButtonStyle = useMemo<React.CSSProperties>(() => ({
+    width: 28,
+    height: 28,
+    minWidth: 28,
+    padding: 0,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  }), []);
+  const toolbarDropdownButtonStyle = useMemo<React.CSSProperties>(() => ({
+    height: 28,
+    minWidth: 38,
+    padding: '0 6px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  }), []);
 
   const setActivePage = useUIStore((s) => s.setActivePage);
   const setSettingsSection = useUIStore((s) => s.setSettingsSection);
@@ -171,24 +223,46 @@ export function InputArea() {
     if (mcpServers.length === 0) loadMcpServers();
   }, [mcpServers.length, loadMcpServers]);
 
-  // Load memory namespaces on mount
-  useEffect(() => {
-    if (memoryNamespaces.length === 0) loadMemoryNamespaces();
-  }, [memoryNamespaces.length, loadMemoryNamespaces]);
+  const loadAgentEngines = useCallback(async () => {
+    setLoadingAgentEngines(true);
+    try {
+      const engines = await invoke<AgentEngineInfo[]>('agent_list_engines');
+      setAgentEngines(engines);
+    } catch (e) {
+      console.warn('Failed to load agent engines:', e);
+    } finally {
+      setLoadingAgentEngines(false);
+    }
+  }, []);
 
-  // Fetch agent permission mode on mount/conversation switch
+  // Generate/load all engine menu items as soon as the input area starts.
   useEffect(() => {
-    if (currentMode === 'agent' && activeConversationId) {
+    void loadAgentEngines();
+  }, [loadAgentEngines]);
+
+  // Fetch agent session and engine status on mount/conversation switch.
+  // Keep the engine badge visible outside Agent mode, matching CodePilot.
+  useEffect(() => {
+    if (activeConversationId) {
       invoke('agent_get_session', { conversationId: activeConversationId })
         .then((session: any) => {
           if (session) {
             setAgentPermissionMode(session.permission_mode || 'default');
             setAgentCwd(session.cwd || null);
+            const sessionEngine = (session.engine_kind || session.engineKind || readDefaultAgentEngine()) as AgentEngineKind;
+            setAgentEngine(sessionEngine);
+            writeDefaultAgentEngine(sessionEngine);
+          } else {
+            setAgentEngine(readDefaultAgentEngine());
           }
         })
-        .catch(() => {});
+        .catch(() => {
+          setAgentEngine(readDefaultAgentEngine());
+        });
+    } else {
+      setAgentEngine(readDefaultAgentEngine());
     }
-  }, [currentMode, activeConversationId]);
+  }, [activeConversationId]);
 
   // Draft persistence: save old draft & restore new when conversation changes
   useEffect(() => {
@@ -289,66 +363,6 @@ export function InputArea() {
     [setSearchEnabled, setSearchProviderId],
   );
 
-  // MCP popover content — grouped by builtin/custom with checkboxes
-  const mcpPopoverContent = useMemo(() => {
-    const enabledServers = mcpServers.filter((s) => s.enabled);
-    if (enabledServers.length === 0) {
-      return (
-        <div style={{ padding: '8px 0', minWidth: 180 }}>
-          <div style={{ color: token.colorTextSecondary, fontSize: 12, marginBottom: 8 }}>
-            {t('chat.mcp.noServers')}
-          </div>
-          <Button
-            type="link"
-            size="small"
-            style={{ padding: 0, fontSize: 12 }}
-            onClick={() => {
-              setMcpPopoverOpen(false);
-              setSettingsSection('mcpServers');
-              setActivePage('settings');
-            }}
-          >
-            {t('chat.mcp.goConfig')}
-          </Button>
-        </div>
-      );
-    }
-
-    const builtinServers = enabledServers.filter((s) => s.source === 'builtin');
-    const customServers = enabledServers.filter((s) => s.source === 'custom');
-
-    const renderGroup = (title: string, servers: typeof mcpServers) => (
-      <div key={title}>
-        <div style={{ fontSize: 11, color: token.colorTextSecondary, padding: '4px 0', fontWeight: 600 }}>
-          {title}
-        </div>
-        {servers.map((server) => (
-          <div key={server.id} style={{ padding: '3px 0' }}>
-            <Checkbox
-              checked={enabledMcpServerIds.includes(server.id)}
-              onChange={() => toggleMcpServer(server.id)}
-            >
-              <span style={{ fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <McpServerIcon server={server} size={18} />
-                {server.name}
-              </span>
-            </Checkbox>
-          </div>
-        ))}
-      </div>
-    );
-
-    return (
-      <div style={{ minWidth: 180, maxHeight: 300, overflowY: 'auto' }}>
-        {builtinServers.length > 0 && renderGroup(t('settings.mcp.builtin'), builtinServers)}
-        {builtinServers.length > 0 && customServers.length > 0 && (
-          <div style={{ borderTop: `1px solid ${token.colorBorderSecondary}`, margin: '6px 0' }} />
-        )}
-        {customServers.length > 0 && renderGroup(t('settings.mcp.custom'), customServers)}
-      </div>
-    );
-  }, [mcpServers, enabledMcpServerIds, toggleMcpServer, token, t]);
-
   // Agent permission mode menu items
   const permissionModeItems = useMemo<MenuProps['items']>(() => [
     {
@@ -387,8 +401,8 @@ export function InputArea() {
       const isFullAccess = mode === 'full_access';
       modal.confirm({
         title: isFullAccess
-          ? t('agent.permissionFullAccessWarningTitle', '⚠️ 完全访问模式')
-          : t('agent.permissionAcceptEditsWarningTitle', '⚠️ 允许编辑模式'),
+          ? t('agent.permissionFullAccessWarningTitle', '完全访问模式')
+          : t('agent.permissionAcceptEditsWarningTitle', '允许编辑模式'),
         content: isFullAccess
           ? t('agent.permissionFullAccessWarning', 'Agent 将拥有完全访问权限，可以执行任何文件操作且不受路径限制。请确保你信任当前使用的模型和 System Prompt。')
           : t('agent.permissionAcceptEditsWarning', 'Agent 将自动批准文件编辑操作，无需逐一确认。请确保你了解潜在的安全风险。'),
@@ -422,7 +436,7 @@ export function InputArea() {
   const abbreviatePath = useCallback((path: string): string => {
     const segments = path.replace(/\\/g, '/').split('/').filter(Boolean);
     if (segments.length <= 2) return path;
-    return '…/' + segments.slice(-2).join('/');
+    return '.../' + segments.slice(-2).join('/');
   }, []);
 
   const handleSelectCwd = useCallback(async () => {
@@ -444,47 +458,6 @@ export function InputArea() {
       console.warn('Failed to select working directory:', e);
     }
   }, [activeConversationId, t]);
-
-  // Memory namespace popover content
-  const memoryPopoverContent = useMemo(() => {
-    if (memoryNamespaces.length === 0) {
-      return (
-        <div style={{ padding: '8px 0', minWidth: 180 }}>
-          <div style={{ color: token.colorTextSecondary, fontSize: 12, marginBottom: 8 }}>
-            {t('chat.memory.empty')}
-          </div>
-          <Button
-            type="link"
-            size="small"
-            style={{ padding: 0, fontSize: 12 }}
-            onClick={() => {
-              setMemoryPopoverOpen(false);
-              setActivePage('memory');
-            }}
-          >
-            {t('chat.mcp.goConfig')}
-          </Button>
-        </div>
-      );
-    }
-    return (
-      <div style={{ minWidth: 180, maxHeight: 300, overflowY: 'auto' }}>
-        {memoryNamespaces.map((ns) => (
-          <div key={ns.id} style={{ padding: '3px 0' }}>
-            <Checkbox
-              checked={enabledMemoryNamespaceIds.includes(ns.id)}
-              onChange={() => toggleMemoryNamespace(ns.id)}
-            >
-              <span style={{ fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <NamespaceIcon ns={ns} size={16} />
-                {ns.name}
-              </span>
-            </Checkbox>
-          </div>
-        ))}
-      </div>
-    );
-  }, [memoryNamespaces, enabledMemoryNamespaceIds, toggleMemoryNamespace, token, t, setActivePage]);
 
   const currentModel = React.useMemo(() => {
     if (activeConversation) {
@@ -509,6 +482,77 @@ export function InputArea() {
     const providerId = currentModel?.provider_id ?? activeConversation?.provider_id;
     return providers.find((provider) => provider.id === providerId)?.provider_type;
   }, [activeConversation?.provider_id, currentModel?.provider_id, providers]);
+
+  const nativeCliEngine = useMemo(
+    () => resolveNativeCliEngine(currentProviderType, currentModel?.model_id ?? activeConversation?.model_id),
+    [activeConversation?.model_id, currentModel?.model_id, currentProviderType],
+  );
+
+  const agentEngineMode = agentEngine === 'frog_agent' ? 'frog_agent' : 'native_cli';
+  const nativeCliEngineInfo = useMemo(
+    () => agentEngines.find((engine) => engine.kind === nativeCliEngine),
+    [agentEngines, nativeCliEngine],
+  );
+  const nativeCliLabel = nativeCliEngineInfo?.displayName || formatAgentEngineLabel(nativeCliEngine);
+
+  const applyAgentEngine = useCallback(async (nextEngine: AgentEngineKind, options?: { silent?: boolean }) => {
+    if (!SUPPORTED_AGENT_ENGINE_KINDS.includes(nextEngine) || streaming) return false;
+    if (nextEngine === agentEngine) return true;
+
+    const previousEngine = agentEngine;
+    setAgentEngine(nextEngine);
+    writeDefaultAgentEngine(nextEngine);
+
+    if (activeConversationId) {
+      const updated = await updateAgentEngine(activeConversationId, nextEngine);
+      if (!updated) {
+        setAgentEngine(previousEngine);
+        writeDefaultAgentEngine(previousEngine);
+        if (!options?.silent) {
+          messageApi.error(t('chat.engineSwitchFailed', 'Agent engine switch failed'));
+        }
+        return false;
+      }
+      const updatedEngine = (updated.engine_kind || updated.engineKind || nextEngine) as AgentEngineKind;
+      setAgentEngine(updatedEngine);
+      writeDefaultAgentEngine(updatedEngine);
+    }
+
+    if (!options?.silent) {
+      const engineInfo = agentEngines.find((engine) => engine.kind === nextEngine);
+      const statusMessage = engineInfo && !engineInfo.available
+        ? (engineInfo.message || t('chat.engineUnavailable', 'Current CLI is unavailable'))
+        : t('chat.engineSwitchSuccess', 'Agent engine switched');
+      if (engineInfo && !engineInfo.available) {
+        messageApi.warning(statusMessage);
+      } else {
+        messageApi.success(statusMessage);
+      }
+    }
+    return true;
+  }, [activeConversationId, agentEngine, agentEngines, messageApi, streaming, t, updateAgentEngine]);
+
+  const handleAgentEngineModeChange = useCallback((value: string | number) => {
+    const nextEngine = value === 'native_cli' ? nativeCliEngine : 'frog_agent';
+    const runChange = () => applyAgentEngine(nextEngine);
+    if (activeConversationId && messages.length > 0 && nextEngine !== agentEngine) {
+      modal.confirm({
+        title: t('chat.switchEngineTitle', 'Switch Agent Engine'),
+        content: t('chat.switchEngineContent', 'Switching engines starts a new runtime context. Existing messages are kept.'),
+        okText: t('common.confirm', 'Confirm'),
+        cancelText: t('common.cancel', 'Cancel'),
+        onOk: runChange,
+      });
+    } else {
+      void runChange();
+    }
+  }, [activeConversationId, agentEngine, applyAgentEngine, messages.length, modal, nativeCliEngine, t]);
+
+  useEffect(() => {
+    if (agentEngine !== 'frog_agent' && agentEngine !== nativeCliEngine && !streaming) {
+      void applyAgentEngine(nativeCliEngine, { silent: true });
+    }
+  }, [agentEngine, applyAgentEngine, nativeCliEngine, streaming]);
 
   const reasoningProfile = useMemo(
     () => resolveReasoningProfile(currentProviderType, currentModel),
@@ -546,37 +590,6 @@ export function InputArea() {
       default: return <Atom size={14} />;
     }
   }, [selectedThinkingOption.icon]);
-
-  const thinkingMenuItems = useMemo<MenuProps['items']>(
-    () => thinkingOptions.map((opt) => ({
-      key: opt.key,
-      label: opt.label,
-      icon: (() => {
-        switch (opt.icon) {
-          case 'off': return <CircleOff size={14} />;
-          case 'default': return <Atom size={14} />;
-          case 'low': return <SignalLow size={14} />;
-          case 'medium': return <SignalMedium size={14} />;
-          case 'high': return <SignalHigh size={14} />;
-          case 'xhigh': return <Signal size={14} />;
-          case 'max': return <Signal size={14} />;
-          default: return <Atom size={14} />;
-        }
-      })(),
-    })),
-    [thinkingOptions],
-  );
-
-  const handleThinkingMenuClick = useCallback<NonNullable<MenuProps['onClick']>>(
-    ({ key }) => {
-      const selected = thinkingOptions.find((opt) => opt.key === key);
-      if (!selected) return;
-      setThinkingLevel(selected.key === 'default' ? null : selected.key);
-      if (selected.key === 'default') setThinkingBudget(null);
-      setThinkingDropdownOpen(false);
-    },
-    [setThinkingBudget, setThinkingLevel, thinkingOptions],
-  );
 
   // Context token usage calculation
   const getCompressionSummary = useConversationStore((s) => s.getCompressionSummary);
@@ -644,17 +657,6 @@ export function InputArea() {
     });
   }, [companionModels, providers]);
 
-  const handleMultiModelSelect = useCallback((models: Array<{ providerId: string; modelId: string }>) => {
-    setCompanionModels(models);
-    if (companionStorageKey) {
-      if (models.length > 0) {
-        localStorage.setItem(companionStorageKey, JSON.stringify(models));
-      } else {
-        localStorage.removeItem(companionStorageKey);
-      }
-    }
-  }, [companionStorageKey]);
-
   const removeCompanionModel = useCallback((index: number) => {
     setCompanionModels((prev) => {
       const next = prev.filter((_, i) => i !== index);
@@ -689,22 +691,34 @@ export function InputArea() {
     await updateConversation(activeConversation.id, { mode });
 
     if (mode === 'agent') {
-      // Clear multi-model companion models — not applicable in agent mode
+      // Clear multi-model companion models 閳?not applicable in agent mode
       if (companionModels.length > 0) {
         setCompanionModels([]);
         if (companionStorageKey) localStorage.removeItem(companionStorageKey);
       }
       try {
-        const session = await invoke<{ cwd: string | null }>('agent_update_session', {
+        const session = await invoke<{ cwd: string | null; engine_kind?: AgentEngineKind; engineKind?: AgentEngineKind }>('agent_update_session', {
           conversationId: activeConversation.id,
+          engineKind: agentEngine,
         });
-        if (!session.cwd) {
+        const sessionEngine = (session.engine_kind || session.engineKind || agentEngine) as AgentEngineKind;
+        setAgentEngine(sessionEngine);
+        writeDefaultAgentEngine(sessionEngine);
+        if (activeConversation.working_directory) {
+          await invoke('agent_update_session', {
+            conversationId: activeConversation.id,
+            cwd: activeConversation.working_directory,
+            engineKind: sessionEngine,
+          });
+          setAgentCwd(activeConversation.working_directory);
+        } else if (!session.cwd) {
           const workspacePath = await invoke<string>('agent_ensure_workspace', {
             conversationId: activeConversation.id,
           });
           await invoke('agent_update_session', {
             conversationId: activeConversation.id,
             cwd: workspacePath,
+            engineKind: sessionEngine,
           });
           setAgentCwd(workspacePath);
         } else {
@@ -714,7 +728,148 @@ export function InputArea() {
         console.warn('Failed to init agent session:', e);
       }
     }
-  }, [activeConversation, updateConversation, companionModels, companionStorageKey]);
+  }, [activeConversation, updateConversation, companionModels, companionStorageKey, agentEngine]);
+
+  const enabledMcpServers = useMemo(
+    () => mcpServers.filter((server) => server.enabled),
+    [mcpServers],
+  );
+
+  const handleClearConversationFromMenu = useCallback(() => {
+    if (!activeConversationId || streaming || messages.length === 0) return;
+    modal.confirm({
+      title: t('chat.clearConversationConfirmTitle'),
+      content: t('chat.clearConversationConfirmContent'),
+      okButtonProps: { danger: true },
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
+      onOk: async () => {
+        await clearAllMessages();
+      },
+    });
+  }, [activeConversationId, clearAllMessages, messages.length, modal, streaming, t]);
+
+  const contextMenuItems = useMemo<MenuProps['items']>(() => {
+    const items: MenuProps['items'] = [];
+
+    items.push({
+      key: 'mcp',
+      icon: <Plug size={14} />,
+      label: t('chat.mcp.title'),
+      children: enabledMcpServers.length > 0
+        ? enabledMcpServers.map((server) => ({
+            key: `mcp:${server.id}`,
+            label: server.name,
+            icon: enabledMcpServerIds.includes(server.id) ? <Check size={14} /> : undefined,
+          }))
+        : [
+            {
+              key: 'mcp-settings',
+              label: t('chat.mcp.goConfig'),
+            },
+          ],
+    });
+
+    items.push(
+      { type: 'divider' },
+      {
+        key: 'auto',
+        icon: activeConversation?.context_compression ? <ZapOff size={14} /> : <Zap size={14} />,
+        label: activeConversation?.context_compression
+          ? t('chat.disableAutoCompression')
+          : t('chat.enableAutoCompression'),
+        disabled: !activeConversationId,
+      },
+      {
+        key: 'manual',
+        icon: <Shrink size={14} />,
+        label: t('chat.manualCompress'),
+        disabled: !activeConversationId || streaming || compressing || messages.length === 0,
+      },
+      { type: 'divider' },
+      {
+        key: 'clear-context',
+        icon: <Scissors size={14} />,
+        label: shortcutHint(t('chat.clearContext'), 'clearContext'),
+        disabled: !activeConversationId || streaming || messages.length === 0 || messages[messages.length - 1]?.content === '<!-- context-clear -->',
+      },
+      {
+        key: 'clear-conversation',
+        icon: <Eraser size={14} />,
+        label: shortcutHint(t('chat.clearConversation'), 'clearConversationMessages'),
+        danger: true,
+        disabled: !activeConversationId || streaming || messages.length === 0,
+      },
+    );
+
+    return items;
+  }, [
+    activeConversation?.context_compression,
+    activeConversationId,
+    compressing,
+    enabledMcpServerIds,
+    enabledMcpServers,
+    messages,
+    shortcutHint,
+    streaming,
+    t,
+  ]);
+
+  const handleContextMenuClick = useCallback<NonNullable<MenuProps['onClick']>>(
+    async ({ key }) => {
+      const keyText = String(key);
+      if (keyText.startsWith('mcp:')) {
+        toggleMcpServer(keyText.slice('mcp:'.length));
+        return;
+      }
+
+      if (keyText === 'mcp-settings') {
+        setSettingsSection('mcpServers');
+        setActivePage('settings');
+        return;
+      }
+
+      if (keyText === 'auto') {
+        if (!activeConversationId || !activeConversation) return;
+        updateConversation(activeConversationId, { context_compression: !activeConversation.context_compression });
+        return;
+      }
+
+      if (keyText === 'manual') {
+        if (!activeConversationId) return;
+        try {
+          await compressContext();
+          messageApi.success(t('chat.compressSuccess'));
+        } catch {
+          messageApi.error(t('chat.compressFailed'));
+        }
+        return;
+      }
+
+      if (keyText === 'clear-context') {
+        if (activeConversationId && !streaming) void insertContextClear();
+        return;
+      }
+
+      if (keyText === 'clear-conversation') {
+        handleClearConversationFromMenu();
+      }
+    },
+    [
+      activeConversation,
+      activeConversationId,
+      compressContext,
+      handleClearConversationFromMenu,
+      insertContextClear,
+      messageApi,
+      setActivePage,
+      setSettingsSection,
+      streaming,
+      t,
+      toggleMcpServer,
+      updateConversation,
+    ],
+  );
 
   const handleSend = useCallback(async () => {
     const trimmed = value.trim();
@@ -1034,7 +1189,12 @@ export function InputArea() {
   }, [currentMode, handleModeSwitch]);
 
   return (
-    <div className="px-4 pb-3 pt-1">
+    <div
+      className="px-4 pb-2 pt-2"
+      style={{
+        background: token.colorBgContainer,
+      }}
+    >
       <input
         ref={fileInputRef}
         type="file"
@@ -1045,7 +1205,7 @@ export function InputArea() {
 
       {/* Attachment preview */}
       {attachedFiles.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-2">
+        <div className="mx-auto flex max-w-3xl flex-wrap gap-2 mb-2">
           {attachedFiles.map((file, idx) => (
             <span
               key={`${file.name}-${idx}`}
@@ -1067,13 +1227,15 @@ export function InputArea() {
         </div>
       )}
 
+      <div className="mx-auto max-w-3xl">
       {/* Main input container */}
       <div
         ref={containerRef}
         style={{
-          border: '1px solid var(--border-color)',
-          borderRadius: 16,
-          backgroundColor: token.colorBgContainer,
+          border: `1px solid ${token.colorBorderSecondary}`,
+          borderRadius: 12,
+          backgroundColor: token.colorBgElevated,
+          boxShadow: token.boxShadowTertiary,
           overflow: 'hidden',
         }}
       >
@@ -1081,7 +1243,7 @@ export function InputArea() {
         <div
           onMouseDown={handleResizeMouseDown}
           style={{
-            height: 10,
+            height: 6,
             cursor: 'ns-resize',
             display: 'flex',
             alignItems: 'center',
@@ -1089,7 +1251,7 @@ export function InputArea() {
             flexShrink: 0,
           }}
         >
-          <GripHorizontal size={14} style={{ color: token.colorTextQuaternary, opacity: 0.5 }} />
+          <GripHorizontal size={12} style={{ color: token.colorTextQuaternary, opacity: 0.4 }} />
         </div>
         {/* Companion model tags */}
         {currentMode !== 'agent' && companionModels.length > 0 && (
@@ -1157,7 +1319,7 @@ export function InputArea() {
             border: 'none',
             outline: 'none',
             resize: 'none',
-            padding: '4px 16px 8px',
+            padding: '6px 14px 8px',
             fontSize: token.fontSize,
             lineHeight: 1.6,
             backgroundColor: 'transparent',
@@ -1170,15 +1332,15 @@ export function InputArea() {
         />
 
         {/* Bottom action bar */}
-        <div className="flex items-center justify-between px-2 pb-2">
-          <div className="flex items-center gap-0.5">
+        <div className="flex items-center justify-between gap-2 px-2 pb-2">
+          <div className="flex min-w-0 flex-1 items-center gap-1">
             {searchEnabled ? (
               <Tooltip title={t('chat.search.title')}>
                 <Button
                   type="text"
                   size="small"
-                  icon={<Globe size={14} />}
-                  style={{ color: token.colorPrimary }}
+                  icon={<Globe size={16} />}
+                  style={{ ...toolbarIconButtonStyle, color: token.colorPrimary }}
                   onClick={() => {
                     setSearchEnabled(false);
                     setSearchProviderId(null);
@@ -1197,40 +1359,8 @@ export function InputArea() {
                   <Button
                     type="text"
                     size="small"
-                    icon={<Globe size={14} />}
-                  />
-                </Tooltip>
-              </Dropdown>
-            )}
-            {hasReasoning && (
-              <Dropdown
-                trigger={['click']}
-                placement="topLeft"
-                menu={{
-                  items: thinkingMenuItems,
-                  onClick: handleThinkingMenuClick,
-                  selectable: true,
-                  selectedKeys: [selectedThinkingOption.key],
-                }}
-                open={thinkingDropdownOpen}
-                onOpenChange={setThinkingDropdownOpen}
-              >
-                <Tooltip
-                  title={`${t('chat.thinkingIntensity')}: ${selectedThinkingOption.label}`}
-                  open={thinkingDropdownOpen ? false : undefined}
-                >
-                  <Button
-                    aria-label={t('chat.thinkingIntensity')}
-                    type="text"
-                    size="small"
-                    icon={thinkingIcon}
-                    style={
-                      selectedThinkingOption.key === 'off' || selectedThinkingOption.key === 'none'
-                        ? { color: token.colorError }
-                        : selectedThinkingOption.key !== 'default'
-                          ? { color: token.colorPrimary }
-                          : undefined
-                    }
+                    icon={<Globe size={16} />}
+                    style={toolbarIconButtonStyle}
                   />
                 </Tooltip>
               </Dropdown>
@@ -1240,149 +1370,88 @@ export function InputArea() {
                 <Button
                   type="text"
                   size="small"
-                  icon={<Paperclip size={14} />}
+                  icon={<Paperclip size={16} />}
+                  style={toolbarIconButtonStyle}
                   onClick={handleFileSelect}
                 />
               </Tooltip>
             )}
-            <Popover
-              trigger="click"
-              placement="topLeft"
-              content={mcpPopoverContent}
-              arrow={false}
-              open={mcpPopoverOpen}
-              onOpenChange={setMcpPopoverOpen}
-            >
-              <Tooltip title={t('chat.mcp.title')} open={mcpPopoverOpen ? false : undefined}>
-                <Badge count={enabledMcpServerIds.filter((id) => mcpServers.some((s) => s.id === id && s.enabled)).length} size="small" offset={[-4, 4]} color={token.colorPrimary}>
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<Plug size={14} />}
-                  style={enabledMcpServerIds.some((id) => mcpServers.some((s) => s.id === id && s.enabled)) ? { color: token.colorPrimary } : undefined}
-                />
-                </Badge>
-              </Tooltip>
-            </Popover>
-            <Popover
-              trigger="click"
-              placement="topLeft"
-              content={memoryPopoverContent}
-              arrow={false}
-              open={memoryPopoverOpen}
-              onOpenChange={setMemoryPopoverOpen}
-            >
-              <Tooltip title={t('chat.memory.title')} open={memoryPopoverOpen ? false : undefined}>
-                <Badge count={enabledMemoryNamespaceIds.length} size="small" offset={[-4, 4]} color={token.colorPrimary}>
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<Brain size={14} />}
-                  style={enabledMemoryNamespaceIds.length > 0 ? { color: token.colorPrimary } : undefined}
-                />
-                </Badge>
-              </Tooltip>
-            </Popover>
-            {currentMode !== 'agent' && (
-              <Tooltip title={t('chat.multiModel.selectTitle')}>
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<GitCompareArrows size={14} />}
-                  onClick={() => setMultiModelOpen(true)}
-                  style={companionModels.length > 0 ? { color: token.colorPrimary } : undefined}
-                />
-              </Tooltip>
+            {hasReasoning && (
+              <Dropdown
+                trigger={['click']}
+                placement="topLeft"
+                menu={{
+                  items: thinkingOptions.map((option) => ({
+                    key: option.key,
+                    label: option.label,
+                    icon: selectedThinkingOption.key === option.key ? <Check size={14} /> : undefined,
+                  })),
+                  onClick: ({ key }) => {
+                    const selected = thinkingOptions.find((option) => option.key === key);
+                    if (!selected) return;
+                    setThinkingLevel(selected.key === 'default' ? null : selected.key);
+                    if (selected.key === 'default') setThinkingBudget(null);
+                  },
+                  selectable: true,
+                  selectedKeys: [selectedThinkingOption.key],
+                }}
+              >
+                <Tooltip title={`${t('chat.thinkingIntensity')}: ${selectedThinkingOption.label}`}>
+                  <Button
+                    aria-label={t('chat.thinkingIntensity')}
+                    type="text"
+                    size="small"
+                    icon={thinkingIcon}
+                    style={{
+                      ...toolbarIconButtonStyle,
+                      ...(
+                        selectedThinkingOption.key === 'off' || selectedThinkingOption.key === 'none'
+                          ? { color: token.colorError }
+                          : selectedThinkingOption.key !== 'default'
+                            ? { color: token.colorPrimary }
+                            : {}
+                      ),
+                    }}
+                  />
+                </Tooltip>
+              </Dropdown>
             )}
             <Dropdown
-              menu={{
-                items: [
-                  {
-                    key: 'auto',
-                    icon: activeConversation?.context_compression
-                      ? <ZapOff size={14} />
-                      : <Zap size={14} />,
-                    label: activeConversation?.context_compression
-                      ? t('chat.disableAutoCompression')
-                      : t('chat.enableAutoCompression'),
-                    onClick: () => {
-                      if (!activeConversationId || !activeConversation) return;
-                      updateConversation(activeConversationId, { context_compression: !activeConversation.context_compression });
-                    },
-                  },
-                  {
-                    key: 'manual',
-                    icon: <Shrink size={14} />,
-                    label: t('chat.manualCompress'),
-                    disabled: !activeConversationId || streaming || compressing || messages.length === 0,
-                    onClick: async () => {
-                      if (!activeConversationId) return;
-                      try {
-                        await compressContext();
-                        messageApi.success(t('chat.compressSuccess'));
-                      } catch {
-                        messageApi.error(t('chat.compressFailed'));
-                      }
-                    },
-                  },
-                ],
-              }}
+              menu={{ items: contextMenuItems, onClick: handleContextMenuClick }}
               trigger={['click']}
               placement="topLeft"
             >
               <Tooltip title={t('chat.contextCompression')}>
                 <Button
+                  aria-label={t('chat.contextCompression')}
                   type="text"
                   size="small"
-                  icon={<Zap size={14} />}
+                  icon={<Zap size={16} />}
                   loading={compressing}
-                  disabled={!activeConversationId}
-                  style={activeConversation?.context_compression ? { color: token.colorPrimary } : undefined}
-                />
+                  style={{
+                    ...toolbarDropdownButtonStyle,
+                    ...(activeConversation?.context_compression ? { color: token.colorPrimary } : {}),
+                  }}
+                >
+                  <ChevronDown size={12} />
+                </Button>
               </Tooltip>
             </Dropdown>
-            <Tooltip title={shortcutHint(t('chat.clearContext'), 'clearContext')}>
-              <Button
-                type="text"
-                size="small"
-                icon={<Scissors size={14} />}
-                onClick={insertContextClear}
-                disabled={!activeConversationId || streaming || messages.length === 0 || messages[messages.length - 1]?.content === '<!-- context-clear -->'}
-              />
-            </Tooltip>
-            <Popconfirm
-              title={t('chat.clearConversationConfirmTitle')}
-              description={t('chat.clearConversationConfirmContent')}
-              okButtonProps={{ danger: true }}
-              okText={t('common.confirm')}
-              cancelText={t('common.cancel')}
-              onConfirm={() => { void clearAllMessages(); }}
-              disabled={!activeConversationId || streaming || messages.length === 0}
-            >
-              <Tooltip title={shortcutHint(t('chat.clearConversation'), 'clearConversationMessages')}>
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<Eraser size={14} />}
-                  disabled={!activeConversationId || streaming || messages.length === 0}
-                />
-              </Tooltip>
-            </Popconfirm>
-            <Tooltip title={t('chat.conversationSettings')}>
-              <Button type="text" size="small" icon={<SlidersHorizontal size={14} />} onClick={() => setSettingsOpen(true)} />
-            </Tooltip>
             {hasRealtimeVoice && (
-              <Tooltip title={t('voice.startCall') + '（暂未实现）'}>
+              <Tooltip title={`${t('voice.startCall')} (not implemented)`}>
                 <Button
                   type="text"
                   size="small"
-                  icon={<Mic size={14} />}
+                  icon={<Mic size={16} />}
+                  style={toolbarIconButtonStyle}
                   disabled
                 />
               </Tooltip>
             )}
+            <div style={{ width: 1, height: 18, background: token.colorBorderSecondary, margin: '0 5px' }} />
+            <ModelSelector />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             {streaming ? (
               <Button
                 shape="circle"
@@ -1405,72 +1474,143 @@ export function InputArea() {
         </div>
       </div>
 
-      {/* Mode controls bar — below input container */}
-      <div className="flex items-center justify-between px-1 pt-1">
-        <div className="flex items-center gap-1">
-          <Dropdown
-            menu={{
-              items: [
-                {
-                  key: 'chat',
-                  icon: <MessageSquare size={14} />,
-                  label: t('common.chatMode'),
-                },
-                {
-                  key: 'agent',
-                  icon: <Bot size={14} />,
-                  label: <>{t('common.agentMode')} <Tag color="blue" style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px', marginLeft: 2 }}>Beta</Tag></>,
-                },
-              ],
-              selectedKeys: [currentMode],
-              onClick: ({ key }) => handleModeSwitch(key as 'chat' | 'agent'),
-            }}
-            trigger={['click']}
-          >
+      {/* Mode controls bar below input container */}
+      <div className="flex items-center justify-between gap-2 px-1 pt-1.5">
+        <div
+          className="flex min-w-0 shrink-0 flex-col items-stretch gap-1"
+          style={{
+            padding: 3,
+            width: currentMode === 'agent' ? 520 : 330,
+            borderRadius: token.borderRadiusLG,
+            border: `1px solid ${token.colorBorderSecondary}`,
+            background: token.colorBgContainer,
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
+          <span style={{ width: 34, fontSize: 11, fontWeight: 700, color: token.colorTextSecondary, whiteSpace: 'nowrap', paddingLeft: 4 }}>{t('chat.modeLabel', '模式')}</span>
+          <div style={{ flex: 1, display: 'inline-flex', alignItems: 'center', gap: 4, padding: 2, borderRadius: token.borderRadiusLG, background: token.colorFillQuaternary }}>
             <Button
-              type="text"
               size="small"
-              icon={currentMode === 'agent' ? <Bot size={14} /> : <MessageSquare size={14} />}
-              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}
+              type={currentMode === 'chat' ? 'primary' : 'text'}
+              disabled={streaming}
+              icon={<MessageSquare size={12} />}
+              onClick={() => void handleModeSwitch('chat')}
+              style={{
+                height: 26,
+                flex: 1,
+                fontSize: 12,
+                fontWeight: 700,
+                color: currentMode === 'chat' ? token.colorWhite : token.colorText,
+                background: currentMode === 'chat' ? token.colorPrimary : 'transparent',
+                boxShadow: currentMode === 'chat' ? token.boxShadowSecondary : 'none',
+              }}
             >
-              {currentMode === 'agent' ? <>{t('common.agentMode')} <Tag color="blue" style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px', marginLeft: 2, marginRight: 0 }}>Beta</Tag></> : t('common.chatMode')}
+              {t('common.chatMode', '问答')}
             </Button>
-          </Dropdown>
+            <Button
+              size="small"
+              type={currentMode === 'agent' ? 'primary' : 'text'}
+              disabled={streaming}
+              icon={<Bot size={12} />}
+              onClick={() => void handleModeSwitch('agent')}
+              style={{
+                height: 26,
+                flex: 1,
+                fontSize: 12,
+                fontWeight: 700,
+                color: currentMode === 'agent' ? token.colorWhite : token.colorText,
+                background: currentMode === 'agent' ? token.colorPrimary : 'transparent',
+                boxShadow: currentMode === 'agent' ? token.boxShadowSecondary : 'none',
+              }}
+            >
+              Agent
+            </Button>
+          </div>
           {currentMode === 'agent' && (
-            <Tooltip title={agentCwd || t('common.workingDirectory')}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
+              <Tooltip title={agentCwd || t('common.workingDirectory')}>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<FolderOpen size={14} />}
+                  onClick={handleSelectCwd}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, maxWidth: 150, fontSize: 12 }}
+                >
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {agentCwd ? abbreviatePath(agentCwd) : t('common.selectDirectory')}
+                  </span>
+                </Button>
+              </Tooltip>
+              {agentCwd && (
+                <Tooltip title={t('common.openDirectory', 'Open directory')}>
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<ExternalLink size={14} />}
+                    onClick={async () => {
+                      try {
+                        const { revealItemInDir } = await import('@tauri-apps/plugin-opener');
+                        await revealItemInDir(agentCwd);
+                      } catch (e) {
+                        console.warn('Failed to open directory:', e);
+                      }
+                    }}
+                    style={{ fontSize: 12, minWidth: 'auto', padding: '0 4px' }}
+                  />
+                </Tooltip>
+              )}
+            </div>
+          )}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
+            <span style={{ width: 34, fontSize: 11, fontWeight: 700, color: token.colorTextSecondary, whiteSpace: 'nowrap', paddingLeft: 4 }}>{t('chat.engineLabel', '引擎')}</span>
+            <div style={{ flex: 1, display: 'inline-flex', alignItems: 'center', gap: 4, padding: 2, borderRadius: token.borderRadiusLG, background: token.colorFillQuaternary }}>
               <Button
-                type="text"
                 size="small"
-                icon={<FolderOpen size={14} />}
-                onClick={handleSelectCwd}
-                style={{ display: 'flex', alignItems: 'center', gap: 4, maxWidth: 200, fontSize: 12 }}
+                type={agentEngineMode === 'frog_agent' ? 'primary' : 'text'}
+                disabled={streaming || loadingAgentEngines}
+                icon={<Atom size={12} />}
+                onClick={() => handleAgentEngineModeChange('frog_agent')}
+                style={{
+                  height: 26,
+                  flex: 1,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: agentEngineMode === 'frog_agent' ? token.colorWhite : token.colorText,
+                  background: agentEngineMode === 'frog_agent' ? token.colorPrimary : 'transparent',
+                  boxShadow: agentEngineMode === 'frog_agent' ? token.boxShadowSecondary : 'none',
+                }}
               >
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {agentCwd ? abbreviatePath(agentCwd) : t('common.selectDirectory')}
+                AIAgent
+              </Button>
+              <Button
+                size="small"
+                type={agentEngineMode === 'native_cli' ? 'primary' : 'text'}
+                disabled={streaming || loadingAgentEngines}
+                icon={<Terminal size={12} />}
+                onClick={() => handleAgentEngineModeChange('native_cli')}
+                style={{
+                  height: 26,
+                  flex: 1.55,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: agentEngineMode === 'native_cli' ? token.colorWhite : token.colorText,
+                  background: agentEngineMode === 'native_cli' ? token.colorPrimary : 'transparent',
+                  boxShadow: agentEngineMode === 'native_cli' ? token.boxShadowSecondary : 'none',
+                }}
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  {t('chat.nativeCli', 'Native CLI')}
+                  <span style={{ fontSize: 10, color: agentEngineMode === 'native_cli' ? token.colorWhite : token.colorTextTertiary, fontWeight: 700 }}>
+                    {nativeCliLabel}
+                  </span>
                 </span>
               </Button>
-            </Tooltip>
-          )}
-          {currentMode === 'agent' && agentCwd && (
-            <Tooltip title={t('common.openDirectory', '打开目录')}>
-              <Button
-                type="text"
-                size="small"
-                icon={<ExternalLink size={14} />}
-                onClick={async () => {
-                  try {
-                    const { revealItemInDir } = await import('@tauri-apps/plugin-opener');
-                    await revealItemInDir(agentCwd);
-                  } catch (e) {
-                    console.warn('Failed to open directory:', e);
-                  }
-                }}
-                style={{ fontSize: 12, minWidth: 'auto', padding: '0 4px' }}
-              />
-            </Tooltip>
-          )}
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           {currentMode === 'agent' && (
             <Dropdown
               menu={{
@@ -1531,8 +1671,7 @@ export function InputArea() {
           })()}
         </div>
       </div>
-
-      <ConversationSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      </div>
 
       {hasRealtimeVoice && (
         <VoiceCall
@@ -1576,16 +1715,7 @@ export function InputArea() {
         </div>
       )}
 
-      {/* Multi-model selector (trigger hidden, controlled via multiModelOpen state) */}
-      <ModelSelector
-        multiSelect
-        open={multiModelOpen}
-        onOpenChange={setMultiModelOpen}
-        onMultiSelect={handleMultiModelSelect}
-        defaultSelectedModels={companionModels}
-      >
-        <span />
-      </ModelSelector>
     </div>
   );
 }
+
