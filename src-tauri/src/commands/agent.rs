@@ -282,6 +282,17 @@ fn provider_type_to_registry_key(pt: &ProviderType) -> &'static str {
     }
 }
 
+fn is_deepseek_v4_model(model_id: &str) -> bool {
+    model_id.to_lowercase().starts_with("deepseek-v4-")
+}
+
+fn provider_type_to_registry_key_for_model(pt: &ProviderType, model_id: &str) -> &'static str {
+    if matches!(pt, ProviderType::OpenAIResponses) && is_deepseek_v4_model(model_id) {
+        return "openai";
+    }
+    provider_type_to_registry_key(pt)
+}
+
 fn is_supported_engine_kind(kind: &str) -> bool {
     matches!(
         kind,
@@ -414,7 +425,11 @@ fn cli_engine_info(
 
 /// Create an `Arc<dyn ProviderAdapter>` directly (avoids borrow-lifetime issues
 /// with the registry returning `&dyn ProviderAdapter`).
-fn create_adapter_arc(pt: &ProviderType) -> Result<Arc<dyn ProviderAdapter>, String> {
+fn create_adapter_arc(pt: &ProviderType, model_id: &str) -> Result<Arc<dyn ProviderAdapter>, String> {
+    if matches!(pt, ProviderType::OpenAIResponses) && is_deepseek_v4_model(model_id) {
+        return Ok(Arc::new(frogclaw_providers::openai::OpenAIAdapter::new()));
+    }
+
     match pt {
         ProviderType::OpenAI | ProviderType::Custom => {
             Ok(Arc::new(frogclaw_providers::openai::OpenAIAdapter::new()))
@@ -626,8 +641,8 @@ pub async fn agent_query(
 
     // 7. Create bridge
     let title_ctx = ctx.clone();
-    let adapter = create_adapter_arc(&prov.provider_type)?;
-    let provider_type_str = provider_type_to_registry_key(&prov.provider_type);
+    let adapter = create_adapter_arc(&prov.provider_type, &model_id)?;
+    let provider_type_str = provider_type_to_registry_key_for_model(&prov.provider_type, &model_id);
     let bridge = frogclaw_agent::bridge::FrogClawClientProviderBridge::new(adapter, ctx, provider_type_str)
         .map_err(|e| e.to_string())?
         .with_app(app.clone(), conversation_id.clone());

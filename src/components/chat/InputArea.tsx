@@ -1,7 +1,7 @@
 ﻿import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Button, Tooltip, App, theme, Dropdown, Tag, Popover } from 'antd';
 import type { MenuProps } from 'antd';
-import { Paperclip, Trash2, Mic, Eraser, Scissors, Globe, Atom, Plug, ArrowUp, Square, Check, Zap, ZapOff, Shrink, Upload, X, GripHorizontal, CircleOff, SignalLow, SignalMedium, SignalHigh, Signal, Bot, MessageSquare, Shield, ShieldCheck, ShieldAlert, FolderOpen, ExternalLink, ChevronDown, Terminal } from 'lucide-react';
+import { Paperclip, Trash2, Mic, Eraser, Scissors, Globe, Atom, Plug, ArrowUp, Square, Check, Zap, ZapOff, Shrink, Upload, GripHorizontal, CircleOff, SignalLow, SignalMedium, SignalHigh, Signal, Shield, ShieldCheck, ShieldAlert, FolderOpen, ExternalLink, ChevronDown, Terminal } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAgentStore, useConversationStore, useProviderStore, useSettingsStore, useSearchStore, useMcpStore } from '@/stores';
 import { useUIStore } from '@/stores/uiStore';
@@ -17,7 +17,6 @@ import type { ShortcutAction } from '@/lib/shortcuts';
 import { VoiceCall } from './VoiceCall';
 import { ModelSelector } from './ModelSelector';
 import { SearchProviderTypeIcon, PROVIDER_TYPE_LABELS } from '@/components/shared/SearchProviderIcon';
-import { ModelIcon } from '@lobehub/icons';
 import type { AttachmentInput, ProviderType, RealtimeConfig } from '@/types';
 import type { AgentEngineInfo, AgentEngineKind } from '@/types/agent';
 import { invoke } from '@/lib/invoke';
@@ -43,6 +42,7 @@ async function fileToAttachmentInput(file: File): Promise<AttachmentInput> {
 const _draftCache = new Map<string, string>();
 const DEFAULT_AGENT_ENGINE_KEY = 'frogclaw:default-agent-engine';
 const SUPPORTED_AGENT_ENGINE_KINDS: AgentEngineKind[] = ['frog_agent', 'claude_code', 'codex_cli', 'gemini_cli'];
+const DEFAULT_AGENT_PERMISSION_MODE = 'full_access';
 
 function readDefaultAgentEngine(): AgentEngineKind {
   try {
@@ -115,14 +115,12 @@ export function InputArea() {
 
   // Multi-model companion state
   const [companionModels, setCompanionModels] = useState<Array<{ providerId: string; modelId: string }>>([]);
-  const sendMultiModelMessage = useConversationStore((s) => s.sendMultiModelMessage);
 
   const { message: messageApi, modal } = App.useApp();
   const streaming = useConversationStore((s) => s.streaming);
   const compressing = useConversationStore((s) => s.compressing);
   const cancelCurrentStream = useConversationStore((s) => s.cancelCurrentStream);
   const activeConversationId = useConversationStore((s) => s.activeConversationId);
-  const sendMessage = useConversationStore((s) => s.sendMessage);
   const sendAgentMessage = useConversationStore((s) => s.sendAgentMessage);
   const createConversation = useConversationStore((s) => s.createConversation);
   const messages = useConversationStore((s) => s.messages);
@@ -174,7 +172,7 @@ export function InputArea() {
   const setThinkingLevel = useConversationStore((s) => s.setThinkingLevel);
 
   // Agent permission mode state
-  const [agentPermissionMode, setAgentPermissionMode] = useState<string>('default');
+  const [agentPermissionMode, setAgentPermissionMode] = useState<string>(DEFAULT_AGENT_PERMISSION_MODE);
   const updateAgentEngine = useAgentStore((s) => s.updateEngine);
 
   // Agent working directory state
@@ -190,7 +188,7 @@ export function InputArea() {
   const compressContext = useConversationStore((s) => s.compressContext);
 
   const activeConversation = conversations.find((c) => c.id === activeConversationId);
-  const currentMode = activeConversation?.mode || 'chat';
+
   const toolbarIconButtonStyle = useMemo<React.CSSProperties>(() => ({
     width: 28,
     height: 28,
@@ -247,19 +245,22 @@ export function InputArea() {
       invoke('agent_get_session', { conversationId: activeConversationId })
         .then((session: any) => {
           if (session) {
-            setAgentPermissionMode(session.permission_mode || 'default');
+            setAgentPermissionMode(session.permission_mode || DEFAULT_AGENT_PERMISSION_MODE);
             setAgentCwd(session.cwd || null);
             const sessionEngine = (session.engine_kind || session.engineKind || readDefaultAgentEngine()) as AgentEngineKind;
             setAgentEngine(sessionEngine);
             writeDefaultAgentEngine(sessionEngine);
           } else {
+            setAgentPermissionMode(DEFAULT_AGENT_PERMISSION_MODE);
             setAgentEngine(readDefaultAgentEngine());
           }
         })
         .catch(() => {
+          setAgentPermissionMode(DEFAULT_AGENT_PERMISSION_MODE);
           setAgentEngine(readDefaultAgentEngine());
         });
     } else {
+      setAgentPermissionMode(DEFAULT_AGENT_PERMISSION_MODE);
       setAgentEngine(readDefaultAgentEngine());
     }
   }, [activeConversationId]);
@@ -306,11 +307,7 @@ export function InputArea() {
     const text = pendingPromptText;
     (async () => {
       try {
-        if (companionModels.length > 0) {
-          await sendMultiModelMessage(text, companionModels, undefined, searchEnabled ? searchProviderId : null);
-        } else {
-          await sendMessage(text, undefined, searchEnabled ? searchProviderId : null);
-        }
+        await sendAgentMessage(text);
       } catch (e) {
         console.error('[InputArea] pendingPromptText send error:', e);
         messageApi.error(String(e));
@@ -643,39 +640,6 @@ export function InputArea() {
     hasVision: modelHasCapability(currentModel, 'Vision'),
   }), [activeConversation, currentModel, providers]);
 
-  // Current model key for excluding from multi-select (no longer used - users can select any model)
-
-  const companionDisplayInfos = useMemo(() => {
-    return companionModels.map((cm) => {
-      const provider = providers.find((p) => p.id === cm.providerId);
-      const model = provider?.models.find((m) => m.model_id === cm.modelId);
-      return {
-        ...cm,
-        modelName: model?.name ?? cm.modelId,
-        providerName: provider?.name ?? '',
-      };
-    });
-  }, [companionModels, providers]);
-
-  const removeCompanionModel = useCallback((index: number) => {
-    setCompanionModels((prev) => {
-      const next = prev.filter((_, i) => i !== index);
-      if (companionStorageKey) {
-        if (next.length > 0) {
-          localStorage.setItem(companionStorageKey, JSON.stringify(next));
-        } else {
-          localStorage.removeItem(companionStorageKey);
-        }
-      }
-      return next;
-    });
-  }, [companionStorageKey]);
-
-  const clearAllCompanionModels = useCallback(() => {
-    setCompanionModels([]);
-    if (companionStorageKey) localStorage.removeItem(companionStorageKey);
-  }, [companionStorageKey]);
-
   const voiceConfig: RealtimeConfig = React.useMemo(
     () => ({
       model_id: activeConversation?.model_id ?? '',
@@ -685,50 +649,62 @@ export function InputArea() {
     [activeConversation?.model_id],
   );
 
-  const handleModeSwitch = useCallback(async (mode: 'chat' | 'agent') => {
+  const initializeAgentSession = useCallback(async () => {
     if (!activeConversation) return;
 
-    await updateConversation(activeConversation.id, { mode });
+    try {
+      if (activeConversation.mode !== 'agent') {
+        await updateConversation(activeConversation.id, { mode: 'agent' });
+      }
+    } catch (e) {
+      console.warn('Failed to persist default agent mode:', e);
+    }
 
-    if (mode === 'agent') {
-      // Clear multi-model companion models 閳?not applicable in agent mode
+    try {
+      // Clear multi-model companion models - not applicable in agent mode.
       if (companionModels.length > 0) {
         setCompanionModels([]);
         if (companionStorageKey) localStorage.removeItem(companionStorageKey);
       }
-      try {
-        const session = await invoke<{ cwd: string | null; engine_kind?: AgentEngineKind; engineKind?: AgentEngineKind }>('agent_update_session', {
+      const session = await invoke<{ cwd: string | null; permission_mode?: string; permissionMode?: string; engine_kind?: AgentEngineKind; engineKind?: AgentEngineKind }>('agent_update_session', {
+        conversationId: activeConversation.id,
+        permissionMode: DEFAULT_AGENT_PERMISSION_MODE,
+        engineKind: agentEngine,
+      });
+      setAgentPermissionMode(session.permission_mode || session.permissionMode || DEFAULT_AGENT_PERMISSION_MODE);
+      const sessionEngine = (session.engine_kind || session.engineKind || agentEngine) as AgentEngineKind;
+      setAgentEngine(sessionEngine);
+      writeDefaultAgentEngine(sessionEngine);
+      if (activeConversation.working_directory) {
+        await invoke('agent_update_session', {
           conversationId: activeConversation.id,
-          engineKind: agentEngine,
+          cwd: activeConversation.working_directory,
+          permissionMode: DEFAULT_AGENT_PERMISSION_MODE,
+          engineKind: sessionEngine,
         });
-        const sessionEngine = (session.engine_kind || session.engineKind || agentEngine) as AgentEngineKind;
-        setAgentEngine(sessionEngine);
-        writeDefaultAgentEngine(sessionEngine);
-        if (activeConversation.working_directory) {
-          await invoke('agent_update_session', {
-            conversationId: activeConversation.id,
-            cwd: activeConversation.working_directory,
-            engineKind: sessionEngine,
-          });
-          setAgentCwd(activeConversation.working_directory);
-        } else if (!session.cwd) {
-          const workspacePath = await invoke<string>('agent_ensure_workspace', {
-            conversationId: activeConversation.id,
-          });
-          await invoke('agent_update_session', {
-            conversationId: activeConversation.id,
-            cwd: workspacePath,
-            engineKind: sessionEngine,
-          });
-          setAgentCwd(workspacePath);
-        } else {
-          setAgentCwd(session.cwd);
-        }
-      } catch (e) {
-        console.warn('Failed to init agent session:', e);
+        setAgentCwd(activeConversation.working_directory);
+      } else if (!session.cwd) {
+        const workspacePath = await invoke<string>('agent_ensure_workspace', {
+          conversationId: activeConversation.id,
+        });
+        await invoke('agent_update_session', {
+          conversationId: activeConversation.id,
+          cwd: workspacePath,
+          permissionMode: DEFAULT_AGENT_PERMISSION_MODE,
+          engineKind: sessionEngine,
+        });
+        setAgentCwd(workspacePath);
+      } else {
+        setAgentCwd(session.cwd);
       }
+    } catch (e) {
+      console.warn('Failed to init agent session:', e);
     }
   }, [activeConversation, updateConversation, companionModels, companionStorageKey, agentEngine]);
+
+  useEffect(() => {
+    void initializeAgentSession();
+  }, [initializeAgentSession]);
 
   const enabledMcpServers = useMemo(
     () => mcpServers.filter((server) => server.enabled),
@@ -912,13 +888,7 @@ export function InputArea() {
           textareaRef.current.style.height = 'auto';
         }
       });
-      if (currentMode === 'agent') {
-        await sendAgentMessage(trimmed, attachments);
-      } else if (companionModels.length > 0) {
-        await sendMultiModelMessage(trimmed, companionModels, attachments, searchEnabled ? searchProviderId : null);
-      } else {
-        await sendMessage(trimmed, attachments, searchEnabled ? searchProviderId : null);
-      }
+      await sendAgentMessage(trimmed, attachments);
     } catch (e) {
       setValue((current) => current || trimmed);
       setAttachedFiles((current) => (current.length > 0 ? current : submittedFiles));
@@ -936,7 +906,7 @@ export function InputArea() {
         }
       });
     }
-  }, [value, attachedFiles, sendMessage, sendAgentMessage, sendMultiModelMessage, companionModels, activeConversationId, providers, settings, createConversation, messageApi, t, searchEnabled, searchProviderId, currentMode]);
+  }, [value, attachedFiles, sendAgentMessage, activeConversationId, providers, settings, createConversation, messageApi, t]);
 
   const handleFillLastMessage = useCallback(() => {
     if (streaming) return;
@@ -1178,15 +1148,12 @@ export function InputArea() {
     return () => window.removeEventListener('frogclaw:fill-input', onFillInput);
   }, []);
 
-  // Listen for mode toggle shortcut
+  // Mode switching is intentionally disabled; FrogClaw chat now runs in Agent mode by default.
   React.useEffect(() => {
-    const onToggleMode = () => {
-      const nextMode = currentMode === 'chat' ? 'agent' : 'chat';
-      handleModeSwitch(nextMode);
-    };
+    const onToggleMode = () => void initializeAgentSession();
     window.addEventListener('frogclaw:toggle-mode', onToggleMode);
     return () => window.removeEventListener('frogclaw:toggle-mode', onToggleMode);
-  }, [currentMode, handleModeSwitch]);
+  }, [initializeAgentSession]);
 
   return (
     <div
@@ -1253,57 +1220,6 @@ export function InputArea() {
         >
           <GripHorizontal size={12} style={{ color: token.colorTextQuaternary, opacity: 0.4 }} />
         </div>
-        {/* Companion model tags */}
-        {currentMode !== 'agent' && companionModels.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 px-3 pt-3 pb-1">
-            <span
-              className="inline-flex items-center px-2 py-0.5 text-xs"
-              style={{ color: token.colorTextTertiary }}
-            >
-              {t('chat.multiModel.selectTitle')}:
-            </span>
-            {companionDisplayInfos.map((cm, idx) => (
-              <span
-                key={`${cm.providerId}-${cm.modelId}`}
-                className="inline-flex items-center gap-1.5 pl-1.5 pr-1 py-0.5 text-xs"
-                style={{
-                  backgroundColor: token.colorFillSecondary,
-                  borderRadius: token.borderRadiusSM,
-                  color: token.colorText,
-                }}
-              >
-                <ModelIcon model={cm.modelId} size={14} type="avatar" />
-                <span style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {cm.modelName}
-                </span>
-                {cm.providerName && (
-                  <span style={{ color: token.colorTextQuaternary, fontSize: 11 }}>
-                    {cm.providerName}
-                  </span>
-                )}
-                <X
-                  size={12}
-                  className="cursor-pointer flex-shrink-0"
-                  style={{ color: token.colorTextTertiary }}
-                  onClick={() => removeCompanionModel(idx)}
-                />
-              </span>
-            ))}
-            {/* Clear all companion models */}
-            <span
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs cursor-pointer"
-              style={{
-                borderRadius: token.borderRadiusSM,
-                color: token.colorTextTertiary,
-              }}
-              onClick={clearAllCompanionModels}
-            >
-              <Trash2 size={11} />
-              {t('chat.clearAll')}
-            </span>
-          </div>
-        )}
-
         {/* Textarea */}
         <textarea
           className="frogclaw-input-textarea"
@@ -1474,95 +1390,19 @@ export function InputArea() {
         </div>
       </div>
 
-      {/* Mode controls bar below input container */}
+      {/* Agent controls bar below input container */}
       <div className="flex items-center justify-between gap-2 px-1 pt-1.5">
         <div
           className="flex min-w-0 shrink-0 flex-col items-stretch gap-1"
           style={{
             padding: 3,
-            width: currentMode === 'agent' ? 520 : 330,
+            width: 520,
             borderRadius: token.borderRadiusLG,
             border: `1px solid ${token.colorBorderSecondary}`,
             background: token.colorBgContainer,
             boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
-          <span style={{ width: 34, fontSize: 11, fontWeight: 700, color: token.colorTextSecondary, whiteSpace: 'nowrap', paddingLeft: 4 }}>{t('chat.modeLabel', '模式')}</span>
-          <div style={{ flex: 1, display: 'inline-flex', alignItems: 'center', gap: 4, padding: 2, borderRadius: token.borderRadiusLG, background: token.colorFillQuaternary }}>
-            <Button
-              size="small"
-              type={currentMode === 'chat' ? 'primary' : 'text'}
-              disabled={streaming}
-              icon={<MessageSquare size={12} />}
-              onClick={() => void handleModeSwitch('chat')}
-              style={{
-                height: 26,
-                flex: 1,
-                fontSize: 12,
-                fontWeight: 700,
-                color: currentMode === 'chat' ? token.colorWhite : token.colorText,
-                background: currentMode === 'chat' ? token.colorPrimary : 'transparent',
-                boxShadow: currentMode === 'chat' ? token.boxShadowSecondary : 'none',
-              }}
-            >
-              {t('common.chatMode', '问答')}
-            </Button>
-            <Button
-              size="small"
-              type={currentMode === 'agent' ? 'primary' : 'text'}
-              disabled={streaming}
-              icon={<Bot size={12} />}
-              onClick={() => void handleModeSwitch('agent')}
-              style={{
-                height: 26,
-                flex: 1,
-                fontSize: 12,
-                fontWeight: 700,
-                color: currentMode === 'agent' ? token.colorWhite : token.colorText,
-                background: currentMode === 'agent' ? token.colorPrimary : 'transparent',
-                boxShadow: currentMode === 'agent' ? token.boxShadowSecondary : 'none',
-              }}
-            >
-              Agent
-            </Button>
-          </div>
-          {currentMode === 'agent' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
-              <Tooltip title={agentCwd || t('common.workingDirectory')}>
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<FolderOpen size={14} />}
-                  onClick={handleSelectCwd}
-                  style={{ display: 'flex', alignItems: 'center', gap: 4, maxWidth: 150, fontSize: 12 }}
-                >
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {agentCwd ? abbreviatePath(agentCwd) : t('common.selectDirectory')}
-                  </span>
-                </Button>
-              </Tooltip>
-              {agentCwd && (
-                <Tooltip title={t('common.openDirectory', 'Open directory')}>
-                  <Button
-                    type="text"
-                    size="small"
-                    icon={<ExternalLink size={14} />}
-                    onClick={async () => {
-                      try {
-                        const { revealItemInDir } = await import('@tauri-apps/plugin-opener');
-                        await revealItemInDir(agentCwd);
-                      } catch (e) {
-                        console.warn('Failed to open directory:', e);
-                      }
-                    }}
-                    style={{ fontSize: 12, minWidth: 'auto', padding: '0 4px' }}
-                  />
-                </Tooltip>
-              )}
-            </div>
-          )}
-          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
             <span style={{ width: 34, fontSize: 11, fontWeight: 700, color: token.colorTextSecondary, whiteSpace: 'nowrap', paddingLeft: 4 }}>{t('chat.engineLabel', '引擎')}</span>
             <div style={{ flex: 1, display: 'inline-flex', alignItems: 'center', gap: 4, padding: 2, borderRadius: token.borderRadiusLG, background: token.colorFillQuaternary }}>
@@ -1608,32 +1448,63 @@ export function InputArea() {
                 </span>
               </Button>
             </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
+              <Tooltip title={agentCwd || t('common.workingDirectory')}>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<FolderOpen size={14} />}
+                  onClick={handleSelectCwd}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, maxWidth: 150, fontSize: 12 }}
+                >
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {agentCwd ? abbreviatePath(agentCwd) : t('common.selectDirectory')}
+                  </span>
+                </Button>
+              </Tooltip>
+              {agentCwd && (
+                <Tooltip title={t('common.openDirectory', 'Open directory')}>
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<ExternalLink size={14} />}
+                    onClick={async () => {
+                      try {
+                        const { revealItemInDir } = await import('@tauri-apps/plugin-opener');
+                        await revealItemInDir(agentCwd);
+                      } catch (e) {
+                        console.warn('Failed to open directory:', e);
+                      }
+                    }}
+                    style={{ fontSize: 12, minWidth: 'auto', padding: '0 4px' }}
+                  />
+                </Tooltip>
+              )}
+            </div>
           </div>
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-2">
-          {currentMode === 'agent' && (
-            <Dropdown
-              menu={{
-                items: permissionModeItems,
-                selectedKeys: [agentPermissionMode],
-                onClick: ({ key }) => handlePermissionModeChange(key),
+          <Dropdown
+            menu={{
+              items: permissionModeItems,
+              selectedKeys: [agentPermissionMode],
+              onClick: ({ key }) => handlePermissionModeChange(key),
+            }}
+            trigger={['click']}
+            placement="topRight"
+          >
+            <Button
+              type="text"
+              size="small"
+              icon={permissionModeIcon}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4, fontSize: 12,
+                ...(agentPermissionMode === 'full_access' ? { color: '#ff4d4f' } : {}),
               }}
-              trigger={['click']}
-              placement="topRight"
             >
-              <Button
-                type="text"
-                size="small"
-                icon={permissionModeIcon}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 4, fontSize: 12,
-                  ...(agentPermissionMode === 'full_access' ? { color: '#ff4d4f' } : {}),
-                }}
-              >
-                {permissionModeLabel}
-              </Button>
-            </Dropdown>
-          )}
+              {permissionModeLabel}
+            </Button>
+          </Dropdown>
           {contextCount > 0 && (
             <span style={{ fontSize: 11, color: token.colorTextSecondary }}>
               {contextCount} {t('chat.contextMessages')}

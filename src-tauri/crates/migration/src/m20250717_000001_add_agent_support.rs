@@ -15,7 +15,7 @@ impl MigrationTrait for Migration {
                         ColumnDef::new(Alias::new("mode"))
                             .string()
                             .not_null()
-                            .default("chat"),
+                            .default("agent"),
                     )
                     .to_owned(),
             )
@@ -57,7 +57,7 @@ impl MigrationTrait for Migration {
                         ColumnDef::new(Alias::new("permission_mode"))
                             .string()
                             .not_null()
-                            .default("default"),
+                            .default("full_access"),
                     )
                     .col(
                         ColumnDef::new(Alias::new("runtime_status"))

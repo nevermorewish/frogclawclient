@@ -22,6 +22,17 @@ fn provider_type_to_registry_key(pt: &ProviderType) -> &'static str {
     }
 }
 
+fn is_deepseek_v4_model(model_id: &str) -> bool {
+    model_id.to_lowercase().starts_with("deepseek-v4-")
+}
+
+fn provider_type_to_registry_key_for_model(pt: &ProviderType, model_id: &str) -> &'static str {
+    if matches!(pt, ProviderType::OpenAIResponses) && is_deepseek_v4_model(model_id) {
+        return "openai";
+    }
+    provider_type_to_registry_key(pt)
+}
+
 /// Resolve effective system prompt with priority: Conversation → Category → Global Default
 async fn resolve_system_prompt(
     db: &DatabaseConnection,
@@ -1167,7 +1178,7 @@ async fn generate_ai_title_with(
     };
 
     let registry = ProviderRegistry::create_default();
-    let registry_key = provider_type_to_registry_key(&provider.provider_type);
+    let registry_key = provider_type_to_registry_key_for_model(&provider.provider_type, model_id);
     let adapter = match registry.get(registry_key) {
         Some(a) => a,
         None => {
@@ -1433,7 +1444,7 @@ fn spawn_stream_task(
             force_max_tokens,
         );
         let registry = ProviderRegistry::create_default();
-        let registry_key = provider_type_to_registry_key(&provider.provider_type);
+        let registry_key = provider_type_to_registry_key_for_model(&provider.provider_type, &model_id);
         let adapter: &dyn frogclaw_providers::ProviderAdapter = match registry.get(registry_key) {
             Some(a) => a,
             None => {
@@ -3118,7 +3129,7 @@ async fn do_compress(
     };
 
     let registry = ProviderRegistry::create_default();
-    let registry_key = provider_type_to_registry_key(&comp_provider.provider_type);
+    let registry_key = provider_type_to_registry_key_for_model(&comp_provider.provider_type, &comp_model_id);
     let adapter = registry
         .get(registry_key)
         .ok_or_else(|| "Provider adapter not found".to_string())?;

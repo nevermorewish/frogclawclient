@@ -119,7 +119,7 @@ export function Sidebar() {
       .catch(() => setDefaultWorkspace(null));
   }, [fetchConversations, fetchProviders, providers.length]);
 
-  const displayName = user?.display_name || user?.username || t('common.login', '鐧诲綍');
+  const displayName = user?.display_name || user?.username || t('common.login', '登录');
 
   const handleSettingsToggle = () => {
     if (activePage === 'settings') {
@@ -548,7 +548,7 @@ export function Sidebar() {
           </button>
         </Dropdown>
       ) : (
-        <Tooltip title={t('account.loginFrogClaw', '鐧诲綍 FrogClaw')} placement="right">
+        <Tooltip title={t('account.loginFrogClaw', '登录 FrogClaw')} placement="right">
           <button
             onClick={() => setLoginOpen(true)}
             className="flex items-center transition-colors"
@@ -568,7 +568,7 @@ export function Sidebar() {
             <span style={{ display: 'inline-flex', width: 18, justifyContent: 'center', flexShrink: 0 }}>
               <User size={17} />
             </span>
-            <span className="truncate" style={{ fontSize: 13, fontWeight: 500 }}>鐧诲綍</span>
+            <span className="truncate" style={{ fontSize: 13, fontWeight: 500 }}>登录</span>
           </button>
         </Tooltip>
       )}

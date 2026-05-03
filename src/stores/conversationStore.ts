@@ -1194,6 +1194,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
             ...conversationPreferenceUpdateFromState(get()),
             working_directory: workingDirectory,
             project_name: projectName,
+            mode: 'agent',
           },
         });
       } catch (preferenceError) {

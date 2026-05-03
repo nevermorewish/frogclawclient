@@ -69,7 +69,7 @@ pub async fn upsert_agent_session(
             id: Set(id),
             conversation_id: Set(conversation_id.to_string()),
             cwd: Set(cwd.map(|s| s.to_string())),
-            permission_mode: Set(permission_mode.unwrap_or("default").to_string()),
+            permission_mode: Set(permission_mode.unwrap_or("full_access").to_string()),
             runtime_status: Set("idle".to_string()),
             sdk_context_json: Set(None),
             sdk_context_backup_json: Set(None),

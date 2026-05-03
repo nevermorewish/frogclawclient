@@ -97,6 +97,7 @@ pub async fn create_conversation(
         system_prompt: Set(system_prompt.map(|s| s.to_string())),
         message_count: Set(0),
         is_pinned: Set(0),
+        mode: Set("agent".to_string()),
         created_at: Set(now),
         updated_at: Set(now),
         ..Default::default()
