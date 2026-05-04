@@ -30,6 +30,7 @@ dist-ssr
 # Build outputs
 dist/
 target/
+src-tauri/binaries/codex-app-server.exe
 
 # Secrets
 *.key

@@ -859,6 +859,80 @@ export async function handleCommand<T>(cmd: string, args?: Record<string, unknow
       return undefined as T;
 
     // ── Phase 2: Memory ───────────────────────────────────────────────
+    case 'list_project_memory_profiles': {
+      const conversations = getStore<any[]>('conversations', []);
+      const defaultPath = 'C:\\Users\\Administrator\\.frogclaw\\workspace';
+      const projects = new Map<string, string>();
+      projects.set(defaultPath, 'workspace');
+      for (const c of conversations) {
+        const path = c.working_directory || defaultPath;
+        projects.set(path, c.project_name || path.split(/[\\/]/).filter(Boolean).pop() || 'project');
+      }
+      const mns = getStore<any[]>('memory_namespaces', []);
+      return [...projects.entries()].map(([projectPath, projectName]) => {
+        const namespaceId = `project_mem_${btoa(projectPath).replace(/[^a-z0-9]/gi, '').slice(0, 24)}`;
+        let ns = mns.find((n) => n.id === namespaceId);
+        if (!ns) {
+          ns = { id: namespaceId, name: projectName, scope: 'project', embeddingProvider: 'frogclaw::BAAI/bge-m3', items: [], sortOrder: 0 };
+          mns.push(ns);
+        } else if (!ns.embeddingProvider) {
+          ns.embeddingProvider = 'frogclaw::BAAI/bge-m3';
+        }
+        const items = ns.items || [];
+        return {
+          projectPath,
+          projectName,
+          namespaceId,
+          enabled: Boolean(ns.embeddingProvider),
+          embeddingProvider: ns.embeddingProvider,
+          embeddingDimensions: ns.embeddingDimensions,
+          retrievalThreshold: ns.retrievalThreshold ?? 0.35,
+          retrievalTopK: ns.retrievalTopK ?? 6,
+          itemCount: items.length,
+          pendingCount: items.filter((i: any) => i.indexStatus !== 'ready').length,
+          failedCount: items.filter((i: any) => i.indexStatus === 'failed').length,
+        };
+      }) as T;
+    }
+    case 'get_project_memory_profile': {
+      const profiles = await handleCommand<any[]>('list_project_memory_profiles', {});
+      const projectPath = (args as any)?.projectPath;
+      return (profiles.find((p) => p.projectPath === projectPath) ?? profiles[0]) as T;
+    }
+    case 'update_project_memory_profile': {
+      const profile = await handleCommand<any>('get_project_memory_profile', args);
+      const mns = getStore<any[]>('memory_namespaces', []);
+      const idx = mns.findIndex((n) => n.id === profile.namespaceId);
+      if (idx >= 0) {
+        const input = (args as any)?.input ?? {};
+        mns[idx] = {
+          ...mns[idx],
+          embeddingProvider: input.updateEmbeddingProvider ? input.embeddingProvider : mns[idx].embeddingProvider,
+          embeddingDimensions: input.updateEmbeddingDimensions ? input.embeddingDimensions : mns[idx].embeddingDimensions,
+          retrievalThreshold: input.updateRetrievalThreshold ? input.retrievalThreshold : mns[idx].retrievalThreshold,
+          retrievalTopK: input.updateRetrievalTopK ? input.retrievalTopK : mns[idx].retrievalTopK,
+        };
+        setStore('memory_namespaces', mns);
+      }
+      return (await handleCommand<any>('get_project_memory_profile', args)) as T;
+    }
+    case 'list_project_memory_items': {
+      const profile = await handleCommand<any>('get_project_memory_profile', args);
+      const mns = getStore<any[]>('memory_namespaces', []);
+      const ns = mns.find((n) => n.id === profile.namespaceId);
+      return (ns?.items ?? []) as T;
+    }
+    case 'add_project_memory_item': {
+      const profile = await handleCommand<any>('get_project_memory_profile', args);
+      return await handleCommand<T>('add_memory_item', {
+        input: {
+          namespaceId: profile.namespaceId,
+          title: (args as any)?.title,
+          content: (args as any)?.content,
+          source: 'manual',
+        },
+      });
+    }
     case 'list_memory_namespaces':
       return getStore('memory_namespaces', []) as T;
     case 'create_memory_namespace': {
@@ -878,7 +952,7 @@ export async function handleCommand<T>(cmd: string, args?: Record<string, unknow
       const inputMem = (args as any)?.input ?? args;
       const mni = mns3.findIndex(n => n.id === inputMem?.namespaceId);
       if (mni >= 0) {
-        const item = { id: genId(), ...inputMem, created_at: nowTs() };
+        const item = { id: genId(), ...inputMem, indexStatus: 'ready', updatedAt: new Date().toISOString(), created_at: nowTs() };
         mns3[mni].items = [...(mns3[mni].items || []), item];
         mns3[mni].updated_at = nowTs();
         setStore('memory_namespaces', mns3);

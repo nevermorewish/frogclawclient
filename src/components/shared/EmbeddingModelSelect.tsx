@@ -4,8 +4,17 @@ import { ModelIcon } from '@lobehub/icons';
 import { useProviderStore } from '@/stores';
 import { parseModelValue, useProviderNameMap } from './ModelSelect';
 
-function isEmbeddingModel(model: { model_id: string; model_type?: string }) {
-  return model.model_type === 'Embedding' || /embed/i.test(model.model_id);
+function isEmbeddingModel(model: { model_id: string; name?: string; model_type?: string }) {
+  const modelType = String(model.model_type ?? '').toLowerCase();
+  const id = model.model_id.toLowerCase();
+  const name = String(model.name ?? '').toLowerCase();
+  const searchable = `${id} ${name}`;
+  return (
+    modelType === 'embedding'
+    || /\bembed(ding|dings)?\b/i.test(searchable)
+    || /(^|[/_-])(bge|e5|gte|m3e)([/_.:-]|$)/i.test(searchable)
+    || /jina-?embedding/i.test(searchable)
+  );
 }
 
 /** Hook: returns grouped Select options filtered to embedding-capable models */
@@ -107,6 +116,7 @@ export function EmbeddingModelSelect({
       optionRender={optionRender}
       labelRender={labelRender}
       options={embeddingOptions}
+      notFoundContent="没有可用的向量模型，请先在设置 -> 模型提供商中添加并启用 Embedding 模型"
       style={style}
     />
   );

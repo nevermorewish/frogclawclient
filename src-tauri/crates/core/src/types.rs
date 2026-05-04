@@ -1257,6 +1257,22 @@ pub struct MemoryItem {
     pub updated_at: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectMemoryProfile {
+    pub project_path: String,
+    pub project_name: String,
+    pub namespace_id: String,
+    pub enabled: bool,
+    pub embedding_provider: Option<String>,
+    pub embedding_dimensions: Option<i32>,
+    pub retrieval_threshold: Option<f32>,
+    pub retrieval_top_k: Option<i32>,
+    pub item_count: i64,
+    pub pending_count: i64,
+    pub failed_count: i64,
+}
+
 // Artifacts
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

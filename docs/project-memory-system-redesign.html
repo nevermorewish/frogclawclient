@@ -1,0 +1,798 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FrogClaw 项目级记忆系统重设计</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8fb;
+      --panel: #ffffff;
+      --panel-2: #f1f4f8;
+      --text: #18212f;
+      --muted: #637083;
+      --line: #d9e0ea;
+      --line-strong: #bac6d5;
+      --primary: #2364aa;
+      --primary-soft: #e8f1fb;
+      --green: #1f7a55;
+      --green-soft: #e8f6ef;
+      --amber: #9a6400;
+      --amber-soft: #fff4d8;
+      --red: #b42318;
+      --red-soft: #fdeceb;
+      --purple: #6b4fb3;
+      --purple-soft: #f0edfb;
+      --shadow: 0 14px 30px rgba(28, 39, 55, 0.08);
+      --radius: 8px;
+      font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+    }
+    header {
+      padding: 28px 34px 20px;
+      background: #ffffff;
+      border-bottom: 1px solid var(--line);
+    }
+    .header-inner {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 24px;
+      align-items: end;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      max-width: 820px;
+      font-size: 14px;
+    }
+    .meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      height: 26px;
+      padding: 0 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .tag.primary { color: var(--primary); background: var(--primary-soft); border-color: #c8dbf1; }
+    .tag.green { color: var(--green); background: var(--green-soft); border-color: #bfe5d1; }
+    .tag.amber { color: var(--amber); background: var(--amber-soft); border-color: #efd58e; }
+    main {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 24px 34px 42px;
+      display: grid;
+      grid-template-columns: 250px minmax(0, 1fr);
+      gap: 22px;
+    }
+    nav {
+      position: sticky;
+      top: 16px;
+      align-self: start;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 10px;
+    }
+    nav a {
+      display: block;
+      padding: 9px 10px;
+      border-radius: 6px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+    }
+    nav a:hover { background: var(--panel-2); color: var(--text); }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      margin-bottom: 18px;
+      overflow: hidden;
+    }
+    .section-head {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    h2 {
+      margin: 0 0 5px;
+      font-size: 19px;
+      letter-spacing: 0;
+    }
+    h3 {
+      margin: 0 0 8px;
+      font-size: 15px;
+      letter-spacing: 0;
+    }
+    .section-note {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .body { padding: 18px 20px 20px; }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      padding: 14px;
+    }
+    .card.tint { background: #fbfcfe; }
+    .card p, .body p { margin: 0 0 10px; }
+    .card p:last-child, .body p:last-child { margin-bottom: 0; }
+    .muted { color: var(--muted); }
+    .small { font-size: 12px; }
+    ul, ol { margin: 8px 0 0 18px; padding: 0; }
+    li { margin: 6px 0; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+    th, td {
+      padding: 10px 11px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      text-align: left;
+    }
+    th {
+      background: var(--panel-2);
+      color: #334155;
+      font-weight: 600;
+    }
+    tr:last-child td { border-bottom: 0; }
+    code {
+      background: #eef2f7;
+      padding: 1px 5px;
+      border-radius: 5px;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      font-size: 12px;
+    }
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(120px, 1fr));
+      gap: 10px;
+    }
+    .step {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      padding: 12px;
+      min-height: 118px;
+      position: relative;
+    }
+    .step-num {
+      width: 24px;
+      height: 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: var(--primary-soft);
+      color: var(--primary);
+      font-weight: 700;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+    .app-shell {
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: #eef2f7;
+    }
+    .topbar {
+      height: 46px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      background: #ffffff;
+      border-bottom: 1px solid var(--line);
+    }
+    .window-title { font-weight: 700; font-size: 13px; }
+    .toolbar { display: flex; gap: 8px; align-items: center; }
+    .btn {
+      height: 30px;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      background: #fff;
+      color: #334155;
+      padding: 0 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+    }
+    .btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+    .mock-body {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr) 300px;
+      min-height: 530px;
+    }
+    .mock-pane {
+      background: #ffffff;
+      border-right: 1px solid var(--line);
+      padding: 12px;
+    }
+    .mock-pane.right {
+      border-right: 0;
+      border-left: 1px solid var(--line);
+    }
+    .project-row {
+      border: 1px solid transparent;
+      border-radius: 7px;
+      padding: 10px;
+      margin-bottom: 7px;
+      background: #fff;
+    }
+    .project-row.active {
+      background: var(--primary-soft);
+      border-color: #c8dbf1;
+    }
+    .project-name {
+      font-weight: 700;
+      font-size: 13px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .project-meta {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .memory-main {
+      padding: 14px;
+      background: #f8fafc;
+    }
+    .summary-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .metric {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 10px;
+    }
+    .metric b { display: block; font-size: 18px; }
+    .tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+      border-bottom: 1px solid var(--line);
+    }
+    .tab {
+      padding: 8px 10px;
+      color: var(--muted);
+      font-size: 12px;
+      border-bottom: 2px solid transparent;
+    }
+    .tab.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+      font-weight: 700;
+    }
+    .memory-item {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fff;
+      padding: 12px;
+      margin-bottom: 9px;
+    }
+    .memory-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-start;
+      margin-bottom: 6px;
+    }
+    .memory-title strong { font-size: 13px; }
+    .source-line {
+      display: flex;
+      gap: 7px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      background: var(--panel-2);
+      color: var(--muted);
+    }
+    .pill.green { background: var(--green-soft); color: var(--green); }
+    .pill.amber { background: var(--amber-soft); color: var(--amber); }
+    .pill.red { background: var(--red-soft); color: var(--red); }
+    .pill.purple { background: var(--purple-soft); color: var(--purple); }
+    .timeline {
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+    .event {
+      position: relative;
+      padding-bottom: 14px;
+      font-size: 12px;
+    }
+    .event::before {
+      content: "";
+      position: absolute;
+      left: -19px;
+      top: 3px;
+      width: 9px;
+      height: 9px;
+      background: var(--primary);
+      border-radius: 50%;
+      border: 2px solid #fff;
+    }
+    .schema {
+      display: grid;
+      grid-template-columns: 240px minmax(0, 1fr);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 10px;
+      font-size: 13px;
+    }
+    .schema-name {
+      background: var(--panel-2);
+      padding: 12px;
+      font-weight: 700;
+      border-right: 1px solid var(--line);
+    }
+    .schema-body { padding: 12px; }
+    .decision {
+      border-left: 4px solid var(--primary);
+      background: #fbfcfe;
+      padding: 12px 14px;
+      border-radius: 0 7px 7px 0;
+    }
+    .warning {
+      border-left-color: var(--amber);
+      background: var(--amber-soft);
+    }
+    @media (max-width: 980px) {
+      .header-inner, main, .grid-2, .grid-3, .mock-body, .summary-strip, .flow {
+        grid-template-columns: 1fr;
+      }
+      nav { position: static; }
+      .header-inner { align-items: start; }
+      .meta { justify-content: flex-start; }
+      .mock-pane.right { border-left: 0; border-top: 1px solid var(--line); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <div>
+        <h1>FrogClaw 项目级记忆系统重设计</h1>
+        <p class="subtitle">移除“命名空间”概念，以项目作为记忆边界。系统按项目自动捕获、摘要、向量化、去重合并和召回，用户只需要确认项目与策略，不再手动维护记忆桶。</p>
+      </div>
+      <div class="meta">
+        <span class="tag primary">目标：项目即记忆容器</span>
+        <span class="tag green">自动捕获默认开启</span>
+        <span class="tag amber">向量模型仍必需</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <nav>
+      <a href="#principles">设计原则</a>
+      <a href="#architecture">系统架构</a>
+      <a href="#ui">页面原型</a>
+      <a href="#pipeline">自动记忆流水线</a>
+      <a href="#data">数据模型</a>
+      <a href="#migration">迁移方案</a>
+      <a href="#settings">设置策略</a>
+      <a href="#implementation">实现拆分</a>
+    </nav>
+
+    <div>
+      <section id="principles">
+        <div class="section-head">
+          <div>
+            <h2>设计原则</h2>
+            <p class="section-note">把 MemOS 的自动捕获思路压缩成适合 FrogClawClient 的项目级方案。</p>
+          </div>
+        </div>
+        <div class="body">
+          <div class="grid-3">
+            <div class="card">
+              <h3>项目是唯一边界</h3>
+              <p class="muted">每个项目拥有一份独立记忆配置、向量索引、自动捕获队列和召回策略。删除“命名空间”入口，聊天页只选择项目。</p>
+            </div>
+            <div class="card">
+              <h3>自动写入，用户可审阅</h3>
+              <p class="muted">会话结束后自动抽取候选记忆。默认先进入“待确认”，用户可切换成可信项目自动入库。</p>
+            </div>
+            <div class="card">
+              <h3>聊天模型和向量模型分工</h3>
+              <p class="muted">GPT-5.x 用于摘要、抽取、过滤、合并判断；embedding 模型用于检索相似度，不能用普通聊天模型替代。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="architecture">
+        <div class="section-head">
+          <div>
+            <h2>系统架构</h2>
+            <p class="section-note">从“手动 namespace + item”改成“project profile + memory entries + capture jobs”。</p>
+          </div>
+        </div>
+        <div class="body">
+          <div class="flow">
+            <div class="step">
+              <span class="step-num">1</span>
+              <h3>项目绑定</h3>
+              <p class="small muted">对话、文件、知识库和记忆都挂到 projectId。</p>
+            </div>
+            <div class="step">
+              <span class="step-num">2</span>
+              <h3>自动捕获</h3>
+              <p class="small muted">assistant 完成后提取最新 user/assistant/tool 片段。</p>
+            </div>
+            <div class="step">
+              <span class="step-num">3</span>
+              <h3>摘要抽取</h3>
+              <p class="small muted">用聊天模型输出结构化候选记忆，过滤无价值内容。</p>
+            </div>
+            <div class="step">
+              <span class="step-num">4</span>
+              <h3>向量索引</h3>
+              <p class="small muted">用项目配置的 embedding 模型写入 <code>mem_projectId</code> 集合。</p>
+            </div>
+            <div class="step">
+              <span class="step-num">5</span>
+              <h3>召回注入</h3>
+              <p class="small muted">下一轮按项目检索，经过相关性过滤后注入上下文。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="ui">
+        <div class="section-head">
+          <div>
+            <h2>页面原型</h2>
+            <p class="section-note">记忆页从“命名空间列表”改为“项目记忆控制台”。</p>
+          </div>
+        </div>
+        <div class="body">
+          <div class="app-shell">
+            <div class="topbar">
+              <div class="window-title">记忆 / 项目记忆控制台</div>
+              <div class="toolbar">
+                <button class="btn">搜索</button>
+                <button class="btn">重建索引</button>
+                <button class="btn primary">添加手动记忆</button>
+              </div>
+            </div>
+            <div class="mock-body">
+              <aside class="mock-pane">
+                <div class="project-row active">
+                  <div class="project-name">FrogClawClient <span class="pill green">启用</span></div>
+                  <div class="project-meta">327 条记忆 · 12 条待确认 · text-embedding-3-large</div>
+                </div>
+                <div class="project-row">
+                  <div class="project-name">Codex 集成 <span class="pill amber">待配置</span></div>
+                  <div class="project-meta">84 条记忆 · 未配置向量模型</div>
+                </div>
+                <div class="project-row">
+                  <div class="project-name">图片工具 <span class="pill green">启用</span></div>
+                  <div class="project-meta">41 条记忆 · 自动入库</div>
+                </div>
+                <div class="project-row">
+                  <div class="project-name">全局偏好 <span class="pill purple">用户级</span></div>
+                  <div class="project-meta">23 条偏好 · 跨项目召回</div>
+                </div>
+              </aside>
+
+              <div class="memory-main">
+                <div class="summary-strip">
+                  <div class="metric"><span class="small muted">有效记忆</span><b>327</b></div>
+                  <div class="metric"><span class="small muted">待确认</span><b>12</b></div>
+                  <div class="metric"><span class="small muted">索引失败</span><b>2</b></div>
+                  <div class="metric"><span class="small muted">今日捕获</span><b>18</b></div>
+                </div>
+                <div class="tabs">
+                  <div class="tab active">记忆项</div>
+                  <div class="tab">待确认</div>
+                  <div class="tab">捕获日志</div>
+                  <div class="tab">项目设置</div>
+                </div>
+                <div class="memory-item">
+                  <div class="memory-title">
+                    <strong>Codex app-server 需要随安装包携带 codex-app-server.exe</strong>
+                    <span class="pill green">ready</span>
+                  </div>
+                  <p class="small muted">打包时应将 <code>src-tauri/binaries/codex-app-server.exe</code> 加入 resources；运行时按 exe dir / resources / binaries 查找。</p>
+                  <div class="source-line">
+                    <span class="pill">auto_extract</span>
+                    <span class="pill">项目决策</span>
+                    <span class="pill">来源：对话 #2026-05-04</span>
+                    <span class="pill">相似合并 2 次</span>
+                  </div>
+                </div>
+                <div class="memory-item">
+                  <div class="memory-title">
+                    <strong>Windows 启动 CLI 子进程应使用 CREATE_NO_WINDOW</strong>
+                    <span class="pill green">ready</span>
+                  </div>
+                  <p class="small muted">对话页面会触发引擎探测和 app-server 启动，所有 .cmd/.bat/version probing 子进程都应隐藏控制台窗口。</p>
+                  <div class="source-line">
+                    <span class="pill">auto_extract</span>
+                    <span class="pill">工程约束</span>
+                    <span class="pill">置信度 0.91</span>
+                  </div>
+                </div>
+                <div class="memory-item">
+                  <div class="memory-title">
+                    <strong>存储策略：状态在 ~/.frogclaw，用户文件在 Documents/frogclaw</strong>
+                    <span class="pill amber">待复核</span>
+                  </div>
+                  <p class="small muted">来自 AGENTS.md，属于项目级长期约束。建议用户确认后锁定为高优先级记忆。</p>
+                  <div class="source-line">
+                    <span class="pill amber">pending_review</span>
+                    <span class="pill">项目约束</span>
+                    <span class="pill">来源：系统说明</span>
+                  </div>
+                </div>
+              </div>
+
+              <aside class="mock-pane right">
+                <h3>项目策略</h3>
+                <p class="small muted">FrogClawClient 的记忆策略和索引状态。</p>
+                <div class="card tint">
+                  <p><strong>自动捕获</strong> <span class="pill green">开启</span></p>
+                  <p><strong>写入模式</strong> <span class="pill amber">先审阅</span></p>
+                  <p><strong>摘要模型</strong> <span class="pill">gpt-5.x</span></p>
+                  <p><strong>向量模型</strong> <span class="pill">text-embedding-3-large</span></p>
+                </div>
+                <h3 style="margin-top: 16px;">最近捕获</h3>
+                <div class="timeline">
+                  <div class="event"><strong>16:38</strong><br><span class="muted">从对话提取 3 条候选，2 条自动合并。</span></div>
+                  <div class="event"><strong>16:31</strong><br><span class="muted">重建索引完成，327/327 ready。</span></div>
+                  <div class="event"><strong>16:22</strong><br><span class="muted">召回 6 条，LLM 过滤保留 4 条。</span></div>
+                </div>
+              </aside>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="pipeline">
+        <div class="section-head">
+          <div>
+            <h2>自动记忆流水线</h2>
+            <p class="section-note">参考 MemOS，但先实现轻量可靠版本。</p>
+          </div>
+        </div>
+        <div class="body">
+          <table>
+            <thead>
+              <tr><th>阶段</th><th>输入</th><th>处理</th><th>输出</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Capture</td>
+                <td>最新 user / assistant / tool 消息</td>
+                <td>清理 memory 注入、系统提示、thinking、空消息和重复消息</td>
+                <td><code>memory_capture_jobs</code></td>
+              </tr>
+              <tr>
+                <td>Extract</td>
+                <td>清理后的 turn</td>
+                <td>调用 gpt-5.x 输出 JSON：事实、偏好、决策、路径、错误签名、无需记忆原因</td>
+                <td><code>pending_memory_candidates</code></td>
+              </tr>
+              <tr>
+                <td>Dedup / Merge</td>
+                <td>候选记忆 + 相似记忆</td>
+                <td>content hash 精确去重；向量 TopK 后用 LLM 判断 new / duplicate / update</td>
+                <td>新建或更新 <code>project_memory_items</code></td>
+              </tr>
+              <tr>
+                <td>Embed</td>
+                <td>最终摘要和内容</td>
+                <td>使用项目 embedding 模型生成向量，写入 <code>mem_projectId</code></td>
+                <td>ready / failed / skipped</td>
+              </tr>
+              <tr>
+                <td>Recall</td>
+                <td>下一轮 user prompt</td>
+                <td>项目内检索 + 全局偏好可选检索 + LLM 相关性过滤</td>
+                <td>注入上下文和召回日志</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="decision" style="margin-top: 14px;">
+            <strong>写入策略建议：</strong>
+            默认“先审阅后入库”。项目可切换为“自动入库”，但必须保留捕获日志、撤销、禁用某条记忆和批量清理能力。
+          </div>
+        </div>
+      </section>
+
+      <section id="data">
+        <div class="section-head">
+          <div>
+            <h2>数据模型</h2>
+            <p class="section-note">删除业务概念里的 namespace，底层迁移可以保留兼容视图一段时间。</p>
+          </div>
+        </div>
+        <div class="body">
+          <div class="schema">
+            <div class="schema-name">projects</div>
+            <div class="schema-body">
+              <code>id</code>, <code>name</code>, <code>root_path</code>, <code>description</code>, <code>created_at</code>, <code>updated_at</code>
+            </div>
+          </div>
+          <div class="schema">
+            <div class="schema-name">project_memory_profiles</div>
+            <div class="schema-body">
+              <code>project_id</code>, <code>enabled</code>, <code>capture_mode</code>, <code>summary_provider</code>, <code>embedding_provider</code>, <code>embedding_dimensions</code>, <code>retrieval_top_k</code>, <code>retrieval_threshold</code>, <code>write_policy</code>
+            </div>
+          </div>
+          <div class="schema">
+            <div class="schema-name">project_memory_items</div>
+            <div class="schema-body">
+              <code>id</code>, <code>project_id</code>, <code>title</code>, <code>content</code>, <code>summary</code>, <code>kind</code>, <code>source</code>, <code>confidence</code>, <code>status</code>, <code>index_status</code>, <code>source_conversation_id</code>, <code>source_message_ids</code>, <code>merge_target_id</code>, <code>created_at</code>, <code>updated_at</code>
+            </div>
+          </div>
+          <div class="schema">
+            <div class="schema-name">memory_capture_jobs</div>
+            <div class="schema-body">
+              <code>id</code>, <code>project_id</code>, <code>conversation_id</code>, <code>turn_hash</code>, <code>status</code>, <code>raw_excerpt</code>, <code>result_json</code>, <code>error</code>, <code>created_at</code>
+            </div>
+          </div>
+          <div class="schema">
+            <div class="schema-name">memory_recall_logs</div>
+            <div class="schema-body">
+              <code>id</code>, <code>project_id</code>, <code>conversation_id</code>, <code>query</code>, <code>candidate_count</code>, <code>injected_count</code>, <code>latency_ms</code>, <code>model_filter_used</code>, <code>created_at</code>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="migration">
+        <div class="section-head">
+          <div>
+            <h2>迁移方案</h2>
+            <p class="section-note">从现有 memory_namespaces 平滑过渡。</p>
+          </div>
+        </div>
+        <div class="body">
+          <ol>
+            <li>新增 <code>projects</code> 和项目级记忆表，不立即删除旧表。</li>
+            <li>为每个已有 project 创建默认 <code>project_memory_profiles</code>。</li>
+            <li>旧 namespace 的 <code>scope=project</code> 迁移到对应 project；无法判断项目的先放到“未归档项目”。</li>
+            <li>旧 namespace 的 <code>scope=global</code> 迁移到“全局偏好”，作为可选跨项目召回源。</li>
+            <li>向量集合从 <code>mem_namespaceId</code> 重建为 <code>mem_projectId</code>。</li>
+            <li>前端移除 namespace 管理入口，保留只读迁移报告。</li>
+          </ol>
+          <div class="decision warning" style="margin-top: 14px;">
+            <strong>兼容风险：</strong>
+            当前 conversation 存的是 <code>enabled_memory_namespace_ids</code>。需要迁移成 <code>memory_project_id</code>、<code>memory_enabled</code>、<code>memory_write_policy</code>，并在读取旧会话时做兼容映射。
+          </div>
+        </div>
+      </section>
+
+      <section id="settings">
+        <div class="section-head">
+          <div>
+            <h2>设置策略</h2>
+            <p class="section-note">用户只配置“项目如何记忆”，不再创建命名空间。</p>
+          </div>
+        </div>
+        <div class="body">
+          <div class="grid-2">
+            <div class="card">
+              <h3>项目设置页</h3>
+              <ul>
+                <li>启用项目记忆</li>
+                <li>写入模式：关闭 / 待确认 / 自动入库</li>
+                <li>摘要模型：默认使用当前项目聊天模型，可指定 gpt-5.x</li>
+                <li>向量模型：必须选择 embedding 模型</li>
+                <li>召回范围：仅项目 / 项目 + 全局偏好</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>对话页</h3>
+              <ul>
+                <li>显示当前项目记忆状态，而不是 namespace 选择器</li>
+                <li>上下文条显示“项目记忆：已召回 N 条”</li>
+                <li>会话设置只保留启用/禁用本项目记忆</li>
+                <li>结束后生成捕获日志，可跳到记忆页查看候选</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="implementation">
+        <div class="section-head">
+          <div>
+            <h2>实现拆分</h2>
+            <p class="section-note">建议分三期，先把核心路径跑通。</p>
+          </div>
+        </div>
+        <div class="body">
+          <table>
+            <thead>
+              <tr><th>阶段</th><th>范围</th><th>验收标准</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Phase 1</td>
+                <td>项目级 profile、UI 去 namespace、手动记忆按项目入库、项目内向量检索</td>
+                <td>用户创建/选择项目后即可添加和检索项目记忆</td>
+              </tr>
+              <tr>
+                <td>Phase 2</td>
+                <td>assistant 完成后自动抽取候选，待确认队列，确认后索引</td>
+                <td>完成一次对话后自动出现候选记忆，确认后下一轮可召回</td>
+              </tr>
+              <tr>
+                <td>Phase 3</td>
+                <td>去重合并、召回 LLM filter、捕获日志、迁移旧 namespace</td>
+                <td>重复事实不会无限增长，日志可解释每次写入和召回</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

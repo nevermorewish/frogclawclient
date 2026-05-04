@@ -14,6 +14,8 @@ permissions:
 env:
   CARGO_INCREMENTAL: 0
   RUST_BACKTRACE: short
+  CODEX_APP_SERVER_REPO: nevermorewish/codex
+  CODEX_APP_SERVER_RELEASE_TAG: codex-app-server-v0.1.0
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.ref }}'
@@ -108,6 +110,9 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Prepare Codex app-server resource
+        run: node scripts/prepare-codex-app-server.mjs x86_64-pc-windows-msvc
+
       - name: Disable updater artifacts when signing key is unavailable
         shell: pwsh
         env:
@@ -136,6 +141,7 @@ jobs:
           if-no-files-found: error
           path: |
             src-tauri/target/x86_64-pc-windows-msvc/release/FrogClawClient.exe
+            src-tauri/target/x86_64-pc-windows-msvc/release/binaries/**
             src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
             src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*setup.exe
 
@@ -143,9 +149,18 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         run: |
-          $exe = "src-tauri/target/x86_64-pc-windows-msvc/release/FrogClawClient.exe"
+          $releaseDir = "src-tauri/target/x86_64-pc-windows-msvc/release"
+          $exe = Join-Path $releaseDir "FrogClawClient.exe"
+          $resources = Join-Path $releaseDir "binaries"
           $zipName = "FrogClawClient_${{ github.ref_name }}_windows-x64-portable.zip"
-          Compress-Archive -Path $exe -DestinationPath $zipName
+          $stage = Join-Path $env:RUNNER_TEMP "frogclaw-portable-x64"
+          Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $stage | Out-Null
+          Copy-Item -LiteralPath $exe -Destination $stage
+          if (Test-Path -LiteralPath $resources) {
+            Copy-Item -LiteralPath $resources -Destination $stage -Recurse
+          }
+          Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $zipName
 
       - name: Upload Windows portable to release
         if: startsWith(github.ref, 'refs/tags/')

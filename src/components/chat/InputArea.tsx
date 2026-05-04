@@ -3,7 +3,7 @@ import { Button, Tooltip, App, theme, Dropdown, Tag, Popover } from 'antd';
 import type { MenuProps } from 'antd';
 import { Paperclip, Trash2, Mic, Eraser, Scissors, Globe, Atom, Plug, ArrowUp, Square, Check, Zap, ZapOff, Shrink, Upload, GripHorizontal, CircleOff, SignalLow, SignalMedium, SignalHigh, Signal, Shield, ShieldCheck, ShieldAlert, FolderOpen, ExternalLink, ChevronDown, Terminal } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useAgentStore, useConversationStore, useProviderStore, useSettingsStore, useSearchStore, useMcpStore } from '@/stores';
+import { useAgentStore, useConversationStore, useProviderStore, useSettingsStore, useSearchStore, useMcpStore, useMemoryStore } from '@/stores';
 import { useUIStore } from '@/stores/uiStore';
 import { findModelByIds, supportsReasoning, modelHasCapability } from '@/lib/modelCapabilities';
 import {
@@ -188,6 +188,8 @@ export function InputArea() {
   const compressContext = useConversationStore((s) => s.compressContext);
 
   const activeConversation = conversations.find((c) => c.id === activeConversationId);
+  const setEnabledMemoryNamespaceIds = useConversationStore((s) => s.setEnabledMemoryNamespaceIds);
+  const getProjectProfile = useMemoryStore((s) => s.getProjectProfile);
 
   const toolbarIconButtonStyle = useMemo<React.CSSProperties>(() => ({
     width: 28,
@@ -264,6 +266,23 @@ export function InputArea() {
       setAgentEngine(readDefaultAgentEngine());
     }
   }, [activeConversationId]);
+
+  useEffect(() => {
+    if (!activeConversation?.working_directory) return;
+    let cancelled = false;
+    void getProjectProfile(activeConversation.working_directory, activeConversation.project_name)
+      .then((profile) => {
+        if (cancelled || !profile) return;
+        const current = useConversationStore.getState().enabledMemoryNamespaceIds;
+        const nextIds = profile.embeddingProvider ? [profile.namespaceId] : [];
+        if (current.length === nextIds.length && current.every((id, index) => id === nextIds[index])) return;
+        setEnabledMemoryNamespaceIds(nextIds);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [activeConversation?.working_directory, activeConversation?.project_name, getProjectProfile, setEnabledMemoryNamespaceIds]);
 
   // Draft persistence: save old draft & restore new when conversation changes
   useEffect(() => {

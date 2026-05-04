@@ -1,13 +1,15 @@
 import { create } from 'zustand';
 import { invoke } from '@/lib/invoke';
-import type { MemoryNamespace, MemoryItem, UpdateMemoryNamespaceInput, UpdateMemoryItemInput } from '@/types';
+import type { MemoryNamespace, MemoryItem, ProjectMemoryProfile, UpdateMemoryNamespaceInput, UpdateMemoryItemInput } from '@/types';
 
 interface MemoryState {
   namespaces: MemoryNamespace[];
+  projectProfiles: ProjectMemoryProfile[];
   items: MemoryItem[];
   loading: boolean;
   error: string | null;
   selectedNamespaceId: string | null;
+  selectedProjectPath: string | null;
 
   loadNamespaces: () => Promise<void>;
   createNamespace: (name: string, scope: string, embeddingProvider?: string) => Promise<MemoryNamespace | null>;
@@ -19,14 +21,22 @@ interface MemoryState {
   updateItem: (namespaceId: string, itemId: string, input: UpdateMemoryItemInput) => Promise<void>;
   setSelectedNamespaceId: (id: string | null) => void;
   reorderNamespaces: (namespaceIds: string[]) => Promise<void>;
+  loadProjectProfiles: () => Promise<void>;
+  getProjectProfile: (projectPath: string, projectName?: string | null) => Promise<ProjectMemoryProfile | null>;
+  updateProjectProfile: (projectPath: string, projectName: string | null | undefined, input: UpdateMemoryNamespaceInput) => Promise<ProjectMemoryProfile | null>;
+  loadProjectItems: (projectPath: string, projectName?: string | null) => Promise<void>;
+  addProjectItem: (projectPath: string, projectName: string | null | undefined, title: string, content: string) => Promise<void>;
+  setSelectedProjectPath: (projectPath: string | null) => void;
 }
 
 export const useMemoryStore = create<MemoryState>((set, get) => ({
   namespaces: [],
+  projectProfiles: [],
   items: [],
   loading: false,
   error: null,
   selectedNamespaceId: null,
+  selectedProjectPath: null,
 
   loadNamespaces: async () => {
     set({ loading: true });
@@ -129,5 +139,93 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
         .filter(Boolean) as MemoryNamespace[];
       return { namespaces: ordered };
     });
+  },
+
+  loadProjectProfiles: async () => {
+    set({ loading: true });
+    try {
+      const projectProfiles = await invoke<ProjectMemoryProfile[]>('list_project_memory_profiles');
+      set((s) => ({
+        projectProfiles,
+        selectedProjectPath: s.selectedProjectPath ?? projectProfiles[0]?.projectPath ?? null,
+        loading: false,
+        error: null,
+      }));
+    } catch (e) {
+      set({ error: String(e), loading: false });
+    }
+  },
+
+  getProjectProfile: async (projectPath, projectName) => {
+    try {
+      const profile = await invoke<ProjectMemoryProfile>('get_project_memory_profile', {
+        projectPath,
+        projectName: projectName ?? null,
+      });
+      set((s) => {
+        const exists = s.projectProfiles.some((p) => p.projectPath === profile.projectPath);
+        return {
+          projectProfiles: exists
+            ? s.projectProfiles.map((p) => (p.projectPath === profile.projectPath ? profile : p))
+            : [...s.projectProfiles, profile],
+          error: null,
+        };
+      });
+      return profile;
+    } catch (e) {
+      set({ error: String(e) });
+      return null;
+    }
+  },
+
+  updateProjectProfile: async (projectPath, projectName, input) => {
+    try {
+      const profile = await invoke<ProjectMemoryProfile>('update_project_memory_profile', {
+        projectPath,
+        projectName: projectName ?? null,
+        input,
+      });
+      set((s) => ({
+        projectProfiles: s.projectProfiles.map((p) => (p.projectPath === profile.projectPath ? profile : p)),
+        error: null,
+      }));
+      return profile;
+    } catch (e) {
+      set({ error: String(e) });
+      throw e;
+    }
+  },
+
+  loadProjectItems: async (projectPath, projectName) => {
+    set({ loading: true });
+    try {
+      const items = await invoke<MemoryItem[]>('list_project_memory_items', {
+        projectPath,
+        projectName: projectName ?? null,
+      });
+      set({ items, loading: false, error: null });
+    } catch (e) {
+      set({ error: String(e), loading: false });
+    }
+  },
+
+  addProjectItem: async (projectPath, projectName, title, content) => {
+    try {
+      await invoke('add_project_memory_item', {
+        projectPath,
+        projectName: projectName ?? null,
+        title,
+        content,
+      });
+      await get().loadProjectItems(projectPath, projectName ?? null);
+      await get().loadProjectProfiles();
+    } catch (e) {
+      set({ error: String(e) });
+      throw e;
+    }
+  },
+
+  setSelectedProjectPath: (projectPath) => {
+    set({ selectedProjectPath: projectPath });
   },
 }));

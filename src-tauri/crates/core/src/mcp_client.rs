@@ -7,8 +7,13 @@ use rmcp::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+#[cfg(unix)]
+use std::collections::HashSet;
 use std::sync::OnceLock;
+
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 /// Result of a tool call via MCP.
 #[derive(Debug, Clone)]
@@ -157,6 +162,15 @@ fn configure_stdio_env(cmd: &mut tokio::process::Command, env: &HashMap<String, 
     }
 }
 
+fn configure_stdio_process(cmd: &mut tokio::process::Command, env: &HashMap<String, String>) {
+    configure_stdio_env(cmd, env);
+
+    #[cfg(windows)]
+    {
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+}
+
 /// Convert rmcp Tool to our DiscoveredTool.
 fn tool_to_discovered(tool: &Tool) -> DiscoveredTool {
     DiscoveredTool {
@@ -207,7 +221,7 @@ pub async fn call_tool_stdio(
     let transport =
         TokioChildProcess::new(tokio::process::Command::new(command).configure(move |cmd| {
             cmd.args(&args_clone);
-            configure_stdio_env(cmd, &env_clone);
+            configure_stdio_process(cmd, &env_clone);
         }))
         .map_err(|e| {
             FrogClawClientError::Gateway(format!("Failed to spawn MCP server '{}': {}", command, e))
@@ -243,7 +257,7 @@ pub async fn discover_tools_stdio(
     let transport =
         TokioChildProcess::new(tokio::process::Command::new(command).configure(move |cmd| {
             cmd.args(&args_clone);
-            configure_stdio_env(cmd, &env_clone);
+            configure_stdio_process(cmd, &env_clone);
         }))
         .map_err(|e| {
             FrogClawClientError::Gateway(format!("Failed to spawn MCP server '{}': {}", command, e))

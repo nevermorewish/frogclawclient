@@ -10,6 +10,8 @@ permissions: write-all
 env:
   CARGO_INCREMENTAL: 0
   RUST_BACKTRACE: short
+  CODEX_APP_SERVER_REPO: nevermorewish/codex
+  CODEX_APP_SERVER_RELEASE_TAG: codex-app-server-v0.1.0
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.ref }}'
@@ -175,6 +177,9 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Prepare Codex app-server resource
+        run: node scripts/prepare-codex-app-server.mjs ${{ matrix.target }}
+
       - name: Build with Tauri
         uses: tauri-apps/tauri-action@v0
         env:
@@ -197,10 +202,19 @@ jobs:
         if: contains(matrix.target, 'windows')
         shell: pwsh
         run: |
-          $exe = "src-tauri/target/${{ matrix.target }}/release/FrogClawClient.exe"
+          $releaseDir = "src-tauri/target/${{ matrix.target }}/release"
+          $exe = Join-Path $releaseDir "FrogClawClient.exe"
+          $resources = Join-Path $releaseDir "binaries"
           $arch = if ("${{ matrix.target }}" -match "aarch64") { "arm64" } else { "x64" }
           $zipName = "FrogClawClient_${{ github.ref_name }}_windows-${arch}-portable.zip"
-          Compress-Archive -Path $exe -DestinationPath $zipName
+          $stage = Join-Path $env:RUNNER_TEMP "frogclaw-portable-${arch}"
+          Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $stage | Out-Null
+          Copy-Item -LiteralPath $exe -Destination $stage
+          if (Test-Path -LiteralPath $resources) {
+            Copy-Item -LiteralPath $resources -Destination $stage -Recurse
+          }
+          Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $zipName
 
       - name: Upload Windows portable to release
         if: contains(matrix.target, 'windows')
@@ -305,6 +319,9 @@ jobs:
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Prepare Codex app-server resource
+        run: node scripts/prepare-codex-app-server.mjs aarch64-unknown-linux-gnu
 
       - name: Build for Linux ARM64
         run: |

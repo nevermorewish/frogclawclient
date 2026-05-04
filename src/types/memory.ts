@@ -24,6 +24,20 @@ export type MemoryItem = {
   updatedAt: string;
 };
 
+export type ProjectMemoryProfile = {
+  projectPath: string;
+  projectName: string;
+  namespaceId: string;
+  enabled: boolean;
+  embeddingProvider?: string;
+  embeddingDimensions?: number;
+  retrievalThreshold?: number;
+  retrievalTopK?: number;
+  itemCount: number;
+  pendingCount: number;
+  failedCount: number;
+};
+
 export type CreateMemoryNamespaceInput = {
   name: string;
   scope: MemoryScope;

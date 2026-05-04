@@ -2,6 +2,85 @@ use crate::AppState;
 use frogclaw_core::types::*;
 use tauri::{AppHandle, Emitter, State};
 
+async fn index_memory_item_if_configured(
+    app: AppHandle,
+    state: &State<'_, AppState>,
+    item: MemoryItem,
+) -> Result<MemoryItem, String> {
+    let ns = frogclaw_core::repo::memory::get_namespace(&state.sea_db, &item.namespace_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if let Some(ref embedding_provider) = ns.embedding_provider {
+        let _ = frogclaw_core::repo::memory::update_item_index_status(
+            &state.sea_db,
+            &item.id,
+            "indexing",
+            None,
+        )
+        .await;
+
+        let db = state.sea_db.clone();
+        let master_key = state.master_key;
+        let vector_store = state.vector_store.clone();
+        let item_id = item.id.clone();
+        let content = item.content.clone();
+        let ep = embedding_provider.clone();
+        let ns_id = item.namespace_id.clone();
+        let dims = ns.embedding_dimensions.map(|v| v as usize);
+
+        tokio::spawn(async move {
+            let result = crate::indexing::index_memory_item(
+                &db,
+                &master_key,
+                &vector_store,
+                &ns_id,
+                &item_id,
+                &content,
+                &ep,
+                dims,
+            )
+            .await;
+
+            let (status, err_msg) = match &result {
+                Ok(_) => ("ready", None),
+                Err(e) => {
+                    tracing::error!("Memory embedding failed for item {}: {}", item_id, e);
+                    ("failed", Some(e.to_string()))
+                }
+            };
+            let _ = frogclaw_core::repo::memory::update_item_index_status(
+                &db,
+                &item_id,
+                status,
+                err_msg.as_deref(),
+            )
+            .await;
+
+            let _ = app.emit(
+                "memory-item-indexed",
+                serde_json::json!({
+                    "itemId": item_id,
+                    "success": result.is_ok(),
+                    "status": status,
+                    "error": err_msg,
+                }),
+            );
+        });
+
+        Ok(MemoryItem { index_status: "indexing".to_string(), ..item })
+    } else {
+        let _ = frogclaw_core::repo::memory::update_item_index_status(
+            &state.sea_db,
+            &item.id,
+            "skipped",
+            None,
+        )
+        .await;
+        Ok(MemoryItem { index_status: "skipped".to_string(), ..item })
+    }
+}
+
 #[tauri::command]
 pub async fn list_memory_namespaces(
     state: State<'_, AppState>,
@@ -9,6 +88,96 @@ pub async fn list_memory_namespaces(
     frogclaw_core::repo::memory::list_namespaces(&state.sea_db)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_project_memory_profiles(
+    state: State<'_, AppState>,
+) -> Result<Vec<ProjectMemoryProfile>, String> {
+    let default_project_path = crate::paths::default_workspace()
+        .to_string_lossy()
+        .to_string();
+    frogclaw_core::repo::memory::list_project_profiles(&state.sea_db, &default_project_path)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_project_memory_profile(
+    state: State<'_, AppState>,
+    project_path: String,
+    project_name: Option<String>,
+) -> Result<ProjectMemoryProfile, String> {
+    frogclaw_core::repo::memory::get_project_profile(
+        &state.sea_db,
+        &project_path,
+        project_name.as_deref(),
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn update_project_memory_profile(
+    state: State<'_, AppState>,
+    project_path: String,
+    project_name: Option<String>,
+    input: UpdateMemoryNamespaceInput,
+) -> Result<ProjectMemoryProfile, String> {
+    frogclaw_core::repo::memory::update_project_profile(
+        &state.sea_db,
+        &project_path,
+        project_name.as_deref(),
+        input,
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_project_memory_items(
+    state: State<'_, AppState>,
+    project_path: String,
+    project_name: Option<String>,
+) -> Result<Vec<MemoryItem>, String> {
+    frogclaw_core::repo::memory::list_project_items(
+        &state.sea_db,
+        &project_path,
+        project_name.as_deref(),
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn add_project_memory_item(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    project_path: String,
+    project_name: Option<String>,
+    title: String,
+    content: String,
+) -> Result<MemoryItem, String> {
+    let profile = frogclaw_core::repo::memory::ensure_project_profile(
+        &state.sea_db,
+        &project_path,
+        project_name.as_deref(),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    let item = frogclaw_core::repo::memory::add_item(
+        &state.sea_db,
+        CreateMemoryItemInput {
+            namespace_id: profile.namespace_id,
+            title,
+            content,
+            source: Some("manual".to_string()),
+        },
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+
+    index_memory_item_if_configured(app, &state, item).await
 }
 
 #[tauri::command]
@@ -59,64 +228,7 @@ pub async fn add_memory_item(
         .await
         .map_err(|e| e.to_string())?;
 
-    // Spawn async embedding task if namespace has an embedding provider
-    let ns = frogclaw_core::repo::memory::get_namespace(&state.sea_db, &item.namespace_id)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    if let Some(ref embedding_provider) = ns.embedding_provider {
-        // Set status to indexing
-        let _ = frogclaw_core::repo::memory::update_item_index_status(&state.sea_db, &item.id, "indexing", None).await;
-
-        let db = state.sea_db.clone();
-        let master_key = state.master_key;
-        let vector_store = state.vector_store.clone();
-        let item_id = item.id.clone();
-        let content = item.content.clone();
-        let ep = embedding_provider.clone();
-        let ns_id = item.namespace_id.clone();
-        let dims = ns.embedding_dimensions.map(|v| v as usize);
-
-        tokio::spawn(async move {
-            let result = crate::indexing::index_memory_item(
-                &db,
-                &master_key,
-                &vector_store,
-                &ns_id,
-                &item_id,
-                &content,
-                &ep,
-                dims,
-            )
-            .await;
-
-            let (status, err_msg) = match &result {
-                Ok(_) => ("ready", None),
-                Err(e) => {
-                    tracing::error!("Memory embedding failed for item {}: {}", item_id, e);
-                    ("failed", Some(e.to_string()))
-                }
-            };
-            let _ = frogclaw_core::repo::memory::update_item_index_status(&db, &item_id, status, err_msg.as_deref()).await;
-
-            let _ = app.emit(
-                "memory-item-indexed",
-                serde_json::json!({
-                    "itemId": item_id,
-                    "success": result.is_ok(),
-                    "status": status,
-                    "error": err_msg,
-                }),
-            );
-        });
-
-        // Return item with "indexing" status
-        return Ok(MemoryItem { index_status: "indexing".to_string(), ..item });
-    } else {
-        // No embedding provider — mark as skipped
-        let _ = frogclaw_core::repo::memory::update_item_index_status(&state.sea_db, &item.id, "skipped", None).await;
-        return Ok(MemoryItem { index_status: "skipped".to_string(), ..item });
-    }
+    index_memory_item_if_configured(app, &state, item).await
 }
 
 #[tauri::command]

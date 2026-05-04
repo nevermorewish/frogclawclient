@@ -14,6 +14,9 @@ use tauri::{Emitter, State};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::sync::RwLock;
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
 /// In-memory map of conversation IDs to actively running agent task IDs.
 /// Used as the source of truth for concurrency checks (more reliable than DB status).
 static RUNNING_AGENTS: LazyLock<Mutex<HashMap<String, String>>> =
@@ -394,6 +397,67 @@ fn write_codex_config(
     })
 }
 
+fn codex_app_server_log_path() -> PathBuf {
+    crate::paths::frogclaw_home().join("codex-app-server.log")
+}
+
+fn strip_ansi_control_sequences(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    let mut chars = value.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '\u{1b}' {
+            if chars.peek() == Some(&'[') {
+                let _ = chars.next();
+                for next in chars.by_ref() {
+                    if ('@'..='~').contains(&next) {
+                        break;
+                    }
+                }
+            }
+            continue;
+        }
+        out.push(ch);
+    }
+    out
+}
+
+fn compact_codex_log_message(message: &str) -> String {
+    let cleaned = strip_ansi_control_sequences(message)
+        .replace('\r', "\\r")
+        .replace('\n', "\\n");
+    const MAX_LEN: usize = 600;
+    if cleaned.chars().count() <= MAX_LEN {
+        cleaned
+    } else {
+        format!(
+            "{}... <truncated>",
+            cleaned.chars().take(MAX_LEN).collect::<String>()
+        )
+    }
+}
+
+fn append_codex_app_server_log(message: impl AsRef<str>) {
+    let path = codex_app_server_log_path();
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    const MAX_LOG_BYTES: u64 = 1024 * 1024;
+    if fs::metadata(&path)
+        .map(|metadata| metadata.len() > MAX_LOG_BYTES)
+        .unwrap_or(false)
+    {
+        let rotated = path.with_extension("log.1");
+        let _ = fs::remove_file(&rotated);
+        let _ = fs::rename(&path, rotated);
+    }
+    let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f");
+    let line = compact_codex_log_message(message.as_ref());
+    if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
+        use std::io::Write;
+        let _ = writeln!(file, "[{timestamp}] {line}");
+    }
+}
+
 fn path_entries() -> Vec<PathBuf> {
     std::env::var_os("PATH")
         .map(|paths| std::env::split_paths(&paths).collect())
@@ -459,22 +523,62 @@ fn claude_candidate_dirs() -> Vec<PathBuf> {
     dirs
 }
 
+fn packaged_binary_candidate_dirs() -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_parent) = exe_path.parent() {
+            dirs.push(exe_parent.to_path_buf());
+            dirs.push(exe_parent.join("resources"));
+            dirs.push(exe_parent.join("resources").join("binaries"));
+            dirs.push(exe_parent.join("binaries"));
+        }
+    }
+    dirs
+}
+
+fn codex_rs_root_from_env() -> Option<PathBuf> {
+    let root = PathBuf::from(std::env::var_os("FROG_CODEX_RS")?);
+    if root.join("Cargo.toml").is_file() {
+        return Some(root);
+    }
+    let nested = root.join("codex-rs");
+    if nested.join("Cargo.toml").is_file() {
+        return Some(nested);
+    }
+    Some(root)
+}
+
 fn codex_app_server_candidate_dirs() -> Vec<PathBuf> {
-    let mut dirs = claude_candidate_dirs();
-    if let Some(root) = std::env::var_os("FROG_CODEX_RS") {
-        let root = PathBuf::from(root);
+    let mut dirs = packaged_binary_candidate_dirs();
+
+    #[cfg(windows)]
+    {
+        dirs.extend(claude_candidate_dirs());
+    }
+
+    if let Some(root) = codex_rs_root_from_env() {
         dirs.push(root.join("target").join("release"));
         dirs.push(root.join("target").join("debug"));
     }
+
+    #[cfg(windows)]
+    {
     let local_codex_rs = PathBuf::from(r"E:\frogclaw\codex\codex-rs");
     dirs.push(local_codex_rs.join("target").join("release"));
     dirs.push(local_codex_rs.join("target").join("debug"));
+    }
+
     dirs
 }
 
 fn command_version(path: &PathBuf) -> Option<String> {
-    StdCommand::new(path)
-        .arg("--version")
+    let mut cmd = StdCommand::new(path);
+    cmd.arg("--version");
+    #[cfg(windows)]
+    {
+        cmd.creation_flags(0x08000000);
+    }
+    cmd
         .output()
         .ok()
         .and_then(|output| {
@@ -1141,6 +1245,22 @@ async fn run_codex_app_server_stdio_query(
     permission_mode: String,
     is_first_message: bool,
 ) {
+    #[cfg(not(windows))]
+    {
+        let message = "Codex app-server is currently bundled for Windows builds only.".to_string();
+        append_codex_app_server_log(&message);
+        let _ = app.emit(
+            "agent-error",
+            AgentErrorPayload {
+                conversation_id: conversation_id.clone(),
+                assistant_message_id: None,
+                message,
+            },
+        );
+        let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
+        return;
+    }
+
     let run_id = format!("codex_app_server_{}", frogclaw_core::utils::gen_id());
     if let Ok(mut running) = RUNNING_AGENTS.lock() {
         running.insert(conversation_id.clone(), run_id.clone());
@@ -1164,6 +1284,7 @@ async fn run_codex_app_server_stdio_query(
     {
         Some(path) => path,
         None => {
+            append_codex_app_server_log("binary not found");
             let _ = app.emit(
                 "agent-error",
                 AgentErrorPayload {
@@ -1202,6 +1323,11 @@ async fn run_codex_app_server_stdio_query(
     let mut child = match cmd.spawn() {
         Ok(child) => child,
         Err(err) => {
+            append_codex_app_server_log(format!(
+                "spawn failed path={} cwd={} error={err}",
+                app_server_path.display(),
+                codex_config.codex_home.display()
+            ));
             let _ = app.emit(
                 "agent-error",
                 AgentErrorPayload {
@@ -1214,6 +1340,13 @@ async fn run_codex_app_server_stdio_query(
             return;
         }
     };
+    append_codex_app_server_log(format!(
+        "spawned path={} cwd={} conversation_id={} session_id={}",
+        app_server_path.display(),
+        codex_config.codex_home.display(),
+        conversation_id,
+        session_id
+    ));
 
     let Some(mut stdin) = child.stdin.take() else {
         let _ = app.emit(
@@ -1251,6 +1384,7 @@ async fn run_codex_app_server_stdio_query(
             message: "Codex app-server starting".to_string(),
         },
     );
+    append_codex_app_server_log("request initialize");
 
     let init_id = match send_app_server_request(
         &mut stdin,
@@ -1271,6 +1405,7 @@ async fn run_codex_app_server_stdio_query(
     {
         Ok(id) => id,
         Err(err) => {
+            append_codex_app_server_log(format!("initialize send failed: {err}"));
             let _ = app.emit(
                 "agent-error",
                 AgentErrorPayload {
@@ -1286,6 +1421,7 @@ async fn run_codex_app_server_stdio_query(
     };
 
     if let Err(err) = read_app_server_response(&mut stdout_lines, init_id).await {
+        append_codex_app_server_log(format!("initialize failed: {err}"));
         let _ = app.emit(
             "agent-error",
             AgentErrorPayload {
@@ -1298,6 +1434,7 @@ async fn run_codex_app_server_stdio_query(
         let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
         return;
     }
+    append_codex_app_server_log("response initialize ok");
     if let Err(err) = write_app_server_message(
         &mut stdin,
         &serde_json::json!({
@@ -1306,6 +1443,7 @@ async fn run_codex_app_server_stdio_query(
     )
     .await
     {
+        append_codex_app_server_log(format!("initialized notification failed: {err}"));
         let _ = app.emit(
             "agent-error",
             AgentErrorPayload {
@@ -1318,7 +1456,9 @@ async fn run_codex_app_server_stdio_query(
         let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
         return;
     }
+    append_codex_app_server_log("notification initialized");
 
+    append_codex_app_server_log(format!("request thread/start cwd={cwd:?}"));
     let thread_start_id = match send_app_server_request(
         &mut stdin,
         &mut next_request_id,
@@ -1327,7 +1467,7 @@ async fn run_codex_app_server_stdio_query(
             "model": null,
             "modelProvider": null,
             "cwd": cwd.clone(),
-            "sessionStartSource": "vscode",
+            "sessionStartSource": "startup",
             "experimentalRawEvents": false,
         }),
     )
@@ -1335,6 +1475,7 @@ async fn run_codex_app_server_stdio_query(
     {
         Ok(id) => id,
         Err(err) => {
+            append_codex_app_server_log(format!("thread/start send failed: {err}"));
             let _ = app.emit(
                 "agent-error",
                 AgentErrorPayload {
@@ -1357,6 +1498,7 @@ async fn run_codex_app_server_stdio_query(
         }) {
         Ok(thread_id) => thread_id,
         Err(err) => {
+            append_codex_app_server_log(format!("thread/start failed: {err}"));
             let _ = app.emit(
                 "agent-error",
                 AgentErrorPayload {
@@ -1389,6 +1531,7 @@ async fn run_codex_app_server_stdio_query(
     {
         Ok(id) => id,
         Err(err) => {
+            append_codex_app_server_log(format!("turn/start send failed: {err}"));
             let _ = app.emit(
                 "agent-error",
                 AgentErrorPayload {
@@ -1402,6 +1545,7 @@ async fn run_codex_app_server_stdio_query(
             return;
         }
     };
+    append_codex_app_server_log(format!("request turn/start thread_id={thread_id}"));
 
     let _ = app.emit(
         "agent-status",
@@ -1410,6 +1554,7 @@ async fn run_codex_app_server_stdio_query(
             message: "Codex app-server running".to_string(),
         },
     );
+    append_codex_app_server_log(format!("response thread/start ok thread_id={thread_id}"));
 
     let mut turn_started_ack = false;
     loop {
@@ -1436,6 +1581,7 @@ async fn run_codex_app_server_stdio_query(
                     Ok(Some(line)) => line,
                     Ok(None) => break,
                     Err(err) => {
+                        append_codex_app_server_log(format!("stdout read failed: {err}"));
                         let _ = app.emit(
                             "agent-error",
                             AgentErrorPayload {
@@ -1455,6 +1601,9 @@ async fn run_codex_app_server_stdio_query(
                 let value: Value = match serde_json::from_str(&line) {
                     Ok(value) => value,
                     Err(err) => {
+                        append_codex_app_server_log(format!(
+                            "invalid stdout JSON-RPC line: {err}: {line}"
+                        ));
                         tracing::warn!("[agent:codex_app_server] invalid JSON-RPC line: {}: {}", err, line);
                         continue;
                     }
@@ -1467,6 +1616,7 @@ async fn run_codex_app_server_stdio_query(
                             .and_then(|v| v.as_str())
                             .unwrap_or("Codex app-server turn/start failed")
                             .to_string();
+                        append_codex_app_server_log(format!("turn/start failed: {message}"));
                         let _ = app.emit(
                             "agent-error",
                             AgentErrorPayload {
@@ -1568,6 +1718,12 @@ async fn run_codex_app_server_stdio_query(
 
                 let method = value.get("method").and_then(|v| v.as_str()).unwrap_or_default();
                 let params = value.get("params").cloned().unwrap_or(Value::Null);
+                if !method.is_empty()
+                    && method != "item/agentMessage/delta"
+                    && method != "item/commandExecution/outputDelta"
+                {
+                    append_codex_app_server_log(format!("event {method}"));
+                }
                 match method {
                     "turn/started" => {
                         turn_started_ack = true;
@@ -1698,6 +1854,7 @@ async fn run_codex_app_server_stdio_query(
                         if is_first_message {
                             tracing::info!("[agent:codex_app_server] first message completed; title fallback already set");
                         }
+                        append_codex_app_server_log("turn completed");
                         return;
                     }
                     _ => {}
@@ -1711,6 +1868,7 @@ async fn run_codex_app_server_stdio_query(
             } => {
                 if let Ok(Some(line)) = line {
                     if !line.trim().is_empty() {
+                        append_codex_app_server_log(format!("stderr: {line}"));
                         let _ = app.emit(
                             "agent-status",
                             AgentStatusPayload {
@@ -1732,6 +1890,7 @@ async fn run_codex_app_server_stdio_query(
         Ok(status) => format!("Codex app-server exited before turn completion: {status}"),
         Err(err) => format!("Failed to wait for Codex app-server: {err}"),
     };
+    append_codex_app_server_log(&message);
     let _ = app.emit(
         "agent-error",
         AgentErrorPayload {
@@ -1809,6 +1968,11 @@ async fn run_claude_code_cli_query(
     }
     if let Some(cwd) = cwd.as_deref() {
         cmd.current_dir(cwd);
+    }
+
+    #[cfg(windows)]
+    {
+        cmd.creation_flags(0x08000000);
     }
 
     let mut child = match cmd.spawn() {

@@ -10,6 +10,8 @@ permissions: write-all
 env:
   CARGO_INCREMENTAL: 0
   RUST_BACKTRACE: short
+  CODEX_APP_SERVER_REPO: nevermorewish/codex
+  CODEX_APP_SERVER_RELEASE_TAG: codex-app-server-v0.1.0
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.ref }}'
@@ -82,6 +84,9 @@ jobs:
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Prepare Codex app-server resource
+        run: node scripts/prepare-codex-app-server.mjs aarch64-apple-darwin
 
       - name: Build with Tauri
         uses: tauri-apps/tauri-action@v0

@@ -35,8 +35,9 @@ vi.mock('@lobehub/icons', () => ({
 }));
 
 vi.mock('antd', () => ({
-  Select: ({ options }: { options?: Array<{ title: string; options: Array<{ label: string; value: string }> }> }) => (
+  Select: ({ options, notFoundContent }: { options?: Array<{ title: string; options: Array<{ label: string; value: string }> }>; notFoundContent?: React.ReactNode }) => (
     <div>
+      {options?.length === 0 ? <div>{notFoundContent}</div> : null}
       {options?.map((group) => (
         <section key={group.title} aria-label={group.title}>
           {group.options.map((option) => (
@@ -116,5 +117,53 @@ describe('EmbeddingModelSelect', () => {
     await waitFor(() => {
       expect(mocks.fetchProviders).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it('recognizes common embedding model names even when model_type is chat', () => {
+    providers = [
+      makeProvider({
+        models: [
+          {
+            provider_id: 'provider-1',
+            model_id: 'BAAI/bge-m3',
+            name: 'BGE M3',
+            group_name: null,
+            model_type: 'Chat',
+            capabilities: ['TextChat'],
+            max_tokens: null,
+            enabled: true,
+            param_overrides: null,
+          },
+        ],
+      }),
+    ];
+
+    render(<EmbeddingModelSelect onChange={vi.fn()} />);
+
+    expect(screen.getByText('BGE M3')).toBeInTheDocument();
+  });
+
+  it('explains why the list is empty when no embedding models exist', () => {
+    providers = [
+      makeProvider({
+        models: [
+          {
+            provider_id: 'provider-1',
+            model_id: 'gpt-5.4',
+            name: 'GPT 5.4',
+            group_name: null,
+            model_type: 'Chat',
+            capabilities: ['TextChat'],
+            max_tokens: null,
+            enabled: true,
+            param_overrides: null,
+          },
+        ],
+      }),
+    ];
+
+    render(<EmbeddingModelSelect onChange={vi.fn()} />);
+
+    expect(screen.getByText(/没有可用的向量模型/)).toBeInTheDocument();
   });
 });

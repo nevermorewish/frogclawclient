@@ -115,6 +115,7 @@ pub fn run() {
             commands::platform_bridge::platform_connect_feishu,
             commands::platform_bridge::platform_read_log,
             commands::platform_bridge::install_read_log,
+            commands::platform_bridge::codex_app_server_read_log,
             commands::platform_bridge::get_log_file_path,
             // drawing
             commands::drawing::list_drawing_generations,
@@ -216,6 +217,11 @@ pub fn run() {
             commands::knowledge::add_knowledge_chunk,
             // memory
             commands::memory::list_memory_namespaces,
+            commands::memory::list_project_memory_profiles,
+            commands::memory::get_project_memory_profile,
+            commands::memory::update_project_memory_profile,
+            commands::memory::list_project_memory_items,
+            commands::memory::add_project_memory_item,
             commands::memory::create_memory_namespace,
             commands::memory::delete_memory_namespace,
             commands::memory::update_memory_namespace,

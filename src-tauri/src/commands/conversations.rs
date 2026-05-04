@@ -9,6 +9,258 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use tauri::{Emitter, State};
 
+#[derive(Debug, serde::Deserialize)]
+struct AutoMemoryCandidate {
+    title: String,
+    content: String,
+}
+
+fn parse_auto_memory_candidates(text: &str) -> Vec<AutoMemoryCandidate> {
+    let trimmed = text.trim();
+    let json_text = if let (Some(start), Some(end)) = (trimmed.find('['), trimmed.rfind(']')) {
+        &trimmed[start..=end]
+    } else {
+        trimmed
+    };
+    serde_json::from_str::<Vec<AutoMemoryCandidate>>(json_text)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|item| !item.title.trim().is_empty() && !item.content.trim().is_empty())
+        .take(5)
+        .collect()
+}
+
+async fn resolve_auto_memory_summary_runtime(
+    db: &DatabaseConnection,
+    master_key: &[u8; 32],
+    fallback_provider: &ProviderConfig,
+    fallback_ctx: &ProviderRequestContext,
+    fallback_model_id: &str,
+) -> Option<(ProviderConfig, ProviderRequestContext, String)> {
+    let providers = frogclaw_core::repo::provider::list_providers(db).await.ok()?;
+    let preferred = providers.iter().find_map(|provider| {
+        if !provider.enabled {
+            return None;
+        }
+        let model = provider.models.iter().find(|model| {
+            model.enabled && model.model_id.eq_ignore_ascii_case("gpt-5.5")
+        })?;
+        Some((provider.clone(), model.model_id.clone()))
+    });
+
+    let Some((provider, model_id)) = preferred else {
+        return Some((
+            fallback_provider.clone(),
+            fallback_ctx.clone(),
+            fallback_model_id.to_string(),
+        ));
+    };
+
+    let key_row = match frogclaw_core::repo::provider::get_active_key(db, &provider.id).await {
+        Ok(key) => key,
+        Err(err) => {
+            tracing::warn!("[project-memory] gpt-5.5 provider has no active key: {}", err);
+            return Some((
+                fallback_provider.clone(),
+                fallback_ctx.clone(),
+                fallback_model_id.to_string(),
+            ));
+        }
+    };
+    let decrypted_key = match frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, master_key) {
+        Ok(key) => key,
+        Err(err) => {
+            tracing::warn!("[project-memory] gpt-5.5 key decrypt failed: {}", err);
+            return Some((
+                fallback_provider.clone(),
+                fallback_ctx.clone(),
+                fallback_model_id.to_string(),
+            ));
+        }
+    };
+    let settings = frogclaw_core::repo::settings::get_settings(db)
+        .await
+        .unwrap_or_default();
+    let proxy_config = ProviderProxyConfig::resolve(&provider.proxy_config, &settings);
+    let ctx = ProviderRequestContext {
+        api_key: decrypted_key,
+        key_id: key_row.id,
+        provider_id: provider.id.clone(),
+        base_url: Some(resolve_base_url_for_type(
+            &provider.api_host,
+            &provider.provider_type,
+        )),
+        api_path: provider.api_path.clone(),
+        proxy_config,
+        custom_headers: provider
+            .custom_headers
+            .as_ref()
+            .and_then(|s| serde_json::from_str(s).ok()),
+    };
+
+    Some((provider, ctx, model_id))
+}
+
+async fn auto_capture_project_memory(
+    db: &DatabaseConnection,
+    master_key: &[u8; 32],
+    vector_store: &frogclaw_core::vector_store::VectorStore,
+    fallback_provider: &ProviderConfig,
+    fallback_ctx: &ProviderRequestContext,
+    conversation: &Conversation,
+    fallback_model_id: &str,
+    user_content: &str,
+    assistant_content: &str,
+) {
+    let Some(project_path) = conversation.working_directory.as_deref() else {
+        return;
+    };
+    if user_content.trim().len() < 3 || assistant_content.trim().len() < 3 {
+        return;
+    }
+
+    let profile = match frogclaw_core::repo::memory::ensure_project_profile(
+        db,
+        project_path,
+        conversation.project_name.as_deref(),
+    )
+    .await
+    {
+        Ok(profile) => profile,
+        Err(err) => {
+            tracing::warn!("[project-memory] ensure profile failed: {}", err);
+            return;
+        }
+    };
+    let Some(embedding_provider) = profile.embedding_provider.clone() else {
+        tracing::debug!("[project-memory] skip auto capture: embedding provider not configured");
+        return;
+    };
+
+    let prompt = format!(
+        "从下面这一轮对话中抽取值得在该项目长期记住的信息。只返回 JSON 数组，不要 Markdown。\
+每项格式为 {{\"title\":\"简短标题\",\"content\":\"完整但简洁的记忆内容\"}}。\
+只保留稳定事实、用户偏好、项目路径、工程约束、已确认决策、错误解决方案。\
+如果没有值得记住的信息，返回 []。\n\nUSER:\n{}\n\nASSISTANT:\n{}",
+        user_content.chars().take(4000).collect::<String>(),
+        assistant_content.chars().take(6000).collect::<String>(),
+    );
+
+    let Some((summary_provider, summary_ctx, summary_model_id)) = resolve_auto_memory_summary_runtime(
+        db,
+        master_key,
+        fallback_provider,
+        fallback_ctx,
+        fallback_model_id,
+    )
+    .await
+    else {
+        return;
+    };
+    let registry = ProviderRegistry::create_default();
+    let registry_key = provider_type_to_registry_key_for_model(
+        &summary_provider.provider_type,
+        &summary_model_id,
+    );
+    let Some(summary_adapter) = registry.get(registry_key) else {
+        tracing::warn!("[project-memory] unsupported summary provider type: {}", registry_key);
+        return;
+    };
+
+    let request = ChatRequest {
+        model: summary_model_id,
+        messages: vec![
+            ChatMessage {
+                role: "system".to_string(),
+                content: ChatContent::Text(
+                    "你是项目记忆抽取器。你只输出 JSON 数组。".to_string(),
+                ),
+                tool_calls: None,
+                tool_call_id: None,
+            },
+            ChatMessage {
+                role: "user".to_string(),
+                content: ChatContent::Text(prompt),
+                tool_calls: None,
+                tool_call_id: None,
+            },
+        ],
+        stream: false,
+        temperature: Some(0.0),
+        top_p: None,
+        max_tokens: Some(800),
+        tools: None,
+        thinking_budget: Some(0),
+        thinking_level: Some("off".to_string()),
+        reasoning_profile: None,
+        use_max_completion_tokens: None,
+        thinking_param_style: None,
+    };
+
+    let response = match summary_adapter.chat(&summary_ctx, request).await {
+        Ok(response) => response,
+        Err(err) => {
+            tracing::warn!("[project-memory] extractor failed: {}", err);
+            return;
+        }
+    };
+
+    let candidates = parse_auto_memory_candidates(&response.content);
+    if candidates.is_empty() {
+        return;
+    }
+
+    for candidate in candidates {
+        let item = match frogclaw_core::repo::memory::add_item(
+            db,
+            CreateMemoryItemInput {
+                namespace_id: profile.namespace_id.clone(),
+                title: candidate.title.trim().chars().take(120).collect(),
+                content: candidate.content.trim().chars().take(4000).collect(),
+                source: Some("auto_extract".to_string()),
+            },
+        )
+        .await
+        {
+            Ok(item) => item,
+            Err(err) => {
+                tracing::warn!("[project-memory] add item failed: {}", err);
+                continue;
+            }
+        };
+
+        let _ = frogclaw_core::repo::memory::update_item_index_status(
+            db,
+            &item.id,
+            "indexing",
+            None,
+        )
+        .await;
+        let result = crate::indexing::index_memory_item(
+            db,
+            master_key,
+            vector_store,
+            &profile.namespace_id,
+            &item.id,
+            &item.content,
+            &embedding_provider,
+            profile.embedding_dimensions.map(|v| v as usize),
+        )
+        .await;
+        let (status, err_msg) = match result {
+            Ok(_) => ("ready", None),
+            Err(err) => ("failed", Some(err.to_string())),
+        };
+        let _ = frogclaw_core::repo::memory::update_item_index_status(
+            db,
+            &item.id,
+            status,
+            err_msg.as_deref(),
+        )
+        .await;
+    }
+}
+
 fn provider_type_to_registry_key(pt: &ProviderType) -> &'static str {
     match pt {
         ProviderType::OpenAI => "openai",
@@ -1406,6 +1658,7 @@ fn build_memory_retrieval_tag(sources: &[RagSourceResult]) -> String {
 fn spawn_stream_task(
     app: tauri::AppHandle,
     db: sea_orm::DatabaseConnection,
+    vector_store: Arc<frogclaw_core::vector_store::VectorStore>,
     conversation_id: String,
     assistant_message_id: String,
     conversation: Conversation,
@@ -1800,6 +2053,21 @@ fn spawn_stream_task(
             frogclaw_core::repo::conversation::increment_message_count(&db, &conversation_id).await
         {
             tracing::error!("Failed to increment message count: {}", e);
+        }
+
+        if final_status == "complete" && !total_content.trim().is_empty() {
+            auto_capture_project_memory(
+                &db,
+                &master_key,
+                vector_store.as_ref(),
+                &provider,
+                &ctx,
+                &conversation,
+                &model_id,
+                &user_content,
+                &total_content,
+            )
+            .await;
         }
 
         // Auto-title: if this is the first user message, set conversation title
@@ -2259,6 +2527,7 @@ pub async fn send_message(
     spawn_stream_task(
         app,
         state.sea_db.clone(),
+        state.vector_store.clone(),
         conversation_id.clone(),
         assistant_message_id,
         conversation,
@@ -2579,6 +2848,7 @@ pub async fn regenerate_message(
     spawn_stream_task(
         app,
         state.sea_db.clone(),
+        state.vector_store.clone(),
         conversation_id,
         assistant_message_id,
         conversation,
@@ -2925,6 +3195,7 @@ pub async fn regenerate_with_model(
     spawn_stream_task(
         app,
         state.sea_db.clone(),
+        state.vector_store.clone(),
         conversation_id,
         assistant_message_id,
         conversation,

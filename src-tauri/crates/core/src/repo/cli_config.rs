@@ -2,6 +2,9 @@ use std::path::{Path, PathBuf};
 
 use crate::error::{FrogClawClientError, Result};
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
 // ─── Types ──────────────────────────────────────────────
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,10 +107,16 @@ pub fn check_config_exists(tool: CliTool) -> bool {
 }
 
 fn run_version_command(cmd: &str, arg: &str) -> Option<String> {
-    std::process::Command::new(cmd)
+    let mut command = std::process::Command::new(cmd);
+    command
         .arg(arg)
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+    #[cfg(windows)]
+    {
+        command.creation_flags(0x08000000);
+    }
+    command
         .output()
         .ok()
         .filter(|o| o.status.success())

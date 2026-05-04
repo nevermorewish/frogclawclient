@@ -660,10 +660,16 @@ pub async fn install_read_log(max_bytes: Option<u64>) -> Result<String, String> 
 }
 
 #[tauri::command]
+pub async fn codex_app_server_read_log(max_bytes: Option<u64>) -> Result<String, String> {
+    read_log_file(config_dir()?.join("codex-app-server.log"), max_bytes)
+}
+
+#[tauri::command]
 pub async fn get_log_file_path(source: String) -> Result<String, String> {
     let file_name = match source.as_str() {
         "install" => "install.log",
         "sidecar" | "platform" => "platform-sidecar.log",
+        "codex_app_server" | "codex" => "codex-app-server.log",
         other => return Err(format!("Unknown log source: {other}")),
     };
     Ok(config_dir()?.join(file_name).display().to_string())
