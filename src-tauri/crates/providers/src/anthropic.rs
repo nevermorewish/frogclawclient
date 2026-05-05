@@ -1,16 +1,16 @@
+use async_trait::async_trait;
 use frogclaw_core::error::{FrogClawClientError, Result};
 use frogclaw_core::types::*;
-use async_trait::async_trait;
 use futures::Stream;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::pin::Pin;
 
+use crate::reasoning::{resolve_reasoning, ReasoningStyle};
 use crate::{
     build_http_client, parse_base64_data_url, resolve_chat_url, ProviderAdapter,
     ProviderRequestContext,
 };
-use crate::reasoning::{resolve_reasoning, ReasoningStyle};
 
 const DEFAULT_BASE_URL: &str = "https://api.anthropic.com/v1";
 const ANTHROPIC_VERSION: &str = "2023-06-01";
@@ -291,7 +291,9 @@ fn build_request(
                         r#type: "adaptive".to_string(),
                         budget_tokens: None,
                     });
-                    output_config = reasoning.reasoning_effort.map(|effort| AnthropicOutputConfig { effort });
+                    output_config = reasoning
+                        .reasoning_effort
+                        .map(|effort| AnthropicOutputConfig { effort });
                     suppress_sampling = reasoning.suppress_sampling_params;
                 }
             }
@@ -562,8 +564,9 @@ impl ProviderAdapter for AnthropicAdapter {
                     return;
                 }
                 Err(e) => {
-                    let _ = tx
-                        .unbounded_send(Err(FrogClawClientError::Provider(format!("Request failed: {e}"))));
+                    let _ = tx.unbounded_send(Err(FrogClawClientError::Provider(format!(
+                        "Request failed: {e}"
+                    ))));
                     return;
                 }
             };
@@ -725,10 +728,11 @@ impl ProviderAdapter for AnthropicAdapter {
                                                 .map(|tu| frogclaw_core::types::ToolCall {
                                                     id: tu.id.clone(),
                                                     call_type: "function".to_string(),
-                                                    function: frogclaw_core::types::ToolCallFunction {
-                                                        name: tu.name.clone(),
-                                                        arguments: tu.arguments.clone(),
-                                                    },
+                                                    function:
+                                                        frogclaw_core::types::ToolCallFunction {
+                                                            name: tu.name.clone(),
+                                                            arguments: tu.arguments.clone(),
+                                                        },
                                                 })
                                                 .collect(),
                                         )

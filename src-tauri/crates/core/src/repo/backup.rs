@@ -16,7 +16,10 @@ fn model_to_manifest(m: backup_manifests::Model) -> BackupManifest {
         checksum: m.checksum,
         object_counts_json: m.object_counts_json,
         source_app_version: m.source_app_version,
-        file_path: m.file_path.as_ref().map(|p| crate::path_vars::decode_path(p)),
+        file_path: m
+            .file_path
+            .as_ref()
+            .map(|p| crate::path_vars::decode_path(p)),
         file_size: m.file_size,
     }
 }
@@ -33,8 +36,9 @@ pub fn resolve_backup_dir(backup_dir_setting: Option<&str>, app_data_dir: &Path)
 
 /// Ensure the backup directory exists
 pub fn ensure_backup_dir(dir: &Path) -> Result<()> {
-    std::fs::create_dir_all(dir)
-        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to create backup directory: {}", e)))
+    std::fs::create_dir_all(dir).map_err(|e| {
+        FrogClawClientError::Gateway(format!("Failed to create backup directory: {}", e))
+    })
 }
 
 /// Create a real backup file (SQLite copy or JSON export)
@@ -78,7 +82,9 @@ pub async fn create_backup(
         checksum: Set(checksum),
         object_counts_json: Set(object_counts),
         source_app_version: Set(env!("CARGO_PKG_VERSION").to_string()),
-        file_path: Set(Some(crate::path_vars::encode_path(&file_path.to_string_lossy()))),
+        file_path: Set(Some(crate::path_vars::encode_path(
+            &file_path.to_string_lossy(),
+        ))),
         file_size: Set(file_size),
         ..Default::default()
     };
@@ -140,8 +146,9 @@ async fn create_json_backup(db: &DatabaseConnection, dest: &Path) -> Result<()> 
 }
 
 fn compute_file_checksum(path: &Path) -> Result<String> {
-    let data = std::fs::read(path)
-        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read file for checksum: {}", e)))?;
+    let data = std::fs::read(path).map_err(|e| {
+        FrogClawClientError::Gateway(format!("Failed to read file for checksum: {}", e))
+    })?;
     let hash = Sha256::digest(&data);
     Ok(format!("{:x}", hash))
 }
@@ -193,7 +200,10 @@ pub async fn delete_backup(db: &DatabaseConnection, id: &str) -> Result<()> {
     let result = backup_manifests::Entity::delete_by_id(id).exec(db).await?;
 
     if result.rows_affected == 0 {
-        return Err(FrogClawClientError::NotFound(format!("BackupManifest {}", id)));
+        return Err(FrogClawClientError::NotFound(format!(
+            "BackupManifest {}",
+            id
+        )));
     }
     Ok(())
 }

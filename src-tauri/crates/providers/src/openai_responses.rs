@@ -1,13 +1,13 @@
+use async_trait::async_trait;
 use frogclaw_core::error::{FrogClawClientError, Result};
 use frogclaw_core::types::*;
-use async_trait::async_trait;
 use futures::Stream;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::pin::Pin;
 
-use crate::{build_http_client, resolve_chat_url, ProviderAdapter, ProviderRequestContext};
 use crate::reasoning::{resolve_reasoning, ReasoningStyle};
+use crate::{build_http_client, resolve_chat_url, ProviderAdapter, ProviderRequestContext};
 
 const DEFAULT_BASE_URL: &str = "https://api.openai.com/v1";
 
@@ -392,17 +392,18 @@ fn build_responses_input(messages: &[ChatMessage]) -> (serde_json::Value, Option
 fn build_request(request: &ChatRequest, stream: bool) -> ResponsesRequest {
     let (input, instructions) = build_responses_input(&request.messages);
 
-    let reasoning = resolve_reasoning(request, ReasoningStyle::OpenAIResponsesReasoning).and_then(|r| {
-        let effort = r.reasoning_effort?;
-        Some(ResponsesReasoning {
-            effort: effort.clone(),
-            summary: if effort == "none" {
-                None
-            } else {
-                Some("auto".to_string())
-            },
-        })
-    });
+    let reasoning =
+        resolve_reasoning(request, ReasoningStyle::OpenAIResponsesReasoning).and_then(|r| {
+            let effort = r.reasoning_effort?;
+            Some(ResponsesReasoning {
+                effort: effort.clone(),
+                summary: if effort == "none" {
+                    None
+                } else {
+                    Some("auto".to_string())
+                },
+            })
+        });
 
     let tools = request.tools.as_ref().map(|tools| {
         tools
@@ -593,8 +594,9 @@ impl ProviderAdapter for OpenAIResponsesAdapter {
                     return;
                 }
                 Err(e) => {
-                    let _ = tx
-                        .unbounded_send(Err(FrogClawClientError::Provider(format!("Request failed: {e}"))));
+                    let _ = tx.unbounded_send(Err(FrogClawClientError::Provider(format!(
+                        "Request failed: {e}"
+                    ))));
                     return;
                 }
             };
@@ -883,7 +885,9 @@ impl ProviderAdapter for OpenAIResponsesAdapter {
                                         current_event_type,
                                         err_msg
                                     );
-                                    let _ = tx.unbounded_send(Err(FrogClawClientError::Provider(err_msg)));
+                                    let _ = tx.unbounded_send(Err(FrogClawClientError::Provider(
+                                        err_msg,
+                                    )));
                                     return;
                                 }
                                 // Known event types we intentionally skip
@@ -965,7 +969,9 @@ impl ProviderAdapter for OpenAIResponsesAdapter {
         if !resp.status().is_success() {
             let s = resp.status();
             let t = resp.text().await.unwrap_or_default();
-            return Err(FrogClawClientError::Provider(format!("OpenAI API error {s}: {t}")));
+            return Err(FrogClawClientError::Provider(format!(
+                "OpenAI API error {s}: {t}"
+            )));
         }
 
         let models: ModelsResponse = resp
@@ -1040,7 +1046,9 @@ impl ProviderAdapter for OpenAIResponsesAdapter {
         if !resp.status().is_success() {
             let s = resp.status();
             let t = resp.text().await.unwrap_or_default();
-            return Err(FrogClawClientError::Provider(format!("OpenAI API error {s}: {t}")));
+            return Err(FrogClawClientError::Provider(format!(
+                "OpenAI API error {s}: {t}"
+            )));
         }
 
         let result: EmbedResp = resp

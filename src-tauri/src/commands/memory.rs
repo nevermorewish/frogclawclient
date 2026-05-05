@@ -4,7 +4,11 @@ use frogclaw_providers::{resolve_base_url_for_type, ProviderRequestContext};
 use tauri::{AppHandle, Emitter, State};
 
 fn normalize_project_path(value: &str) -> String {
-    value.trim().replace('\\', "/").trim_end_matches('/').to_lowercase()
+    value
+        .trim()
+        .replace('\\', "/")
+        .trim_end_matches('/')
+        .to_lowercase()
 }
 
 async fn index_memory_item_if_configured(
@@ -73,7 +77,10 @@ async fn index_memory_item_if_configured(
             );
         });
 
-        Ok(MemoryItem { index_status: "indexing".to_string(), ..item })
+        Ok(MemoryItem {
+            index_status: "indexing".to_string(),
+            ..item
+        })
     } else {
         let _ = frogclaw_core::repo::memory::update_item_index_status(
             &state.sea_db,
@@ -82,7 +89,10 @@ async fn index_memory_item_if_configured(
             None,
         )
         .await;
-        Ok(MemoryItem { index_status: "skipped".to_string(), ..item })
+        Ok(MemoryItem {
+            index_status: "skipped".to_string(),
+            ..item
+        })
     }
 }
 
@@ -198,13 +208,11 @@ pub async fn summarize_project_memory(
     )
     .await
     .map_err(|e| e.to_string())?;
-    let before_count = frogclaw_core::repo::memory::list_items(
-        &state.sea_db,
-        &profile.namespace_id,
-    )
-    .await
-    .map_err(|e| e.to_string())?
-    .len();
+    let before_count =
+        frogclaw_core::repo::memory::list_items(&state.sea_db, &profile.namespace_id)
+            .await
+            .map_err(|e| e.to_string())?
+            .len();
 
     let target_path = normalize_project_path(&project_path);
     let mut conversations = frogclaw_core::repo::conversation::list_conversations(&state.sea_db)
@@ -232,7 +240,10 @@ pub async fn summarize_project_memory(
         let messages = frogclaw_core::repo::message::list_messages(&state.sea_db, &conversation.id)
             .await
             .map_err(|e| e.to_string())?;
-        if messages.iter().any(|msg| matches!(msg.role, MessageRole::Assistant)) {
+        if messages
+            .iter()
+            .any(|msg| matches!(msg.role, MessageRole::Assistant))
+        {
             runtime_conversation.get_or_insert_with(|| conversation.clone());
         }
         for msg in messages.iter().rev().take(16).rev() {
@@ -241,8 +252,12 @@ pub async fn summarize_project_memory(
                 continue;
             }
             match msg.role {
-                MessageRole::User => user_parts.push(format!("会话「{}」用户：{}", conversation.title, content)),
-                MessageRole::Assistant => assistant_parts.push(format!("会话「{}」助手：{}", conversation.title, content)),
+                MessageRole::User => {
+                    user_parts.push(format!("会话「{}」用户：{}", conversation.title, content))
+                }
+                MessageRole::Assistant => {
+                    assistant_parts.push(format!("会话「{}」助手：{}", conversation.title, content))
+                }
                 _ => {}
             }
         }
@@ -254,18 +269,14 @@ pub async fn summarize_project_memory(
     conversation.working_directory = Some(project_path.clone());
     conversation.project_name = project_name.clone();
 
-    let provider = frogclaw_core::repo::provider::get_provider(
-        &state.sea_db,
-        &conversation.provider_id,
-    )
-    .await
-    .map_err(|e| e.to_string())?;
-    let key_row = frogclaw_core::repo::provider::get_active_key(
-        &state.sea_db,
-        &conversation.provider_id,
-    )
-    .await
-    .map_err(|e| e.to_string())?;
+    let provider =
+        frogclaw_core::repo::provider::get_provider(&state.sea_db, &conversation.provider_id)
+            .await
+            .map_err(|e| e.to_string())?;
+    let key_row =
+        frogclaw_core::repo::provider::get_active_key(&state.sea_db, &conversation.provider_id)
+            .await
+            .map_err(|e| e.to_string())?;
     let api_key = frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
         .map_err(|e| e.to_string())?;
     let settings = frogclaw_core::repo::settings::get_settings(&state.sea_db)
@@ -301,13 +312,10 @@ pub async fn summarize_project_memory(
     )
     .await;
 
-    let after_count = frogclaw_core::repo::memory::list_items(
-        &state.sea_db,
-        &profile.namespace_id,
-    )
-    .await
-    .map_err(|e| e.to_string())?
-    .len();
+    let after_count = frogclaw_core::repo::memory::list_items(&state.sea_db, &profile.namespace_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .len();
     Ok(after_count.saturating_sub(before_count))
 }
 
@@ -401,7 +409,13 @@ pub async fn update_memory_item(
 
         if let Some(ref embedding_provider) = ns.embedding_provider {
             // Set status to indexing
-            let _ = frogclaw_core::repo::memory::update_item_index_status(&state.sea_db, &id, "indexing", None).await;
+            let _ = frogclaw_core::repo::memory::update_item_index_status(
+                &state.sea_db,
+                &id,
+                "indexing",
+                None,
+            )
+            .await;
 
             let db = state.sea_db.clone();
             let master_key = state.master_key;
@@ -438,7 +452,13 @@ pub async fn update_memory_item(
                         ("failed", Some(e.to_string()))
                     }
                 };
-                let _ = frogclaw_core::repo::memory::update_item_index_status(&db, &item_id, status, err_msg.as_deref()).await;
+                let _ = frogclaw_core::repo::memory::update_item_index_status(
+                    &db,
+                    &item_id,
+                    status,
+                    err_msg.as_deref(),
+                )
+                .await;
 
                 let _ = app.emit(
                     "memory-item-indexed",
@@ -451,7 +471,10 @@ pub async fn update_memory_item(
                 );
             });
 
-            return Ok(MemoryItem { index_status: "indexing".to_string(), ..item });
+            return Ok(MemoryItem {
+                index_status: "indexing".to_string(),
+                ..item
+            });
         }
     }
 
@@ -502,7 +525,13 @@ pub async fn rebuild_memory_index(
 
     // Set all items to indexing status
     for item in &items {
-        let _ = frogclaw_core::repo::memory::update_item_index_status(&state.sea_db, &item.id, "indexing", None).await;
+        let _ = frogclaw_core::repo::memory::update_item_index_status(
+            &state.sea_db,
+            &item.id,
+            "indexing",
+            None,
+        )
+        .await;
     }
 
     let db = state.sea_db.clone();
@@ -532,7 +561,13 @@ pub async fn rebuild_memory_index(
                     ("failed", Some(e.to_string()))
                 }
             };
-            let _ = frogclaw_core::repo::memory::update_item_index_status(&db, &item.id, status, err_msg.as_deref()).await;
+            let _ = frogclaw_core::repo::memory::update_item_index_status(
+                &db,
+                &item.id,
+                status,
+                err_msg.as_deref(),
+            )
+            .await;
 
             // Emit per-item event for real-time progress
             let _ = app.emit(
@@ -610,7 +645,13 @@ pub async fn reindex_memory_item(
         .find(|i| i.id == item_id)
         .ok_or("Item not found")?;
 
-    let _ = frogclaw_core::repo::memory::update_item_index_status(&state.sea_db, &item_id, "indexing", None).await;
+    let _ = frogclaw_core::repo::memory::update_item_index_status(
+        &state.sea_db,
+        &item_id,
+        "indexing",
+        None,
+    )
+    .await;
 
     let db = state.sea_db.clone();
     let master_key = state.master_key;
@@ -646,7 +687,13 @@ pub async fn reindex_memory_item(
                 ("failed", Some(e.to_string()))
             }
         };
-        let _ = frogclaw_core::repo::memory::update_item_index_status(&db, &iid, status, err_msg.as_deref()).await;
+        let _ = frogclaw_core::repo::memory::update_item_index_status(
+            &db,
+            &iid,
+            status,
+            err_msg.as_deref(),
+        )
+        .await;
 
         let _ = app.emit(
             "memory-item-indexed",

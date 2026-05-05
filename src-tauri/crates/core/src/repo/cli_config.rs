@@ -24,7 +24,10 @@ impl CliTool {
             "gemini" => Ok(Self::Gemini),
             "opencode" => Ok(Self::OpenCode),
             "cursor" => Ok(Self::Cursor),
-            _ => Err(FrogClawClientError::NotFound(format!("Unknown CLI tool: {}", s))),
+            _ => Err(FrogClawClientError::NotFound(format!(
+                "Unknown CLI tool: {}",
+                s
+            ))),
         }
     }
 
@@ -165,7 +168,8 @@ fn check_cursor_installed() -> bool {
 // ─── Config Paths ───────────────────────────────────────
 
 fn home_dir() -> Result<PathBuf> {
-    dirs_next().ok_or_else(|| FrogClawClientError::NotFound("Could not determine home directory".into()))
+    dirs_next()
+        .ok_or_else(|| FrogClawClientError::NotFound("Could not determine home directory".into()))
 }
 
 fn dirs_next() -> Option<PathBuf> {
@@ -238,11 +242,13 @@ fn backup_file(path: &Path, tool: CliTool) -> Result<()> {
         .unwrap_or("config");
     let dest = backup_path(tool, filename)?;
     if let Some(parent) = dest.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| FrogClawClientError::Gateway(format!("Failed to create backup dir: {}", e)))?;
+        std::fs::create_dir_all(parent).map_err(|e| {
+            FrogClawClientError::Gateway(format!("Failed to create backup dir: {}", e))
+        })?;
     }
-    std::fs::copy(path, &dest)
-        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to backup {}: {}", path.display(), e)))?;
+    std::fs::copy(path, &dest).map_err(|e| {
+        FrogClawClientError::Gateway(format!("Failed to backup {}: {}", path.display(), e))
+    })?;
     Ok(())
 }
 
@@ -546,9 +552,9 @@ fn connect_claude_code(
 ) -> Result<()> {
     // Write settings.json
     let mut settings = read_json_or_empty(settings_path)?;
-    let obj = settings
-        .as_object_mut()
-        .ok_or_else(|| FrogClawClientError::Gateway("Claude Code settings is not a JSON object".into()))?;
+    let obj = settings.as_object_mut().ok_or_else(|| {
+        FrogClawClientError::Gateway("Claude Code settings is not a JSON object".into())
+    })?;
     obj.insert(
         "apiBaseUrl".into(),
         serde_json::Value::String(gateway_url.into()),
@@ -577,15 +583,16 @@ fn connect_claude_code(
 
     // Write config.json
     let mut config = read_json_or_empty(config_path)?;
-    let config_obj = config
-        .as_object_mut()
-        .ok_or_else(|| FrogClawClientError::Gateway("Claude Code config is not a JSON object".into()))?;
+    let config_obj = config.as_object_mut().ok_or_else(|| {
+        FrogClawClientError::Gateway("Claude Code config is not a JSON object".into())
+    })?;
     config_obj.insert(
         "primaryApiKey".into(),
         serde_json::Value::String("any".into()),
     );
-    let config_content = serde_json::to_string_pretty(&config)
-        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to serialize config JSON: {}", e)))?;
+    let config_content = serde_json::to_string_pretty(&config).map_err(|e| {
+        FrogClawClientError::Gateway(format!("Failed to serialize config JSON: {}", e))
+    })?;
     atomic_write(config_path, &config_content)
 }
 
@@ -599,14 +606,16 @@ fn connect_codex(
     let auth_json = serde_json::json!({
         "OPENAI_API_KEY": api_key
     });
-    let auth_content = serde_json::to_string_pretty(&auth_json)
-        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to serialize auth JSON: {}", e)))?;
+    let auth_content = serde_json::to_string_pretty(&auth_json).map_err(|e| {
+        FrogClawClientError::Gateway(format!("Failed to serialize auth JSON: {}", e))
+    })?;
     atomic_write(auth_path, &auth_content)?;
 
     // Edit config.toml preserving format
     let content = if config_path.exists() {
-        std::fs::read_to_string(config_path)
-            .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read config.toml: {}", e)))?
+        std::fs::read_to_string(config_path).map_err(|e| {
+            FrogClawClientError::Gateway(format!("Failed to read config.toml: {}", e))
+        })?
     } else {
         String::new()
     };
@@ -689,9 +698,9 @@ fn connect_gemini(
 
     // Write/merge settings.json
     let mut settings = read_json_or_empty(settings_path)?;
-    let obj = settings
-        .as_object_mut()
-        .ok_or_else(|| FrogClawClientError::Gateway("Gemini settings is not a JSON object".into()))?;
+    let obj = settings.as_object_mut().ok_or_else(|| {
+        FrogClawClientError::Gateway("Gemini settings is not a JSON object".into())
+    })?;
 
     // Ensure security.auth.selectedType == "gemini-api-key"
     if !obj.contains_key("security") {
@@ -717,16 +726,17 @@ fn connect_gemini(
         serde_json::Value::String("gemini-api-key".into()),
     );
 
-    let settings_content = serde_json::to_string_pretty(&settings)
-        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to serialize settings JSON: {}", e)))?;
+    let settings_content = serde_json::to_string_pretty(&settings).map_err(|e| {
+        FrogClawClientError::Gateway(format!("Failed to serialize settings JSON: {}", e))
+    })?;
     atomic_write(settings_path, &settings_content)
 }
 
 fn connect_opencode(config_path: &Path, gateway_url: &str, api_key: &str) -> Result<()> {
     let mut json = read_json_or_empty(config_path)?;
-    let obj = json
-        .as_object_mut()
-        .ok_or_else(|| FrogClawClientError::Gateway("OpenCode config is not a JSON object".into()))?;
+    let obj = json.as_object_mut().ok_or_else(|| {
+        FrogClawClientError::Gateway("OpenCode config is not a JSON object".into())
+    })?;
 
     if !obj.contains_key("$schema") {
         obj.insert(
@@ -766,9 +776,9 @@ fn connect_opencode(config_path: &Path, gateway_url: &str, api_key: &str) -> Res
 
 fn connect_cursor(settings_path: &Path, gateway_url: &str, api_key: &str) -> Result<()> {
     let mut json = read_json_or_empty(settings_path)?;
-    let obj = json
-        .as_object_mut()
-        .ok_or_else(|| FrogClawClientError::Gateway("Cursor settings is not a JSON object".into()))?;
+    let obj = json.as_object_mut().ok_or_else(|| {
+        FrogClawClientError::Gateway("Cursor settings is not a JSON object".into())
+    })?;
     obj.insert(
         "openai.apiBaseUrl".into(),
         serde_json::Value::String(gateway_url.into()),
@@ -831,8 +841,9 @@ fn disconnect_remove_fields(tool: CliTool, gateway_url: &str) -> Result<()> {
         CliTool::Codex => {
             // Two-file operation: remove auth.json then clean config.toml.
             let auth_result = if paths[0].exists() {
-                std::fs::remove_file(&paths[0])
-                    .map_err(|e| FrogClawClientError::Gateway(format!("Failed to remove auth.json: {}", e)))
+                std::fs::remove_file(&paths[0]).map_err(|e| {
+                    FrogClawClientError::Gateway(format!("Failed to remove auth.json: {}", e))
+                })
             } else {
                 Ok(())
             };
@@ -996,8 +1007,9 @@ fn remove_claude_settings_gateway_fields(path: &Path, gateway_url: &str) -> Resu
     if !path.exists() {
         return Ok(());
     }
-    let content = std::fs::read_to_string(path)
-        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read settings.json: {}", e)))?;
+    let content = std::fs::read_to_string(path).map_err(|e| {
+        FrogClawClientError::Gateway(format!("Failed to read settings.json: {}", e))
+    })?;
     let mut json: serde_json::Value = serde_json::from_str(&content)
         .map_err(|e| FrogClawClientError::Gateway(format!("Failed to parse JSON: {}", e)))?;
 
@@ -1032,8 +1044,9 @@ fn remove_gemini_settings_selected_type(path: &Path) -> Result<()> {
     if !path.exists() {
         return Ok(());
     }
-    let content = std::fs::read_to_string(path)
-        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read settings.json: {}", e)))?;
+    let content = std::fs::read_to_string(path).map_err(|e| {
+        FrogClawClientError::Gateway(format!("Failed to read settings.json: {}", e))
+    })?;
     let mut json: serde_json::Value = serde_json::from_str(&content)
         .map_err(|e| FrogClawClientError::Gateway(format!("Failed to parse JSON: {}", e)))?;
 
@@ -1075,8 +1088,9 @@ fn read_json_or_empty(path: &Path) -> Result<serde_json::Value> {
 }
 
 fn read_json_file(path: &Path) -> Result<serde_json::Value> {
-    let content = std::fs::read_to_string(path)
-        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read {}: {}", path.display(), e)))?;
+    let content = std::fs::read_to_string(path).map_err(|e| {
+        FrogClawClientError::Gateway(format!("Failed to read {}: {}", path.display(), e))
+    })?;
     serde_json::from_str(&content).map_err(|e| {
         FrogClawClientError::Gateway(format!("Failed to parse JSON in {}: {}", path.display(), e))
     })

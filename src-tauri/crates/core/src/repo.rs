@@ -1,3 +1,4 @@
+pub mod agent_session;
 pub mod artifact;
 pub mod backup;
 pub mod cli_config;
@@ -21,4 +22,3 @@ pub mod settings;
 pub mod skill;
 pub mod stored_file;
 pub mod tool_execution;
-pub mod agent_session;

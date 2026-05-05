@@ -1,6 +1,6 @@
+use async_trait::async_trait;
 use frogclaw_core::error::{FrogClawClientError, Result};
 use frogclaw_core::types::*;
-use async_trait::async_trait;
 use futures::Stream;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
@@ -349,19 +349,16 @@ fn convert_messages(messages: &[ChatMessage]) -> (Option<GeminiContent>, Vec<Gem
 
 fn make_gen_config(request: &ChatRequest) -> Option<GeminiGenerationConfig> {
     let model_id = request.model.to_lowercase();
-    let default_style = if model_id.contains("3.")
-        || model_id.contains("gemini-3")
-        || model_id.contains("-3-")
-    {
-        ReasoningStyle::GeminiThinkingLevel
-    } else {
-        ReasoningStyle::GeminiThinkingBudget
-    };
-    let thinking_config =
-        resolve_reasoning(request, default_style).map(|r| GeminiThinkingConfig {
-            thinking_budget: r.budget_tokens,
-            thinking_level: r.thinking_level,
-        });
+    let default_style =
+        if model_id.contains("3.") || model_id.contains("gemini-3") || model_id.contains("-3-") {
+            ReasoningStyle::GeminiThinkingLevel
+        } else {
+            ReasoningStyle::GeminiThinkingBudget
+        };
+    let thinking_config = resolve_reasoning(request, default_style).map(|r| GeminiThinkingConfig {
+        thinking_budget: r.budget_tokens,
+        thinking_level: r.thinking_level,
+    });
     if request.temperature.is_some()
         || request.top_p.is_some()
         || request.max_tokens.is_some()
@@ -435,7 +432,11 @@ mod tests {
         );
     }
 
-    fn request(model: &str, thinking_level: Option<&str>, thinking_budget: Option<u32>) -> ChatRequest {
+    fn request(
+        model: &str,
+        thinking_level: Option<&str>,
+        thinking_budget: Option<u32>,
+    ) -> ChatRequest {
         ChatRequest {
             model: model.to_string(),
             messages: vec![ChatMessage {
@@ -506,7 +507,9 @@ impl ProviderAdapter for GeminiAdapter {
         if !resp.status().is_success() {
             let s = resp.status();
             let t = resp.text().await.unwrap_or_default();
-            return Err(FrogClawClientError::Provider(format!("Gemini API error {s}: {t}")));
+            return Err(FrogClawClientError::Provider(format!(
+                "Gemini API error {s}: {t}"
+            )));
         }
 
         let gr: GeminiResponse = resp
@@ -604,8 +607,9 @@ impl ProviderAdapter for GeminiAdapter {
                     return;
                 }
                 Err(e) => {
-                    let _ = tx
-                        .unbounded_send(Err(FrogClawClientError::Provider(format!("Request failed: {e}"))));
+                    let _ = tx.unbounded_send(Err(FrogClawClientError::Provider(format!(
+                        "Request failed: {e}"
+                    ))));
                     return;
                 }
             };
@@ -726,7 +730,9 @@ impl ProviderAdapter for GeminiAdapter {
         if !resp.status().is_success() {
             let s = resp.status();
             let t = resp.text().await.unwrap_or_default();
-            return Err(FrogClawClientError::Provider(format!("Gemini API error {s}: {t}")));
+            return Err(FrogClawClientError::Provider(format!(
+                "Gemini API error {s}: {t}"
+            )));
         }
 
         let models: GeminiModelsResponse = resp
@@ -802,7 +808,9 @@ impl ProviderAdapter for GeminiAdapter {
         let resp = crate::apply_request_headers(self.get_client(ctx)?.post(&url).json(&body), ctx)
             .send()
             .await
-            .map_err(|e| FrogClawClientError::Provider(format!("Gemini embed request failed: {e}")))?;
+            .map_err(|e| {
+                FrogClawClientError::Provider(format!("Gemini embed request failed: {e}"))
+            })?;
 
         if !resp.status().is_success() {
             let s = resp.status();

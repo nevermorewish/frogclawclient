@@ -212,7 +212,9 @@ fn parse_deep_link_provider_type(value: &str) -> Result<ProviderType> {
 fn normalize_deep_link_baseurl(value: &str) -> Result<String> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
-        return Err(FrogClawClientError::Validation("Base URL is required".into()));
+        return Err(FrogClawClientError::Validation(
+            "Base URL is required".into(),
+        ));
     }
 
     let forced = trimmed.ends_with('!');
@@ -233,7 +235,9 @@ fn normalize_deep_link_baseurl(value: &str) -> Result<String> {
         }
     }
     if parsed.host_str().is_none() {
-        return Err(FrogClawClientError::Validation("Base URL host is required".into()));
+        return Err(FrogClawClientError::Validation(
+            "Base URL host is required".into(),
+        ));
     }
     if parsed.query().is_some() || parsed.fragment().is_some() {
         return Err(FrogClawClientError::Validation(
@@ -280,12 +284,16 @@ pub async fn import_provider_from_deep_link(
 ) -> Result<DeepLinkProviderImportResult> {
     let name = input.name.trim();
     if name.is_empty() {
-        return Err(FrogClawClientError::Validation("Provider name is required".into()));
+        return Err(FrogClawClientError::Validation(
+            "Provider name is required".into(),
+        ));
     }
 
     let raw_key = input.apikey.trim();
     if raw_key.is_empty() {
-        return Err(FrogClawClientError::Validation("API key is required".into()));
+        return Err(FrogClawClientError::Validation(
+            "API key is required".into(),
+        ));
     }
 
     let provider_type = parse_deep_link_provider_type(&input.provider_type)?;
@@ -460,7 +468,10 @@ pub async fn delete_provider_key(db: &DatabaseConnection, key_id: &str) -> Resul
     let result = provider_keys::Entity::delete_by_id(key_id).exec(db).await?;
 
     if result.rows_affected == 0 {
-        return Err(FrogClawClientError::NotFound(format!("ProviderKey {}", key_id)));
+        return Err(FrogClawClientError::NotFound(format!(
+            "ProviderKey {}",
+            key_id
+        )));
     }
     Ok(())
 }
@@ -572,7 +583,9 @@ pub async fn get_model(
     let row = models::Entity::find_by_id((provider_id.to_string(), model_id.to_string()))
         .one(db)
         .await?
-        .ok_or_else(|| FrogClawClientError::NotFound(format!("Model {}/{}", provider_id, model_id)))?;
+        .ok_or_else(|| {
+            FrogClawClientError::NotFound(format!("Model {}/{}", provider_id, model_id))
+        })?;
 
     Ok(model_from_entity(row))
 }
@@ -632,7 +645,9 @@ pub async fn toggle_model(
     let row = models::Entity::find_by_id((provider_id.to_string(), model_id.to_string()))
         .one(db)
         .await?
-        .ok_or_else(|| FrogClawClientError::NotFound(format!("Model {}/{}", provider_id, model_id)))?;
+        .ok_or_else(|| {
+            FrogClawClientError::NotFound(format!("Model {}/{}", provider_id, model_id))
+        })?;
 
     let mut am: models::ActiveModel = row.into();
     am.enabled = Set(if enabled { 1 } else { 0 });
@@ -652,7 +667,9 @@ pub async fn update_model_params(
     let row = models::Entity::find_by_id((provider_id.to_string(), model_id.to_string()))
         .one(db)
         .await?
-        .ok_or_else(|| FrogClawClientError::NotFound(format!("Model {}/{}", provider_id, model_id)))?;
+        .ok_or_else(|| {
+            FrogClawClientError::NotFound(format!("Model {}/{}", provider_id, model_id))
+        })?;
 
     let mut am: models::ActiveModel = row.into();
     am.param_overrides = Set(Some(param_json));
@@ -751,7 +768,9 @@ pub async fn ensure_builtin_provider(db: &DatabaseConnection, builtin_id: &str) 
     let bp = builtins
         .iter()
         .find(|b| b.builtin_id == builtin_id)
-        .ok_or_else(|| FrogClawClientError::NotFound(format!("Built-in provider {}", builtin_id)))?;
+        .ok_or_else(|| {
+            FrogClawClientError::NotFound(format!("Built-in provider {}", builtin_id))
+        })?;
 
     let prov = create_provider(
         db,

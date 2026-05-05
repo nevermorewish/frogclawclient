@@ -617,9 +617,9 @@ fn codex_app_server_candidate_dirs() -> Vec<PathBuf> {
 
     #[cfg(windows)]
     {
-    let local_codex_rs = PathBuf::from(r"E:\frogclaw\codex\codex-rs");
-    dirs.push(local_codex_rs.join("target").join("release"));
-    dirs.push(local_codex_rs.join("target").join("debug"));
+        let local_codex_rs = PathBuf::from(r"E:\frogclaw\codex\codex-rs");
+        dirs.push(local_codex_rs.join("target").join("release"));
+        dirs.push(local_codex_rs.join("target").join("debug"));
     }
 
     dirs
@@ -632,21 +632,18 @@ fn command_version(path: &PathBuf) -> Option<String> {
     {
         cmd.creation_flags(0x08000000);
     }
-    cmd
-        .output()
-        .ok()
-        .and_then(|output| {
-            let text = if output.stdout.is_empty() {
-                String::from_utf8_lossy(&output.stderr).trim().to_string()
-            } else {
-                String::from_utf8_lossy(&output.stdout).trim().to_string()
-            };
-            if text.is_empty() {
-                None
-            } else {
-                Some(text.lines().next().unwrap_or_default().to_string())
-            }
-        })
+    cmd.output().ok().and_then(|output| {
+        let text = if output.stdout.is_empty() {
+            String::from_utf8_lossy(&output.stderr).trim().to_string()
+        } else {
+            String::from_utf8_lossy(&output.stdout).trim().to_string()
+        };
+        if text.is_empty() {
+            None
+        } else {
+            Some(text.lines().next().unwrap_or_default().to_string())
+        }
+    })
 }
 
 fn cli_engine_info(
@@ -913,7 +910,8 @@ pub async fn agent_query(
     let conv_id = conversation_id.clone();
     let plan_mode = prompt.trim_start().starts_with("/plan");
     let prompt_for_task = if plan_mode {
-        prompt.trim_start()
+        prompt
+            .trim_start()
             .strip_prefix("/plan")
             .unwrap_or(&prompt)
             .trim_start()
@@ -1087,11 +1085,9 @@ fn extract_codex_texts(value: &Value) -> Vec<String> {
 }
 
 fn extract_codex_usage(value: &Value) -> Option<CodexUsage> {
-    let usage = value.get("usage").or_else(|| {
-        value
-            .get("params")
-            .and_then(|params| params.get("usage"))
-    })?;
+    let usage = value
+        .get("usage")
+        .or_else(|| value.get("params").and_then(|params| params.get("usage")))?;
     if value.get("type").and_then(|v| v.as_str()).is_some()
         && value.get("type").and_then(|v| v.as_str()) != Some("turn.completed")
     {
@@ -1118,7 +1114,11 @@ fn estimate_agent_usage(prompt: &str, response: &str) -> CodexUsage {
     }
 }
 
-fn effective_agent_usage(final_usage: Option<&CodexUsage>, prompt: &str, response: &str) -> CodexUsage {
+fn effective_agent_usage(
+    final_usage: Option<&CodexUsage>,
+    prompt: &str,
+    response: &str,
+) -> CodexUsage {
     match final_usage {
         Some(usage) if usage.input_tokens > 0 || usage.output_tokens > 0 => usage.clone(),
         _ => estimate_agent_usage(prompt, response),
@@ -1219,7 +1219,10 @@ fn extract_app_server_completed_text(params: &Value) -> Option<String> {
 
 fn extract_app_server_completed_plan_text(params: &Value) -> Option<String> {
     let item = params.get("item")?;
-    let item_type = item.get("type").and_then(|v| v.as_str()).unwrap_or_default();
+    let item_type = item
+        .get("type")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default();
     if !matches!(item_type, "plan" | "agentPlan" | "turnPlan") {
         return None;
     }
@@ -1294,7 +1297,10 @@ fn extract_app_server_item(params: &Value) -> Option<&Value> {
 
 fn extract_app_server_tool_info(params: &Value) -> Option<(String, String, Value)> {
     let item = extract_app_server_item(params)?;
-    let item_type = item.get("type").and_then(|v| v.as_str()).unwrap_or_default();
+    let item_type = item
+        .get("type")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default();
     let type_lower = item_type.to_lowercase();
     if !(type_lower.contains("command")
         || type_lower.contains("tool")
@@ -1415,7 +1421,10 @@ async fn request_codex_permission(
     .unwrap_or_default();
 
     let (tx, rx) = oneshot::channel();
-    permission_senders.lock().await.insert(tool_use_id.clone(), tx);
+    permission_senders
+        .lock()
+        .await
+        .insert(tool_use_id.clone(), tx);
     let _ = app.emit(
         "agent-permission-request",
         AgentPermissionRequestPayload {

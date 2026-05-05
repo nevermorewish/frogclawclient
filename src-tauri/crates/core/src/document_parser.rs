@@ -50,9 +50,9 @@ fn extract_docx(file_path: &Path) -> Result<String> {
     let mut xml_content = String::new();
     if let Ok(mut entry) = archive.by_name("word/document.xml") {
         use std::io::Read;
-        entry
-            .read_to_string(&mut xml_content)
-            .map_err(|e| FrogClawClientError::Provider(format!("Failed to read document.xml: {e}")))?;
+        entry.read_to_string(&mut xml_content).map_err(|e| {
+            FrogClawClientError::Provider(format!("Failed to read document.xml: {e}"))
+        })?;
     } else {
         return Err(FrogClawClientError::Provider(
             "DOCX: word/document.xml not found".into(),

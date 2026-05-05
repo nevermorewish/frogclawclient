@@ -5,9 +5,11 @@ use axum::{
     routing::post,
     Json, Router,
 };
-use futures::{Stream, StreamExt};
 use frogclaw_core::types::*;
-use frogclaw_providers::{registry::ProviderRegistry, resolve_base_url_for_type, ProviderAdapter, ProviderRequestContext};
+use frogclaw_providers::{
+    registry::ProviderRegistry, resolve_base_url_for_type, ProviderAdapter, ProviderRequestContext,
+};
+use futures::{Stream, StreamExt};
 use sea_orm::DatabaseConnection;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -168,11 +170,18 @@ fn sidecar_path() -> Result<PathBuf, String> {
         .unwrap_or(Path::new("."))
         .to_path_buf();
     let candidates = [
-        cwd.join("src-tauri").join("binaries").join("frogclaw-platform-sidecar.cjs"),
+        cwd.join("src-tauri")
+            .join("binaries")
+            .join("frogclaw-platform-sidecar.cjs"),
         cwd.join("binaries").join("frogclaw-platform-sidecar.cjs"),
         exe_parent.join("frogclaw-platform-sidecar.cjs"),
-        exe_parent.join("resources").join("frogclaw-platform-sidecar.cjs"),
-        exe_parent.join("resources").join("binaries").join("frogclaw-platform-sidecar.cjs"),
+        exe_parent
+            .join("resources")
+            .join("frogclaw-platform-sidecar.cjs"),
+        exe_parent
+            .join("resources")
+            .join("binaries")
+            .join("frogclaw-platform-sidecar.cjs"),
     ];
     candidates
         .into_iter()
@@ -205,7 +214,10 @@ fn write_channels_file(file: &ImChannelsFile) -> Result<(), String> {
     std::fs::rename(tmp, path).map_err(|e| e.to_string())
 }
 
-async fn start_parent_server(app_state: &AppState, bridge: &PlatformBridgeState) -> Result<u16, String> {
+async fn start_parent_server(
+    app_state: &AppState,
+    bridge: &PlatformBridgeState,
+) -> Result<u16, String> {
     if let Some(port) = *bridge.parent_port.lock().await {
         return Ok(port);
     }
@@ -236,7 +248,9 @@ async fn start_parent_server(app_state: &AppState, bridge: &PlatformBridgeState)
 }
 
 async fn choose_default_model(db: &DatabaseConnection) -> Result<(ProviderConfig, Model), String> {
-    let settings = frogclaw_core::repo::settings::get_settings(db).await.unwrap_or_default();
+    let settings = frogclaw_core::repo::settings::get_settings(db)
+        .await
+        .unwrap_or_default();
     let providers = frogclaw_core::repo::provider::list_providers(db)
         .await
         .map_err(|e| e.to_string())?;
@@ -272,12 +286,14 @@ async fn get_or_create_session_conversation(
     first_prompt: &str,
 ) -> Result<(Conversation, ProviderConfig, Model), String> {
     if let Some(conversation_id) = runtime.sessions.lock().await.get(session_key).cloned() {
-        let conversation = frogclaw_core::repo::conversation::get_conversation(&runtime.db, &conversation_id)
-            .await
-            .map_err(|e| e.to_string())?;
-        let provider = frogclaw_core::repo::provider::get_provider(&runtime.db, &conversation.provider_id)
-            .await
-            .map_err(|e| e.to_string())?;
+        let conversation =
+            frogclaw_core::repo::conversation::get_conversation(&runtime.db, &conversation_id)
+                .await
+                .map_err(|e| e.to_string())?;
+        let provider =
+            frogclaw_core::repo::provider::get_provider(&runtime.db, &conversation.provider_id)
+                .await
+                .map_err(|e| e.to_string())?;
         let model = frogclaw_core::repo::provider::get_model(
             &runtime.db,
             &conversation.provider_id,
@@ -368,7 +384,9 @@ async fn bridge_message(
         let start = Instant::now();
         if let Err(error) = stream_project_conversation(runtime, req, tx.clone(), start).await {
             let _ = tx
-                .send(sse_json(serde_json::json!({ "type": "result", "error": error })))
+                .send(sse_json(
+                    serde_json::json!({ "type": "result", "error": error }),
+                ))
                 .await;
         }
     });
@@ -383,7 +401,8 @@ async fn stream_project_conversation(
     tx: mpsc::Sender<Result<Event, std::convert::Infallible>>,
     start: Instant,
 ) -> Result<(), String> {
-    let assignment = normalize_im_assignment(req.assignment.clone()).unwrap_or_else(|| "aiagent".to_string());
+    let assignment =
+        normalize_im_assignment(req.assignment.clone()).unwrap_or_else(|| "aiagent".to_string());
     let prompt = match req.files.as_ref().filter(|files| !files.is_empty()) {
         Some(files) => format!("{}\n\n[IM attachments]\n{}", req.prompt, files.join("\n")),
         None => req.prompt.clone(),
@@ -411,7 +430,9 @@ async fn stream_project_conversation(
         .map_err(|e| e.to_string())?;
     let mut chat_messages: Vec<ChatMessage> = messages.iter().filter_map(message_to_chat).collect();
 
-    let settings = frogclaw_core::repo::settings::get_settings(&runtime.db).await.unwrap_or_default();
+    let settings = frogclaw_core::repo::settings::get_settings(&runtime.db)
+        .await
+        .unwrap_or_default();
     if let Some(system_prompt) = settings
         .default_system_prompt
         .clone()
@@ -438,10 +459,16 @@ async fn stream_project_conversation(
         api_key,
         key_id: key_row.id.clone(),
         provider_id: provider.id.clone(),
-        base_url: Some(resolve_base_url_for_type(&provider.api_host, &provider.provider_type)),
+        base_url: Some(resolve_base_url_for_type(
+            &provider.api_host,
+            &provider.provider_type,
+        )),
         api_path: provider.api_path.clone(),
         proxy_config: resolved_proxy,
-        custom_headers: provider.custom_headers.as_ref().and_then(|s| serde_json::from_str(s).ok()),
+        custom_headers: provider
+            .custom_headers
+            .as_ref()
+            .and_then(|s| serde_json::from_str(s).ok()),
     };
 
     let registry = ProviderRegistry::create_default();
@@ -460,9 +487,15 @@ async fn stream_project_conversation(
         tools: None,
         thinking_budget: None,
         thinking_level: None,
-        reasoning_profile: model_params.as_ref().and_then(|p| p.reasoning_profile.clone()),
-        use_max_completion_tokens: model_params.as_ref().and_then(|p| p.use_max_completion_tokens),
-        thinking_param_style: model_params.as_ref().and_then(|p| p.thinking_param_style.clone()),
+        reasoning_profile: model_params
+            .as_ref()
+            .and_then(|p| p.reasoning_profile.clone()),
+        use_max_completion_tokens: model_params
+            .as_ref()
+            .and_then(|p| p.use_max_completion_tokens),
+        thinking_param_style: model_params
+            .as_ref()
+            .and_then(|p| p.thinking_param_style.clone()),
     };
     let cancel_flag = Arc::new(AtomicBool::new(false));
     runtime
@@ -495,9 +528,11 @@ async fn stream_project_conversation(
                 if let Some(delta) = chunk.thinking.or(chunk.content) {
                     if !delta.is_empty() {
                         assistant_content.push_str(&delta);
-                        tx.send(sse_json(serde_json::json!({ "type": "text", "delta": delta })))
-                            .await
-                            .ok();
+                        tx.send(sse_json(
+                            serde_json::json!({ "type": "text", "delta": delta }),
+                        ))
+                        .await
+                        .ok();
                     }
                 }
                 if chunk.usage.is_some() {
@@ -571,10 +606,15 @@ pub async fn save_im_channels(channels: Vec<ImChannel>) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn platform_status(bridge: State<'_, PlatformBridgeState>) -> Result<PlatformStatus, String> {
-    let tracked_running = bridge.child.lock().await.as_mut().is_some_and(|child| {
-        child.try_wait().ok().flatten().is_none()
-    });
+pub async fn platform_status(
+    bridge: State<'_, PlatformBridgeState>,
+) -> Result<PlatformStatus, String> {
+    let tracked_running = bridge
+        .child
+        .lock()
+        .await
+        .as_mut()
+        .is_some_and(|child| child.try_wait().ok().flatten().is_none());
     let running = tracked_running || is_platform_port_open();
     Ok(PlatformStatus {
         running,
@@ -589,9 +629,13 @@ pub async fn platform_start(
     app_state: State<'_, AppState>,
     bridge: State<'_, PlatformBridgeState>,
 ) -> Result<PlatformStatus, String> {
-    if bridge.child.lock().await.as_mut().is_some_and(|child| {
-        child.try_wait().ok().flatten().is_none()
-    }) {
+    if bridge
+        .child
+        .lock()
+        .await
+        .as_mut()
+        .is_some_and(|child| child.try_wait().ok().flatten().is_none())
+    {
         return platform_status(bridge).await;
     }
     if is_platform_port_open() {
@@ -616,14 +660,17 @@ pub async fn platform_start(
         .stderr(Stdio::from(log_file_err));
     #[cfg(target_os = "windows")]
     command.creation_flags(0x08000000);
-    let child = command.spawn()
+    let child = command
+        .spawn()
         .map_err(|e| format!("Failed to start platform sidecar with node: {e}"))?;
     *bridge.child.lock().await = Some(child);
     platform_status(bridge).await
 }
 
 #[tauri::command]
-pub async fn platform_stop(bridge: State<'_, PlatformBridgeState>) -> Result<PlatformStatus, String> {
+pub async fn platform_stop(
+    bridge: State<'_, PlatformBridgeState>,
+) -> Result<PlatformStatus, String> {
     if let Some(mut child) = bridge.child.lock().await.take() {
         let _ = child.kill();
         let _ = child.wait();

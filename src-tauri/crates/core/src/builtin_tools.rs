@@ -98,10 +98,9 @@ async fn fetch_url(url: &str, max_length: Option<usize>) -> Result<McpToolResult
         });
     }
 
-    let body = resp
-        .text()
-        .await
-        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read response body: {}", e)))?;
+    let body = resp.text().await.map_err(|e| {
+        FrogClawClientError::Gateway(format!("Failed to read response body: {}", e))
+    })?;
 
     let text = html_to_text(&body);
     let max = max_length.unwrap_or(5000);
@@ -146,10 +145,9 @@ async fn fetch_markdown(url: &str, max_length: Option<usize>) -> Result<McpToolR
         });
     }
 
-    let body = resp
-        .text()
-        .await
-        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read response body: {}", e)))?;
+    let body = resp.text().await.map_err(|e| {
+        FrogClawClientError::Gateway(format!("Failed to read response body: {}", e))
+    })?;
 
     let markdown = html_to_markdown(&body);
     let max = max_length.unwrap_or(10000);

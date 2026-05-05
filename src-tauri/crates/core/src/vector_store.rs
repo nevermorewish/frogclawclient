@@ -621,7 +621,9 @@ impl VectorStore {
             ))
             .await
             .map_err(Self::wrap)?
-            .ok_or_else(|| FrogClawClientError::NotFound(format!("Chunk {} not found", chunk_id)))?;
+            .ok_or_else(|| {
+                FrogClawClientError::NotFound(format!("Chunk {} not found", chunk_id))
+            })?;
 
         let rid: i64 = row.try_get("", "rowid").map_err(Self::wrap)?;
         let vec_json = Self::embedding_to_json(embedding);

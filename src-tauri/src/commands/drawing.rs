@@ -1,4 +1,5 @@
 use crate::AppState;
+use base64::Engine;
 use frogclaw_core::file_store::FileStore;
 use frogclaw_core::repo::drawing::{
     DrawingGeneration, DrawingImage, NewDrawingGeneration, NewDrawingImage,
@@ -9,7 +10,6 @@ use frogclaw_providers::openai_images::{
     ImageEditRequest, ImageGenerateRequest, ImageUpload, OpenAIImagesClient,
 };
 use frogclaw_providers::{resolve_base_url_for_type, ProviderRequestContext};
-use base64::Engine;
 use image::GenericImageView;
 use serde::{Deserialize, Serialize};
 use tauri::State;
@@ -105,9 +105,13 @@ pub async fn list_drawing_generations(
     cursor: Option<String>,
 ) -> Result<Vec<DrawingGeneration>, String> {
     let parsed_cursor = cursor.and_then(|value| value.parse::<i64>().ok());
-    frogclaw_core::repo::drawing::list_generations(&state.sea_db, limit.unwrap_or(30), parsed_cursor)
-        .await
-        .map_err(|e| e.to_string())
+    frogclaw_core::repo::drawing::list_generations(
+        &state.sea_db,
+        limit.unwrap_or(30),
+        parsed_cursor,
+    )
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -512,17 +516,19 @@ async fn save_drawing_reference_file(
         .save_file(bytes, file_name, mime_type)
         .map_err(|e| e.to_string())?;
 
-    if let Some(existing) = frogclaw_core::repo::stored_file::find_by_hash(&state.sea_db, &saved.hash)
-        .await
-        .map_err(|e| e.to_string())?
+    if let Some(existing) =
+        frogclaw_core::repo::stored_file::find_by_hash(&state.sea_db, &saved.hash)
+            .await
+            .map_err(|e| e.to_string())?
     {
         if existing.storage_path != saved.storage_path {
-            let references = frogclaw_core::repo::stored_file::count_stored_files_with_storage_path(
-                &state.sea_db,
-                &saved.storage_path,
-            )
-            .await
-            .unwrap_or(0);
+            let references =
+                frogclaw_core::repo::stored_file::count_stored_files_with_storage_path(
+                    &state.sea_db,
+                    &saved.storage_path,
+                )
+                .await
+                .unwrap_or(0);
             if references == 0 {
                 let _ = file_store.delete_file(&saved.storage_path);
             }
@@ -583,9 +589,10 @@ async fn load_drawing_image_upload(
     state: &AppState,
     image: &DrawingImage,
 ) -> Result<ImageUpload, String> {
-    let file = frogclaw_core::repo::stored_file::get_stored_file(&state.sea_db, &image.stored_file_id)
-        .await
-        .map_err(|e| e.to_string())?;
+    let file =
+        frogclaw_core::repo::stored_file::get_stored_file(&state.sea_db, &image.stored_file_id)
+            .await
+            .map_err(|e| e.to_string())?;
     load_stored_file_upload(state, &file).await
 }
 

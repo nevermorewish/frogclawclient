@@ -123,10 +123,7 @@ fn parse_id_list(raw: &str) -> Vec<String> {
     serde_json::from_str::<Vec<String>>(raw).unwrap_or_default()
 }
 
-async fn list_reference_files(
-    db: &DatabaseConnection,
-    ids_json: &str,
-) -> Result<Vec<StoredFile>> {
+async fn list_reference_files(db: &DatabaseConnection, ids_json: &str) -> Result<Vec<StoredFile>> {
     let mut files = Vec::new();
     for id in parse_id_list(ids_json) {
         if let Ok(file) = crate::repo::stored_file::get_stored_file(db, &id).await {
@@ -136,10 +133,7 @@ async fn list_reference_files(
     Ok(files)
 }
 
-async fn list_source_images(
-    db: &DatabaseConnection,
-    ids_json: &str,
-) -> Result<Vec<DrawingImage>> {
+async fn list_source_images(db: &DatabaseConnection, ids_json: &str) -> Result<Vec<DrawingImage>> {
     let mut images = Vec::new();
     for id in parse_id_list(ids_json) {
         if let Ok(image) = get_image(db, &id).await {
@@ -326,7 +320,10 @@ pub async fn delete_generation(db: &DatabaseConnection, id: &str) -> Result<()> 
         .exec(db)
         .await?;
     if result.rows_affected == 0 {
-        return Err(FrogClawClientError::NotFound(format!("DrawingGeneration {}", id)));
+        return Err(FrogClawClientError::NotFound(format!(
+            "DrawingGeneration {}",
+            id
+        )));
     }
     Ok(())
 }

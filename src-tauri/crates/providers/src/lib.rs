@@ -10,9 +10,9 @@ pub mod reasoning;
 pub mod registry;
 pub mod voyage;
 
+use async_trait::async_trait;
 use frogclaw_core::error::{FrogClawClientError, Result};
 use frogclaw_core::types::*;
-use async_trait::async_trait;
 use futures::Stream;
 use std::pin::Pin;
 

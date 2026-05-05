@@ -1,6 +1,6 @@
+use async_trait::async_trait;
 use frogclaw_core::error::{FrogClawClientError, Result};
 use frogclaw_core::types::*;
-use async_trait::async_trait;
 use futures::Stream;
 use futures::StreamExt;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -485,7 +485,10 @@ fn build_request(request: &ChatRequest, messages: &[ChatMessage], stream: bool) 
     let reasoning = resolve_reasoning(request, default_style);
     let reasoning_effort = reasoning.as_ref().and_then(|r| r.reasoning_effort.clone());
     let enable_thinking = reasoning.as_ref().and_then(|r| r.enable_thinking);
-    let sf_thinking_budget = reasoning.as_ref().and_then(|r| r.budget_tokens).filter(|v| *v > 0);
+    let sf_thinking_budget = reasoning
+        .as_ref()
+        .and_then(|r| r.budget_tokens)
+        .filter(|v| *v > 0);
     let has_thinking = reasoning_effort.is_some() || enable_thinking == Some(true);
 
     // Use max_completion_tokens when: model config says so, reasoning mode,
@@ -694,8 +697,9 @@ impl ProviderAdapter for OpenAIAdapter {
                     return;
                 }
                 Err(e) => {
-                    let _ = tx
-                        .unbounded_send(Err(FrogClawClientError::Provider(format!("Request failed: {e}"))));
+                    let _ = tx.unbounded_send(Err(FrogClawClientError::Provider(format!(
+                        "Request failed: {e}"
+                    ))));
                     return;
                 }
             };
@@ -933,7 +937,9 @@ impl ProviderAdapter for OpenAIAdapter {
         if !resp.status().is_success() {
             let s = resp.status();
             let t = resp.text().await.unwrap_or_default();
-            return Err(FrogClawClientError::Provider(format!("OpenAI API error {s}: {t}")));
+            return Err(FrogClawClientError::Provider(format!(
+                "OpenAI API error {s}: {t}"
+            )));
         }
 
         let body = resp

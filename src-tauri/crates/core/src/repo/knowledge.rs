@@ -161,7 +161,10 @@ pub async fn delete_knowledge_base(db: &DatabaseConnection, id: &str) -> Result<
     let result = knowledge_bases::Entity::delete_by_id(id).exec(db).await?;
 
     if result.rows_affected == 0 {
-        return Err(FrogClawClientError::NotFound(format!("KnowledgeBase {}", id)));
+        return Err(FrogClawClientError::NotFound(format!(
+            "KnowledgeBase {}",
+            id
+        )));
     }
     Ok(())
 }
@@ -243,7 +246,10 @@ pub async fn delete_document(db: &DatabaseConnection, id: &str) -> Result<()> {
         .await?;
 
     if result.rows_affected == 0 {
-        return Err(FrogClawClientError::NotFound(format!("KnowledgeDocument {}", id)));
+        return Err(FrogClawClientError::NotFound(format!(
+            "KnowledgeDocument {}",
+            id
+        )));
     }
     Ok(())
 }

@@ -249,7 +249,10 @@ pub async fn delete_conversation(db: &DatabaseConnection, id: &str) -> Result<()
     let result = conversations::Entity::delete_by_id(id).exec(db).await?;
 
     if result.rows_affected == 0 {
-        return Err(FrogClawClientError::NotFound(format!("Conversation {}", id)));
+        return Err(FrogClawClientError::NotFound(format!(
+            "Conversation {}",
+            id
+        )));
     }
     Ok(())
 }
@@ -267,7 +270,9 @@ pub async fn branch_conversation(
     let source = conversations::Entity::find_by_id(conversation_id)
         .one(db)
         .await?
-        .ok_or_else(|| FrogClawClientError::NotFound(format!("Conversation {}", conversation_id)))?;
+        .ok_or_else(|| {
+            FrogClawClientError::NotFound(format!("Conversation {}", conversation_id))
+        })?;
 
     // 2. Load all active messages ordered by created_at
     let all_msgs = messages::Entity::find()

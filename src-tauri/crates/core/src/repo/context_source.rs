@@ -65,7 +65,10 @@ pub async fn remove_context_source(db: &DatabaseConnection, id: &str) -> Result<
     let result = context_sources::Entity::delete_by_id(id).exec(db).await?;
 
     if result.rows_affected == 0 {
-        return Err(FrogClawClientError::NotFound(format!("ContextSource {}", id)));
+        return Err(FrogClawClientError::NotFound(format!(
+            "ContextSource {}",
+            id
+        )));
     }
     Ok(())
 }

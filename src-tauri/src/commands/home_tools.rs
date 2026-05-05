@@ -41,7 +41,11 @@ fn write_log(msg: &str) {
         if let Some(parent) = path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+        {
             let ts = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
             let _ = writeln!(f, "[{}] {}", ts, msg);
         }
@@ -58,7 +62,12 @@ fn ensure_windows_path() {
         if std::path::Path::new(&windows_apps).exists() {
             extra.push(windows_apps);
         }
-        let npm = format!("{}\\npm", local_app.replace("Local", "Roaming").replace("local", "Roaming"));
+        let npm = format!(
+            "{}\\npm",
+            local_app
+                .replace("Local", "Roaming")
+                .replace("local", "Roaming")
+        );
         if std::path::Path::new(&npm).exists() {
             extra.push(npm);
         }
@@ -179,7 +188,11 @@ fn lookup_in_path(cmd: &str) -> Option<String> {
         let p = std::path::Path::new(cmd);
         return p.is_file().then(|| p.to_string_lossy().to_string());
     }
-    for dir in std::env::var("PATH").unwrap_or_default().split(':').filter(|s| !s.is_empty()) {
+    for dir in std::env::var("PATH")
+        .unwrap_or_default()
+        .split(':')
+        .filter(|s| !s.is_empty())
+    {
         let candidate = std::path::Path::new(dir).join(cmd);
         if let Ok(meta) = std::fs::metadata(&candidate) {
             if meta.is_file() && meta.permissions().mode() & 0o111 != 0 {
@@ -218,7 +231,9 @@ fn run_version(cmd: &str, args: &[&str]) -> Option<String> {
             .filter(|s| !s.is_empty());
         let _ = tx.send(result);
     });
-    rx.recv_timeout(std::time::Duration::from_secs(5)).ok().flatten()
+    rx.recv_timeout(std::time::Duration::from_secs(5))
+        .ok()
+        .flatten()
 }
 
 fn parse_node_version(s: &str) -> Option<(u32, u32)> {
@@ -305,9 +320,45 @@ fn install_command(tool_id: &str) -> Result<(String, Vec<String>, bool), String>
             ],
             false,
         )),
-        "claude" => Ok(("cmd".into(), vec!["/C".into(), "npm".into(), "install".into(), "-g".into(), "@anthropic-ai/claude-code".into(), "--registry".into(), "https://registry.npmmirror.com".into()], true)),
-        "codex" => Ok(("cmd".into(), vec!["/C".into(), "npm".into(), "install".into(), "-g".into(), "@openai/codex".into(), "--registry".into(), "https://registry.npmmirror.com".into()], true)),
-        "gemini" => Ok(("cmd".into(), vec!["/C".into(), "npm".into(), "install".into(), "-g".into(), "@google/gemini-cli".into(), "--registry".into(), "https://registry.npmmirror.com".into()], true)),
+        "claude" => Ok((
+            "cmd".into(),
+            vec![
+                "/C".into(),
+                "npm".into(),
+                "install".into(),
+                "-g".into(),
+                "@anthropic-ai/claude-code".into(),
+                "--registry".into(),
+                "https://registry.npmmirror.com".into(),
+            ],
+            true,
+        )),
+        "codex" => Ok((
+            "cmd".into(),
+            vec![
+                "/C".into(),
+                "npm".into(),
+                "install".into(),
+                "-g".into(),
+                "@openai/codex".into(),
+                "--registry".into(),
+                "https://registry.npmmirror.com".into(),
+            ],
+            true,
+        )),
+        "gemini" => Ok((
+            "cmd".into(),
+            vec![
+                "/C".into(),
+                "npm".into(),
+                "install".into(),
+                "-g".into(),
+                "@google/gemini-cli".into(),
+                "--registry".into(),
+                "https://registry.npmmirror.com".into(),
+            ],
+            true,
+        )),
         other => Err(format!("Unknown tool id: {other}")),
     }
 }
@@ -317,9 +368,39 @@ fn install_command(tool_id: &str) -> Result<(String, Vec<String>, bool), String>
     match tool_id {
         "node" => Ok(("brew".into(), vec!["install".into(), "node".into()], false)),
         "git" => Ok(("brew".into(), vec!["install".into(), "git".into()], false)),
-        "claude" => Ok(("npm".into(), vec!["install".into(), "-g".into(), "@anthropic-ai/claude-code".into(), "--registry".into(), "https://registry.npmmirror.com".into()], true)),
-        "codex" => Ok(("npm".into(), vec!["install".into(), "-g".into(), "@openai/codex".into(), "--registry".into(), "https://registry.npmmirror.com".into()], true)),
-        "gemini" => Ok(("npm".into(), vec!["install".into(), "-g".into(), "@google/gemini-cli".into(), "--registry".into(), "https://registry.npmmirror.com".into()], true)),
+        "claude" => Ok((
+            "npm".into(),
+            vec![
+                "install".into(),
+                "-g".into(),
+                "@anthropic-ai/claude-code".into(),
+                "--registry".into(),
+                "https://registry.npmmirror.com".into(),
+            ],
+            true,
+        )),
+        "codex" => Ok((
+            "npm".into(),
+            vec![
+                "install".into(),
+                "-g".into(),
+                "@openai/codex".into(),
+                "--registry".into(),
+                "https://registry.npmmirror.com".into(),
+            ],
+            true,
+        )),
+        "gemini" => Ok((
+            "npm".into(),
+            vec![
+                "install".into(),
+                "-g".into(),
+                "@google/gemini-cli".into(),
+                "--registry".into(),
+                "https://registry.npmmirror.com".into(),
+            ],
+            true,
+        )),
         other => Err(format!("Unknown tool id: {other}")),
     }
 }

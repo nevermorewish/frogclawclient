@@ -40,7 +40,9 @@ pub fn decrypt_key(encrypted: &str, master_key: &[u8; 32]) -> Result<String> {
         .map_err(|e| FrogClawClientError::Crypto(format!("Base64 decode failed: {}", e)))?;
 
     if combined.len() < NONCE_SIZE {
-        return Err(FrogClawClientError::Crypto("Invalid encrypted data".to_string()));
+        return Err(FrogClawClientError::Crypto(
+            "Invalid encrypted data".to_string(),
+        ));
     }
 
     let (nonce_bytes, ciphertext) = combined.split_at(NONCE_SIZE);

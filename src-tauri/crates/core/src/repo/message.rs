@@ -26,8 +26,9 @@ fn role_str(role: &MessageRole) -> &'static str {
 }
 
 fn parse_attachment_list(raw: &str) -> Result<Vec<Attachment>> {
-    serde_json::from_str(raw)
-        .map_err(|e| FrogClawClientError::Validation(format!("Invalid message attachments JSON: {e}")))
+    serde_json::from_str(raw).map_err(|e| {
+        FrogClawClientError::Validation(format!("Invalid message attachments JSON: {e}"))
+    })
 }
 
 fn stringify_attachment_list(attachments: &[Attachment]) -> Result<String> {
@@ -243,7 +244,11 @@ fn select_next_active_version(
         Vec::new()
     };
 
-    let mut candidates = if same_model.is_empty() { remaining } else { same_model };
+    let mut candidates = if same_model.is_empty() {
+        remaining
+    } else {
+        same_model
+    };
     candidates.sort_by(compare_version_priority);
     candidates.into_iter().next()
 }

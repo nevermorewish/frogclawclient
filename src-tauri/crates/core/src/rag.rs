@@ -59,7 +59,9 @@ impl RAGSource for KnowledgeRAG {
     ) -> Result<String> {
         let kb = crate::repo::knowledge::get_knowledge_base(db, container_id).await?;
         kb.embedding_provider.ok_or_else(|| {
-            FrogClawClientError::Provider("Knowledge base has no embedding provider configured".to_string())
+            FrogClawClientError::Provider(
+                "Knowledge base has no embedding provider configured".to_string(),
+            )
         })
     }
 }

@@ -103,7 +103,9 @@ pub async fn verify_key(db: &DatabaseConnection, plain_key: &str) -> Result<Gate
         .filter(gateway_keys::Column::Enabled.eq(1))
         .one(db)
         .await?
-        .ok_or_else(|| FrogClawClientError::NotFound("Invalid or disabled gateway key".to_string()))?;
+        .ok_or_else(|| {
+            FrogClawClientError::NotFound("Invalid or disabled gateway key".to_string())
+        })?;
 
     Ok(key_from_entity(row))
 }
@@ -129,7 +131,9 @@ pub async fn get_plain_key(
         .ok_or_else(|| FrogClawClientError::NotFound(format!("GatewayKey {}", key_id)))?;
 
     let encrypted = row.encrypted_key.ok_or_else(|| {
-        FrogClawClientError::Crypto("Key was created before encrypted storage was available".to_string())
+        FrogClawClientError::Crypto(
+            "Key was created before encrypted storage was available".to_string(),
+        )
     })?;
 
     crypto::decrypt_key(&encrypted, master_key)

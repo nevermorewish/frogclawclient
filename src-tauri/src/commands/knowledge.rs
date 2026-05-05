@@ -115,7 +115,10 @@ pub async fn add_knowledge_document(
                 let err_msg = e.to_string();
                 tracing::error!("Indexing failed for doc {}: {}", doc_id, err_msg);
                 let _ = frogclaw_core::repo::knowledge::update_document_status_with_error(
-                    &db, &doc_id, "failed", Some(&err_msg),
+                    &db,
+                    &doc_id,
+                    "failed",
+                    Some(&err_msg),
                 )
                 .await;
             }
@@ -203,9 +206,12 @@ pub async fn rebuild_knowledge_index(
 
     // Reset all document statuses to "indexing"
     for doc in &docs {
-        let _ =
-            frogclaw_core::repo::knowledge::update_document_status(&state.sea_db, &doc.id, "indexing")
-                .await;
+        let _ = frogclaw_core::repo::knowledge::update_document_status(
+            &state.sea_db,
+            &doc.id,
+            "indexing",
+        )
+        .await;
     }
 
     // Clear only embeddings (vec0), keep _meta intact
@@ -227,7 +233,10 @@ pub async fn rebuild_knowledge_index(
                 Err(e) => {
                     let err_msg = e.to_string();
                     let _ = frogclaw_core::repo::knowledge::update_document_status_with_error(
-                        &db, &doc.id, "failed", Some(&err_msg),
+                        &db,
+                        &doc.id,
+                        "failed",
+                        Some(&err_msg),
                     )
                     .await;
                     let _ = app.emit(
@@ -254,8 +263,10 @@ pub async fn rebuild_knowledge_index(
                 continue;
             }
 
-            let texts: Vec<String> =
-                chunks.iter().map(|(_, _, content)| content.clone()).collect();
+            let texts: Vec<String> = chunks
+                .iter()
+                .map(|(_, _, content)| content.clone())
+                .collect();
             let rowids: Vec<i64> = chunks.iter().map(|(rid, _, _)| *rid).collect();
 
             match crate::indexing::generate_embeddings(&db, &master_key, &ep, texts, None).await {
@@ -276,7 +287,10 @@ pub async fn rebuild_knowledge_index(
                             err_msg
                         );
                         let _ = frogclaw_core::repo::knowledge::update_document_status_with_error(
-                            &db, &doc.id, "failed", Some(&err_msg),
+                            &db,
+                            &doc.id,
+                            "failed",
+                            Some(&err_msg),
                         )
                         .await;
                         let _ = app.emit(
@@ -303,13 +317,12 @@ pub async fn rebuild_knowledge_index(
                 }
                 Err(e) => {
                     let err_msg = e.to_string();
-                    tracing::error!(
-                        "Failed to embed doc {} during rebuild: {}",
-                        doc.id,
-                        err_msg
-                    );
+                    tracing::error!("Failed to embed doc {} during rebuild: {}", doc.id, err_msg);
                     let _ = frogclaw_core::repo::knowledge::update_document_status_with_error(
-                        &db, &doc.id, "failed", Some(&err_msg),
+                        &db,
+                        &doc.id,
+                        "failed",
+                        Some(&err_msg),
                     )
                     .await;
                     let _ = app.emit(
@@ -352,9 +365,12 @@ pub async fn clear_knowledge_index(
         .map_err(|e| e.to_string())?;
 
     for doc in docs {
-        let _ =
-            frogclaw_core::repo::knowledge::update_document_status(&state.sea_db, &doc.id, "pending")
-                .await;
+        let _ = frogclaw_core::repo::knowledge::update_document_status(
+            &state.sea_db,
+            &doc.id,
+            "pending",
+        )
+        .await;
     }
 
     Ok(())
@@ -436,8 +452,15 @@ pub async fn add_knowledge_chunk(
         )
         .await?;
 
-        let embedding = embed_response.embeddings.into_iter().next()
-            .ok_or_else(|| frogclaw_core::error::FrogClawClientError::Provider("No embedding returned".to_string()))?;
+        let embedding = embed_response
+            .embeddings
+            .into_iter()
+            .next()
+            .ok_or_else(|| {
+                frogclaw_core::error::FrogClawClientError::Provider(
+                    "No embedding returned".to_string(),
+                )
+            })?;
 
         let chunk_id = vector_store
             .add_single_chunk(&collection_id, &doc_id, &chunk_content, &embedding)
@@ -479,7 +502,7 @@ pub async fn reindex_knowledge_chunk(
     let collection_id = format!("kb_{}", base_id);
 
     let chunk_content = {
-        use sea_orm::{ConnectionTrait, Statement, DbBackend};
+        use sea_orm::{ConnectionTrait, DbBackend, Statement};
         let name = format!("vec_kb_{}", base_id.replace('-', "_"));
         let row = state
             .sea_db
@@ -568,7 +591,9 @@ pub async fn rebuild_knowledge_document(
 
     // Set document status to "indexing"
     let _ = frogclaw_core::repo::knowledge::update_document_status(
-        &state.sea_db, &document_id, "indexing",
+        &state.sea_db,
+        &document_id,
+        "indexing",
     )
     .await;
 
@@ -579,7 +604,10 @@ pub async fn rebuild_knowledge_document(
     let doc_id = document_id.clone();
 
     tokio::spawn(async move {
-        let texts: Vec<String> = chunks.iter().map(|(_, _, content)| content.clone()).collect();
+        let texts: Vec<String> = chunks
+            .iter()
+            .map(|(_, _, content)| content.clone())
+            .collect();
         let rowids: Vec<i64> = chunks.iter().map(|(rid, _, _)| *rid).collect();
 
         let result = crate::indexing::generate_embeddings(&db, &master_key, &ep, texts, None).await;
@@ -596,9 +624,16 @@ pub async fn rebuild_knowledge_document(
                     .await
                 {
                     let err_msg = e.to_string();
-                    tracing::error!("Failed to upsert embeddings for doc {}: {}", doc_id, err_msg);
+                    tracing::error!(
+                        "Failed to upsert embeddings for doc {}: {}",
+                        doc_id,
+                        err_msg
+                    );
                     let _ = frogclaw_core::repo::knowledge::update_document_status_with_error(
-                        &db, &doc_id, "failed", Some(&err_msg),
+                        &db,
+                        &doc_id,
+                        "failed",
+                        Some(&err_msg),
                     )
                     .await;
                     let _ = app.emit(
@@ -627,7 +662,10 @@ pub async fn rebuild_knowledge_document(
                 let err_msg = e.to_string();
                 tracing::error!("Failed to embed doc {}: {}", doc_id, err_msg);
                 let _ = frogclaw_core::repo::knowledge::update_document_status_with_error(
-                    &db, &doc_id, "failed", Some(&err_msg),
+                    &db,
+                    &doc_id,
+                    "failed",
+                    Some(&err_msg),
                 )
                 .await;
                 let _ = app.emit(

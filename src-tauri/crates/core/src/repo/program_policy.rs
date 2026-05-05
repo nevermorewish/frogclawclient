@@ -75,7 +75,10 @@ pub async fn delete_program_policy(db: &DatabaseConnection, id: &str) -> Result<
     let result = program_policies::Entity::delete_by_id(id).exec(db).await?;
 
     if result.rows_affected == 0 {
-        return Err(FrogClawClientError::NotFound(format!("ProgramPolicy {}", id)));
+        return Err(FrogClawClientError::NotFound(format!(
+            "ProgramPolicy {}",
+            id
+        )));
     }
 
     Ok(())

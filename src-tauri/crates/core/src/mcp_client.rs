@@ -461,7 +461,9 @@ async fn sse_send_request(sse_url: &str, request: Value) -> Result<Value> {
         let chunk = byte_stream
             .next()
             .await
-            .ok_or_else(|| FrogClawClientError::Gateway("SSE stream ended before endpoint event".into()))?
+            .ok_or_else(|| {
+                FrogClawClientError::Gateway("SSE stream ended before endpoint event".into())
+            })?
             .map_err(|e| FrogClawClientError::Gateway(format!("SSE read error: {}", e)))?;
         let text = String::from_utf8_lossy(&chunk)
             .replace("\r\n", "\n")
@@ -587,13 +589,22 @@ where
 
         let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
         match tokio::time::timeout(remaining, stream.next()).await {
-            Err(_) => return Err(FrogClawClientError::Gateway("SSE response timed out".into())),
+            Err(_) => {
+                return Err(FrogClawClientError::Gateway(
+                    "SSE response timed out".into(),
+                ))
+            }
             Ok(None) => {
                 return Err(FrogClawClientError::Gateway(
                     "SSE stream ended before response".into(),
                 ))
             }
-            Ok(Some(Err(e))) => return Err(FrogClawClientError::Gateway(format!("SSE read error: {}", e))),
+            Ok(Some(Err(e))) => {
+                return Err(FrogClawClientError::Gateway(format!(
+                    "SSE read error: {}",
+                    e
+                )))
+            }
             Ok(Some(Ok(chunk))) => {
                 let text = String::from_utf8_lossy(chunk.as_ref())
                     .replace("\r\n", "\n")

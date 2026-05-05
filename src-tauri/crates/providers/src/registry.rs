@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use crate::ProviderAdapter;
 use crate::anthropic::AnthropicAdapter;
 use crate::cohere::CohereAdapter;
 use crate::gemini::GeminiAdapter;
@@ -8,6 +7,7 @@ use crate::jina::JinaAdapter;
 use crate::openai::OpenAIAdapter;
 use crate::openai_responses::OpenAIResponsesAdapter;
 use crate::voyage::VoyageAdapter;
+use crate::ProviderAdapter;
 
 pub struct ProviderRegistry {
     adapters: HashMap<String, Box<dyn ProviderAdapter>>,

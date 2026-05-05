@@ -113,7 +113,10 @@ pub async fn delete_search_provider(db: &DatabaseConnection, id: &str) -> Result
     let result = search_providers::Entity::delete_by_id(id).exec(db).await?;
 
     if result.rows_affected == 0 {
-        return Err(FrogClawClientError::NotFound(format!("SearchProvider {}", id)));
+        return Err(FrogClawClientError::NotFound(format!(
+            "SearchProvider {}",
+            id
+        )));
     }
     Ok(())
 }

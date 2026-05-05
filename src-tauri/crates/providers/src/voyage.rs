@@ -1,11 +1,11 @@
+use async_trait::async_trait;
 use frogclaw_core::error::{FrogClawClientError, Result};
 use frogclaw_core::types::*;
-use async_trait::async_trait;
-use futures::{Stream, stream};
+use futures::{stream, Stream};
 use serde::Deserialize;
 use std::pin::Pin;
 
-use crate::{ProviderAdapter, ProviderRequestContext, build_http_client};
+use crate::{build_http_client, ProviderAdapter, ProviderRequestContext};
 
 const DEFAULT_BASE_URL: &str = "https://api.voyageai.com/v1";
 

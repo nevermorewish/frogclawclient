@@ -39,7 +39,11 @@ fn model_to_item(m: memory_items::Model) -> MemoryItem {
 }
 
 fn normalize_project_path(project_path: &str) -> String {
-    project_path.trim().replace('\\', "/").trim_end_matches('/').to_string()
+    project_path
+        .trim()
+        .replace('\\', "/")
+        .trim_end_matches('/')
+        .to_string()
 }
 
 fn project_namespace_id(project_path: &str) -> String {
@@ -93,8 +97,8 @@ async fn count_items_by_status(
     namespace_id: &str,
     status: Option<&str>,
 ) -> Result<i64> {
-    let mut query = memory_items::Entity::find()
-        .filter(memory_items::Column::NamespaceId.eq(namespace_id));
+    let mut query =
+        memory_items::Entity::find().filter(memory_items::Column::NamespaceId.eq(namespace_id));
     if let Some(status) = status {
         query = query.filter(memory_items::Column::IndexStatus.eq(status));
     }
@@ -164,7 +168,8 @@ pub async fn ensure_project_profile(
     let ns = if let Some(model) = existing {
         let mut ns = model_to_namespace(model);
         if ns.embedding_provider.is_none() {
-            if let Some(default_embedding_provider) = default_project_embedding_provider(db).await? {
+            if let Some(default_embedding_provider) = default_project_embedding_provider(db).await?
+            {
                 ns = update_namespace(
                     db,
                     &namespace_id,
@@ -242,7 +247,11 @@ pub async fn list_project_profiles(
     for (path, name) in projects {
         out.push(ensure_project_profile(db, &path, Some(&name)).await?);
     }
-    out.sort_by(|a, b| a.project_name.to_lowercase().cmp(&b.project_name.to_lowercase()));
+    out.sort_by(|a, b| {
+        a.project_name
+            .to_lowercase()
+            .cmp(&b.project_name.to_lowercase())
+    });
     Ok(out)
 }
 
@@ -302,7 +311,10 @@ pub async fn delete_namespace(db: &DatabaseConnection, id: &str) -> Result<()> {
     let result = memory_namespaces::Entity::delete_by_id(id).exec(db).await?;
 
     if result.rows_affected == 0 {
-        return Err(FrogClawClientError::NotFound(format!("MemoryNamespace {}", id)));
+        return Err(FrogClawClientError::NotFound(format!(
+            "MemoryNamespace {}",
+            id
+        )));
     }
     Ok(())
 }

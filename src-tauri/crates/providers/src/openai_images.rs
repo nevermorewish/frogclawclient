@@ -1,5 +1,5 @@
-use frogclaw_core::error::{FrogClawClientError, Result};
 use base64::Engine;
+use frogclaw_core::error::{FrogClawClientError, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -119,7 +119,9 @@ impl OpenAIImagesClient {
         let response = apply_request_headers(builder, ctx)
             .send()
             .await
-            .map_err(|e| FrogClawClientError::Provider(format!("Image generation failed: {}", e)))?;
+            .map_err(|e| {
+                FrogClawClientError::Provider(format!("Image generation failed: {}", e))
+            })?;
         parse_response(response).await
     }
 
@@ -147,14 +149,18 @@ impl OpenAIImagesClient {
             let part = reqwest::multipart::Part::bytes(image.bytes)
                 .file_name(image.file_name)
                 .mime_str(&image.mime_type)
-                .map_err(|e| FrogClawClientError::Provider(format!("Invalid image MIME type: {}", e)))?;
+                .map_err(|e| {
+                    FrogClawClientError::Provider(format!("Invalid image MIME type: {}", e))
+                })?;
             form = form.part("image[]", part);
         }
         if let Some(mask) = request.mask {
             let part = reqwest::multipart::Part::bytes(mask.bytes)
                 .file_name(mask.file_name)
                 .mime_str(&mask.mime_type)
-                .map_err(|e| FrogClawClientError::Provider(format!("Invalid mask MIME type: {}", e)))?;
+                .map_err(|e| {
+                    FrogClawClientError::Provider(format!("Invalid mask MIME type: {}", e))
+                })?;
             form = form.part("mask", part);
         }
 
@@ -186,9 +192,9 @@ async fn parse_response(response: reqwest::Response) -> Result<ImageApiOutput> {
 
     let mut images = Vec::with_capacity(body.data.len());
     for item in body.data {
-        let encoded = item
-            .b64_json
-            .ok_or_else(|| FrogClawClientError::Provider("Image API response missing b64_json".into()))?;
+        let encoded = item.b64_json.ok_or_else(|| {
+            FrogClawClientError::Provider("Image API response missing b64_json".into())
+        })?;
         let bytes = base64::engine::general_purpose::STANDARD
             .decode(encoded)
             .map_err(|e| FrogClawClientError::Provider(format!("Invalid image b64_json: {}", e)))?;

@@ -1,9 +1,9 @@
 use crate::AppState;
+use base64::Engine;
 use frogclaw_core::types::*;
 use frogclaw_providers::{
     registry::ProviderRegistry, resolve_base_url_for_type, ProviderAdapter, ProviderRequestContext,
 };
-use base64::Engine;
 use sea_orm::*;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -37,14 +37,17 @@ async fn resolve_auto_memory_summary_runtime(
     fallback_ctx: &ProviderRequestContext,
     fallback_model_id: &str,
 ) -> Option<(ProviderConfig, ProviderRequestContext, String)> {
-    let providers = frogclaw_core::repo::provider::list_providers(db).await.ok()?;
+    let providers = frogclaw_core::repo::provider::list_providers(db)
+        .await
+        .ok()?;
     let preferred = providers.iter().find_map(|provider| {
         if !provider.enabled {
             return None;
         }
-        let model = provider.models.iter().find(|model| {
-            model.enabled && model.model_id.eq_ignore_ascii_case("gpt-5.5")
-        })?;
+        let model = provider
+            .models
+            .iter()
+            .find(|model| model.enabled && model.model_id.eq_ignore_ascii_case("gpt-5.5"))?;
         Some((provider.clone(), model.model_id.clone()))
     });
 
@@ -59,7 +62,10 @@ async fn resolve_auto_memory_summary_runtime(
     let key_row = match frogclaw_core::repo::provider::get_active_key(db, &provider.id).await {
         Ok(key) => key,
         Err(err) => {
-            tracing::warn!("[project-memory] gpt-5.5 provider has no active key: {}", err);
+            tracing::warn!(
+                "[project-memory] gpt-5.5 provider has no active key: {}",
+                err
+            );
             return Some((
                 fallback_provider.clone(),
                 fallback_ctx.clone(),
@@ -67,7 +73,8 @@ async fn resolve_auto_memory_summary_runtime(
             ));
         }
     };
-    let decrypted_key = match frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, master_key) {
+    let decrypted_key = match frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, master_key)
+    {
         Ok(key) => key,
         Err(err) => {
             tracing::warn!("[project-memory] gpt-5.5 key decrypt failed: {}", err);
@@ -152,24 +159,26 @@ pub(crate) async fn auto_capture_project_memory(
         assistant_content.chars().take(6000).collect::<String>(),
     );
 
-    let Some((summary_provider, summary_ctx, summary_model_id)) = resolve_auto_memory_summary_runtime(
-        db,
-        master_key,
-        fallback_provider,
-        fallback_ctx,
-        fallback_model_id,
-    )
-    .await
+    let Some((summary_provider, summary_ctx, summary_model_id)) =
+        resolve_auto_memory_summary_runtime(
+            db,
+            master_key,
+            fallback_provider,
+            fallback_ctx,
+            fallback_model_id,
+        )
+        .await
     else {
         return;
     };
     let registry = ProviderRegistry::create_default();
-    let registry_key = provider_type_to_registry_key_for_model(
-        &summary_provider.provider_type,
-        &summary_model_id,
-    );
+    let registry_key =
+        provider_type_to_registry_key_for_model(&summary_provider.provider_type, &summary_model_id);
     let Some(summary_adapter) = registry.get(registry_key) else {
-        tracing::warn!("[project-memory] unsupported summary provider type: {}", registry_key);
+        tracing::warn!(
+            "[project-memory] unsupported summary provider type: {}",
+            registry_key
+        );
         return;
     };
 
@@ -178,9 +187,7 @@ pub(crate) async fn auto_capture_project_memory(
         messages: vec![
             ChatMessage {
                 role: "system".to_string(),
-                content: ChatContent::Text(
-                    "你是项目记忆抽取器。你只输出 JSON 数组。".to_string(),
-                ),
+                content: ChatContent::Text("你是项目记忆抽取器。你只输出 JSON 数组。".to_string()),
                 tool_calls: None,
                 tool_call_id: None,
             },
@@ -244,10 +251,7 @@ pub(crate) async fn auto_capture_project_memory(
 
         if let Some(ref embedding_provider) = embedding_provider {
             let _ = frogclaw_core::repo::memory::update_item_index_status(
-                db,
-                &item.id,
-                "indexing",
-                None,
+                db, &item.id, "indexing", None,
             )
             .await;
             let result = crate::indexing::index_memory_item(
@@ -1589,9 +1593,10 @@ pub async fn regenerate_conversation_title(
 
         match ai_title {
             Ok(title) => {
-                if let Err(e) =
-                    frogclaw_core::repo::conversation::update_conversation_title(&db, &conv_id, &title)
-                        .await
+                if let Err(e) = frogclaw_core::repo::conversation::update_conversation_title(
+                    &db, &conv_id, &title,
+                )
+                .await
                 {
                     tracing::error!("Failed to save regenerated title: {}", e);
                     let _ = app_clone.emit(
@@ -1726,7 +1731,8 @@ fn spawn_stream_task(
             force_max_tokens,
         );
         let registry = ProviderRegistry::create_default();
-        let registry_key = provider_type_to_registry_key_for_model(&provider.provider_type, &model_id);
+        let registry_key =
+            provider_type_to_registry_key_for_model(&provider.provider_type, &model_id);
         let adapter: &dyn frogclaw_providers::ProviderAdapter = match registry.get(registry_key) {
             Some(a) => a,
             None => {
@@ -1941,16 +1947,17 @@ fn spawn_stream_task(
                 );
 
                 // Create execution record
-                let server_id_for_exec = match frogclaw_core::repo::mcp_server::find_server_for_tool(
-                    &db,
-                    &tc.function.name,
-                    &mcp_server_ids,
-                )
-                .await
-                {
-                    Ok(Some((srv, _))) => srv.id.clone(),
-                    _ => String::new(),
-                };
+                let server_id_for_exec =
+                    match frogclaw_core::repo::mcp_server::find_server_for_tool(
+                        &db,
+                        &tc.function.name,
+                        &mcp_server_ids,
+                    )
+                    .await
+                    {
+                        Ok(Some((srv, _))) => srv.id.clone(),
+                        _ => String::new(),
+                    };
                 let exec = frogclaw_core::repo::tool_execution::create_tool_execution(
                     &db,
                     &conversation_id,
@@ -2257,8 +2264,9 @@ pub async fn send_message(
         frogclaw_core::repo::provider::get_active_key(&state.sea_db, &conversation.provider_id)
             .await
             .map_err(|e| e.to_string())?;
-    let decrypted_key = frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
-        .map_err(|e| e.to_string())?;
+    let decrypted_key =
+        frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
+            .map_err(|e| e.to_string())?;
 
     // Get model info for param overrides and token budget
     let resolved_model = frogclaw_core::repo::provider::get_model(
@@ -2511,7 +2519,8 @@ pub async fn send_message(
         let mut all_tools = Vec::new();
         for server_id in &mcp_ids {
             if let Ok(descriptors) =
-                frogclaw_core::repo::mcp_server::list_tools_for_server(&state.sea_db, server_id).await
+                frogclaw_core::repo::mcp_server::list_tools_for_server(&state.sea_db, server_id)
+                    .await
             {
                 for td in descriptors {
                     let parameters: Option<serde_json::Value> = td
@@ -2675,8 +2684,9 @@ pub async fn regenerate_message(
         frogclaw_core::repo::provider::get_active_key(&state.sea_db, &conversation.provider_id)
             .await
             .map_err(|e| e.to_string())?;
-    let decrypted_key = frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
-        .map_err(|e| e.to_string())?;
+    let decrypted_key =
+        frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
+            .map_err(|e| e.to_string())?;
 
     // 6. Rebuild chat messages (active messages only — old inactive versions excluded)
     let remaining_messages =
@@ -2809,7 +2819,8 @@ pub async fn regenerate_message(
         let mut all_tools = Vec::new();
         for server_id in &mcp_ids {
             if let Ok(descriptors) =
-                frogclaw_core::repo::mcp_server::list_tools_for_server(&state.sea_db, server_id).await
+                frogclaw_core::repo::mcp_server::list_tools_for_server(&state.sea_db, server_id)
+                    .await
             {
                 for td in descriptors {
                     let parameters: Option<serde_json::Value> = td
@@ -2976,8 +2987,9 @@ pub async fn regenerate_with_model(
     let key_row = frogclaw_core::repo::provider::get_active_key(&state.sea_db, &target_provider_id)
         .await
         .map_err(|e| e.to_string())?;
-    let decrypted_key = frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
-        .map_err(|e| e.to_string())?;
+    let decrypted_key =
+        frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
+            .map_err(|e| e.to_string())?;
 
     // Build context messages (same logic as regenerate_message)
     let remaining_messages =
@@ -3114,7 +3126,8 @@ pub async fn regenerate_with_model(
         let mut all_tools = Vec::new();
         for server_id in &mcp_ids {
             if let Ok(descriptors) =
-                frogclaw_core::repo::mcp_server::list_tools_for_server(&state.sea_db, server_id).await
+                frogclaw_core::repo::mcp_server::list_tools_for_server(&state.sea_db, server_id)
+                    .await
             {
                 for td in descriptors {
                     let parameters: Option<serde_json::Value> = td
@@ -3294,9 +3307,10 @@ pub async fn delete_message_group(
     conversation_id: String,
     user_message_id: String,
 ) -> Result<(), String> {
-    let deleted = frogclaw_core::repo::message::delete_message_group(&state.sea_db, &user_message_id)
-        .await
-        .map_err(|e| e.to_string())?;
+    let deleted =
+        frogclaw_core::repo::message::delete_message_group(&state.sea_db, &user_message_id)
+            .await
+            .map_err(|e| e.to_string())?;
     // Decrement message count by deleted count
     for _ in 0..deleted {
         frogclaw_core::repo::conversation::decrement_message_count(&state.sea_db, &conversation_id)
@@ -3429,7 +3443,8 @@ async fn do_compress(
     };
 
     let registry = ProviderRegistry::create_default();
-    let registry_key = provider_type_to_registry_key_for_model(&comp_provider.provider_type, &comp_model_id);
+    let registry_key =
+        provider_type_to_registry_key_for_model(&comp_provider.provider_type, &comp_model_id);
     let adapter = registry
         .get(registry_key)
         .ok_or_else(|| "Provider adapter not found".to_string())?;
@@ -3482,8 +3497,9 @@ pub async fn compress_context(
         .keys
         .first()
         .ok_or_else(|| "No API key configured".to_string())?;
-    let decrypted_key = frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
-        .map_err(|e| e.to_string())?;
+    let decrypted_key =
+        frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
+            .map_err(|e| e.to_string())?;
 
     let global_settings = frogclaw_core::repo::settings::get_settings(&state.sea_db)
         .await
@@ -3804,8 +3820,10 @@ mod tests {
 
     #[test]
     fn build_message_content_turns_images_into_multipart_data_urls() {
-        let temp_dir =
-            std::env::temp_dir().join(format!("frogclaw-vision-test-{}", frogclaw_core::utils::gen_id()));
+        let temp_dir = std::env::temp_dir().join(format!(
+            "frogclaw-vision-test-{}",
+            frogclaw_core::utils::gen_id()
+        ));
         fs::create_dir_all(&temp_dir).unwrap();
 
         let result = (|| {
@@ -3863,8 +3881,10 @@ mod tests {
 
     #[test]
     fn build_message_content_uses_inline_attachment_data_when_file_path_is_missing() {
-        let temp_dir =
-            std::env::temp_dir().join(format!("frogclaw-vision-test-{}", frogclaw_core::utils::gen_id()));
+        let temp_dir = std::env::temp_dir().join(format!(
+            "frogclaw-vision-test-{}",
+            frogclaw_core::utils::gen_id()
+        ));
         fs::create_dir_all(&temp_dir).unwrap();
 
         let result = (|| {
@@ -3970,10 +3990,13 @@ mod tests {
             "conversation must be deleted"
         );
         assert!(
-            frogclaw_core::repo::stored_file::list_stored_files_by_conversation(&db, &conversation.id)
-                .await
-                .unwrap()
-                .is_empty(),
+            frogclaw_core::repo::stored_file::list_stored_files_by_conversation(
+                &db,
+                &conversation.id
+            )
+            .await
+            .unwrap()
+            .is_empty(),
             "conversation attachments must be removed from the database"
         );
         assert!(

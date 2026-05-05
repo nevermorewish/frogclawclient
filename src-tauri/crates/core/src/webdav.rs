@@ -50,7 +50,9 @@ impl WebDavClient {
             .danger_accept_invalid_certs(config.accept_invalid_certs)
             .timeout(std::time::Duration::from_secs(300))
             .build()
-            .map_err(|e| FrogClawClientError::Gateway(format!("Failed to create HTTP client: {}", e)))?;
+            .map_err(|e| {
+                FrogClawClientError::Gateway(format!("Failed to create HTTP client: {}", e))
+            })?;
         Ok(Self { client, config })
     }
 
@@ -81,7 +83,9 @@ impl WebDavClient {
             .header("Depth", "0")
             .send()
             .await
-            .map_err(|e| FrogClawClientError::Gateway(format!("WebDAV connection failed: {}", e)))?;
+            .map_err(|e| {
+                FrogClawClientError::Gateway(format!("WebDAV connection failed: {}", e))
+            })?;
 
         match response.status() {
             StatusCode::MULTI_STATUS | StatusCode::OK => Ok(true),
@@ -170,7 +174,9 @@ impl WebDavClient {
                     .body(body)
                     .send()
                     .await
-                    .map_err(|e| FrogClawClientError::Gateway(format!("WebDAV PROPFIND failed: {}", e)))?;
+                    .map_err(|e| {
+                        FrogClawClientError::Gateway(format!("WebDAV PROPFIND failed: {}", e))
+                    })?;
 
                 if response.status() != StatusCode::MULTI_STATUS && !response.status().is_success()
                 {
@@ -180,10 +186,9 @@ impl WebDavClient {
                     )));
                 }
 
-                let text = response
-                    .text()
-                    .await
-                    .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read response: {}", e)))?;
+                let text = response.text().await.map_err(|e| {
+                    FrogClawClientError::Gateway(format!("Failed to read response: {}", e))
+                })?;
 
                 parse_propfind_response(&text)
             },
@@ -196,8 +201,9 @@ impl WebDavClient {
         run_after_directory_ready(
             || self.check_connection(),
             || async {
-                let data = std::fs::read(local_path)
-                    .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read file: {}", e)))?;
+                let data = std::fs::read(local_path).map_err(|e| {
+                    FrogClawClientError::Gateway(format!("Failed to read file: {}", e))
+                })?;
                 let url = self.file_url(filename);
 
                 let response = self
@@ -208,7 +214,9 @@ impl WebDavClient {
                     .body(data)
                     .send()
                     .await
-                    .map_err(|e| FrogClawClientError::Gateway(format!("WebDAV upload failed: {}", e)))?;
+                    .map_err(|e| {
+                        FrogClawClientError::Gateway(format!("WebDAV upload failed: {}", e))
+                    })?;
 
                 match response.status() {
                     StatusCode::CREATED | StatusCode::OK | StatusCode::NO_CONTENT => Ok(()),
@@ -324,8 +332,9 @@ pub fn create_backup_zip(
     // Optional: master.key for cross-device restore
     if let Some(key_path) = master_key_path {
         if key_path.exists() {
-            let key_data = std::fs::read(key_path)
-                .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read master.key: {}", e)))?;
+            let key_data = std::fs::read(key_path).map_err(|e| {
+                FrogClawClientError::Gateway(format!("Failed to read master.key: {}", e))
+            })?;
             zip.start_file("master.key", options)
                 .map_err(|e| FrogClawClientError::Gateway(format!("ZIP error: {}", e)))?;
             zip.write_all(&key_data)
@@ -380,26 +389,31 @@ pub fn extract_backup_zip(zip_path: &Path, dest_dir: &Path) -> Result<BackupZipC
 
         if name == "frogclaw.db" {
             let path = dest_dir.join("frogclaw.db");
-            let mut outfile = std::fs::File::create(&path)
-                .map_err(|e| FrogClawClientError::Gateway(format!("Failed to extract db: {}", e)))?;
-            std::io::copy(&mut entry, &mut outfile)
-                .map_err(|e| FrogClawClientError::Gateway(format!("Failed to extract db: {}", e)))?;
+            let mut outfile = std::fs::File::create(&path).map_err(|e| {
+                FrogClawClientError::Gateway(format!("Failed to extract db: {}", e))
+            })?;
+            std::io::copy(&mut entry, &mut outfile).map_err(|e| {
+                FrogClawClientError::Gateway(format!("Failed to extract db: {}", e))
+            })?;
             db_path = Some(path);
         } else if name == "metadata.json" {
             let mut contents = String::new();
-            entry
-                .read_to_string(&mut contents)
-                .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read metadata: {}", e)))?;
+            entry.read_to_string(&mut contents).map_err(|e| {
+                FrogClawClientError::Gateway(format!("Failed to read metadata: {}", e))
+            })?;
             metadata = Some(
-                serde_json::from_str::<serde_json::Value>(&contents)
-                    .map_err(|e| FrogClawClientError::Gateway(format!("Invalid metadata JSON: {}", e)))?,
+                serde_json::from_str::<serde_json::Value>(&contents).map_err(|e| {
+                    FrogClawClientError::Gateway(format!("Invalid metadata JSON: {}", e))
+                })?,
             );
         } else if name == "master.key" {
             let path = dest_dir.join("master.key");
-            let mut outfile = std::fs::File::create(&path)
-                .map_err(|e| FrogClawClientError::Gateway(format!("Failed to extract master.key: {}", e)))?;
-            std::io::copy(&mut entry, &mut outfile)
-                .map_err(|e| FrogClawClientError::Gateway(format!("Failed to extract master.key: {}", e)))?;
+            let mut outfile = std::fs::File::create(&path).map_err(|e| {
+                FrogClawClientError::Gateway(format!("Failed to extract master.key: {}", e))
+            })?;
+            std::io::copy(&mut entry, &mut outfile).map_err(|e| {
+                FrogClawClientError::Gateway(format!("Failed to extract master.key: {}", e))
+            })?;
             master_key_path = Some(path);
         } else if name.starts_with("documents/") && !entry.is_dir() {
             has_documents = true;
@@ -407,25 +421,30 @@ pub fn extract_backup_zip(zip_path: &Path, dest_dir: &Path) -> Result<BackupZipC
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent).ok();
             }
-            let mut outfile = std::fs::File::create(&path)
-                .map_err(|e| FrogClawClientError::Gateway(format!("Failed to extract file: {}", e)))?;
-            std::io::copy(&mut entry, &mut outfile)
-                .map_err(|e| FrogClawClientError::Gateway(format!("Failed to extract file: {}", e)))?;
+            let mut outfile = std::fs::File::create(&path).map_err(|e| {
+                FrogClawClientError::Gateway(format!("Failed to extract file: {}", e))
+            })?;
+            std::io::copy(&mut entry, &mut outfile).map_err(|e| {
+                FrogClawClientError::Gateway(format!("Failed to extract file: {}", e))
+            })?;
         } else if name.starts_with("workspace/") && !entry.is_dir() {
             has_workspace = true;
             let path = dest_dir.join(&name);
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent).ok();
             }
-            let mut outfile = std::fs::File::create(&path)
-                .map_err(|e| FrogClawClientError::Gateway(format!("Failed to extract file: {}", e)))?;
-            std::io::copy(&mut entry, &mut outfile)
-                .map_err(|e| FrogClawClientError::Gateway(format!("Failed to extract file: {}", e)))?;
+            let mut outfile = std::fs::File::create(&path).map_err(|e| {
+                FrogClawClientError::Gateway(format!("Failed to extract file: {}", e))
+            })?;
+            std::io::copy(&mut entry, &mut outfile).map_err(|e| {
+                FrogClawClientError::Gateway(format!("Failed to extract file: {}", e))
+            })?;
         }
     }
 
     Ok(BackupZipContents {
-        db_path: db_path.ok_or_else(|| FrogClawClientError::Gateway("No frogclaw.db in backup ZIP".into()))?,
+        db_path: db_path
+            .ok_or_else(|| FrogClawClientError::Gateway("No frogclaw.db in backup ZIP".into()))?,
         metadata: metadata
             .ok_or_else(|| FrogClawClientError::Gateway("No metadata.json in backup ZIP".into()))?,
         has_documents,
@@ -436,8 +455,9 @@ pub fn extract_backup_zip(zip_path: &Path, dest_dir: &Path) -> Result<BackupZipC
 
 /// Verify the checksum of an extracted database against metadata.
 pub fn verify_db_checksum(db_path: &Path, expected_checksum: &str) -> Result<bool> {
-    let data = std::fs::read(db_path)
-        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read db for checksum: {}", e)))?;
+    let data = std::fs::read(db_path).map_err(|e| {
+        FrogClawClientError::Gateway(format!("Failed to read db for checksum: {}", e))
+    })?;
     let actual = format!("{:x}", Sha256::digest(&data));
     Ok(actual == expected_checksum)
 }
@@ -528,7 +548,8 @@ fn collect_files(dir: &Path, files: &mut Vec<std::path::PathBuf>) -> Result<()> 
     for entry in std::fs::read_dir(dir)
         .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read directory: {}", e)))?
     {
-        let entry = entry.map_err(|e| FrogClawClientError::Gateway(format!("Dir entry error: {}", e)))?;
+        let entry =
+            entry.map_err(|e| FrogClawClientError::Gateway(format!("Dir entry error: {}", e)))?;
         let path = entry.path();
         if path.is_dir() {
             collect_files(&path, files)?;
