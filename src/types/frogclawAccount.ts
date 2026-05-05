@@ -85,6 +85,17 @@ export interface FrogclawLoginSession {
   system_providers: FrogclawSystemProvider[];
   pricing_models: FrogclawPricingModel[];
   pricing_vendors: FrogclawPricingVendor[];
+  search_provider: FrogclawSearchProviderConfig | null;
+}
+
+export interface FrogclawSearchProviderConfig {
+  enabled: boolean;
+  name: string;
+  provider_type: string;
+  endpoint: string;
+  api_key: string;
+  result_limit: number;
+  timeout_ms: number;
 }
 
 export interface FrogclawConfiguredProvider {
@@ -99,8 +110,16 @@ export interface FrogclawConfiguredProvider {
   updated_key: boolean;
 }
 
+export interface FrogclawConfiguredSearchProvider {
+  provider_id: string;
+  name: string;
+  provider_type: string;
+  created_provider: boolean;
+}
+
 export interface FrogclawConfigureResult {
   session: FrogclawLoginSession;
   configured_providers: FrogclawConfiguredProvider[];
+  configured_search_provider: FrogclawConfiguredSearchProvider | null;
   selected_token_id: number | null;
 }

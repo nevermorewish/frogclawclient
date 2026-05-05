@@ -2,7 +2,8 @@ use crate::frogclaw_config::FROGCLAW_BASE_URL;
 use crate::AppState;
 use frogclaw_core::crypto::encrypt_key;
 use frogclaw_core::types::{
-    CreateProviderInput, Model, ModelCapability, ModelType, ProviderType, UpdateProviderInput,
+    CreateProviderInput, CreateSearchProviderInput, Model, ModelCapability, ModelType,
+    ProviderType, UpdateProviderInput,
 };
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -80,6 +81,7 @@ pub struct FrogclawLoginSession {
     pub system_providers: Vec<FrogclawSystemProvider>,
     pub pricing_models: Vec<FrogclawPricingModel>,
     pub pricing_vendors: Vec<FrogclawPricingVendor>,
+    pub search_provider: Option<FrogclawSearchProviderConfig>,
 }
 
 #[derive(Debug, Serialize)]
@@ -99,7 +101,27 @@ pub struct FrogclawConfiguredProvider {
 pub struct FrogclawConfigureResult {
     pub session: FrogclawLoginSession,
     pub configured_providers: Vec<FrogclawConfiguredProvider>,
+    pub configured_search_provider: Option<FrogclawConfiguredSearchProvider>,
     pub selected_token_id: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FrogclawSearchProviderConfig {
+    pub enabled: bool,
+    pub name: String,
+    pub provider_type: String,
+    pub endpoint: String,
+    pub api_key: String,
+    pub result_limit: i32,
+    pub timeout_ms: i32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FrogclawConfiguredSearchProvider {
+    pub provider_id: String,
+    pub name: String,
+    pub provider_type: String,
+    pub created_provider: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -134,7 +156,11 @@ fn account_log(event: &str, detail: &str) {
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
         use std::io::Write;
         let ts = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S%.3f");
         let _ = writeln!(f, "[{}] [{}] {}", ts, event, detail);
@@ -195,14 +221,17 @@ fn model_supports_provider(model: &FrogclawPricingModel, provider_type: &Provide
     if model.supported_endpoint_types.is_empty() {
         return true;
     }
-    model.supported_endpoint_types.iter().any(|endpoint| match provider_type {
-        ProviderType::Anthropic => endpoint == "anthropic",
-        ProviderType::Gemini => endpoint == "gemini",
-        ProviderType::OpenAI | ProviderType::OpenAIResponses => {
-            endpoint == "openai" || endpoint == "chat_completions" || endpoint == "responses"
-        }
-        _ => true,
-    })
+    model
+        .supported_endpoint_types
+        .iter()
+        .any(|endpoint| match provider_type {
+            ProviderType::Anthropic => endpoint == "anthropic",
+            ProviderType::Gemini => endpoint == "gemini",
+            ProviderType::OpenAI | ProviderType::OpenAIResponses => {
+                endpoint == "openai" || endpoint == "chat_completions" || endpoint == "responses"
+            }
+            _ => true,
+        })
 }
 
 fn model_name_matches_provider_family(model_name: &str, provider_type: &ProviderType) -> bool {
@@ -210,9 +239,8 @@ fn model_name_matches_provider_family(model_name: &str, provider_type: &Provider
     let is_claude = model.starts_with("claude-")
         || model.starts_with("anthropic/")
         || model.contains("/claude-");
-    let is_gemini = model.starts_with("gemini-")
-        || model.starts_with("google/")
-        || model.contains("/gemini-");
+    let is_gemini =
+        model.starts_with("gemini-") || model.starts_with("google/") || model.contains("/gemini-");
 
     match provider_type {
         ProviderType::Anthropic => !is_gemini && (is_claude || !is_openai_family_model(&model)),
@@ -241,7 +269,10 @@ fn capabilities_for_model(model_id: &str, provider_type: &ProviderType) -> Vec<M
     let lower = model_id.to_lowercase();
     if matches!(
         provider_type,
-        ProviderType::Anthropic | ProviderType::OpenAI | ProviderType::OpenAIResponses | ProviderType::Gemini
+        ProviderType::Anthropic
+            | ProviderType::OpenAI
+            | ProviderType::OpenAIResponses
+            | ProviderType::Gemini
     ) {
         capabilities.push(ModelCapability::Vision);
         capabilities.push(ModelCapability::FunctionCalling);
@@ -252,7 +283,10 @@ fn capabilities_for_model(model_id: &str, provider_type: &ProviderType) -> Vec<M
     capabilities
 }
 
-async fn login_and_client(username: &str, password: &str) -> Result<(Client, FrogclawUserData), String> {
+async fn login_and_client(
+    username: &str,
+    password: &str,
+) -> Result<(Client, FrogclawUserData), String> {
     let client = Client::builder()
         .timeout(Duration::from_secs(20))
         .cookie_store(true)
@@ -295,11 +329,12 @@ async fn fetch_tokens(client: &Client, user_id: i64) -> Vec<FrogclawToken> {
         .await
     {
         Ok(resp) if resp.status().is_success() => {
-            let result: FrogclawResponse<TokenListResponse> = resp.json().await.unwrap_or(FrogclawResponse {
-                success: false,
-                message: String::new(),
-                data: None,
-            });
+            let result: FrogclawResponse<TokenListResponse> =
+                resp.json().await.unwrap_or(FrogclawResponse {
+                    success: false,
+                    message: String::new(),
+                    data: None,
+                });
             if result.success {
                 result
                     .data
@@ -340,7 +375,10 @@ async fn fetch_system_providers(client: &Client, user_id: i64) -> Vec<FrogclawSy
     }
 }
 
-async fn fetch_pricing(client: &Client, user_id: i64) -> (Vec<FrogclawPricingModel>, Vec<FrogclawPricingVendor>) {
+async fn fetch_pricing(
+    client: &Client,
+    user_id: i64,
+) -> (Vec<FrogclawPricingModel>, Vec<FrogclawPricingVendor>) {
     match client
         .get(format!("{FROGCLAW_BASE_URL}/api/pricing"))
         .header("New-Api-User", user_id.to_string())
@@ -361,6 +399,30 @@ async fn fetch_pricing(client: &Client, user_id: i64) -> (Vec<FrogclawPricingMod
         }
         _ => (Vec::new(), Vec::new()),
     }
+}
+
+async fn fetch_search_provider(
+    client: &Client,
+    user_id: i64,
+) -> Option<FrogclawSearchProviderConfig> {
+    let resp = client
+        .get(format!(
+            "{FROGCLAW_BASE_URL}/api/frogclaw-client/search-provider"
+        ))
+        .header("New-Api-User", user_id.to_string())
+        .send()
+        .await
+        .ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let result: FrogclawResponse<FrogclawSearchProviderConfig> = resp.json().await.ok()?;
+    if !result.success {
+        return None;
+    }
+    result
+        .data
+        .filter(|cfg| cfg.enabled && !cfg.api_key.trim().is_empty())
 }
 
 async fn ensure_group_token(client: &Client, user_id: i64, group: &str) -> Result<(), String> {
@@ -389,10 +451,14 @@ async fn ensure_group_token(client: &Client, user_id: i64, group: &str) -> Resul
     Ok(())
 }
 
-async fn fetch_session_data(client: &Client, user: FrogclawUserData) -> Result<FrogclawLoginSession, String> {
+async fn fetch_session_data(
+    client: &Client,
+    user: FrogclawUserData,
+) -> Result<FrogclawLoginSession, String> {
     let tokens = fetch_tokens(client, user.id).await;
     let system_providers = fetch_system_providers(client, user.id).await;
     let (pricing_models, pricing_vendors) = fetch_pricing(client, user.id).await;
+    let search_provider = fetch_search_provider(client, user.id).await;
 
     Ok(FrogclawLoginSession {
         user,
@@ -400,16 +466,24 @@ async fn fetch_session_data(client: &Client, user: FrogclawUserData) -> Result<F
         system_providers,
         pricing_models,
         pricing_vendors,
+        search_provider,
     })
 }
 
-async fn ensure_required_token_groups(client: &Client, session: &FrogclawLoginSession) -> Result<bool, String> {
+async fn ensure_required_token_groups(
+    client: &Client,
+    session: &FrogclawLoginSession,
+) -> Result<bool, String> {
     let mut changed = false;
-    if session
-        .system_providers
+    if session.system_providers.iter().any(|sp| {
+        matches!(
+            sp.provider_key.as_str(),
+            "openai" | "codex" | "google" | "gemini"
+        )
+    }) && !session
+        .tokens
         .iter()
-        .any(|sp| matches!(sp.provider_key.as_str(), "openai" | "codex" | "google" | "gemini"))
-        && !session.tokens.iter().any(|t| token_matches_group(t, "default"))
+        .any(|t| token_matches_group(t, "default"))
     {
         ensure_group_token(client, session.user.id, "default").await?;
         changed = true;
@@ -418,7 +492,10 @@ async fn ensure_required_token_groups(client: &Client, session: &FrogclawLoginSe
         .system_providers
         .iter()
         .any(|sp| matches!(sp.provider_key.as_str(), "anthropic" | "claude"))
-        && !session.tokens.iter().any(|t| token_matches_group(t, "Claude Max"))
+        && !session
+            .tokens
+            .iter()
+            .any(|t| token_matches_group(t, "Claude Max"))
     {
         let _ = ensure_group_token(client, session.user.id, "Claude Max").await;
         changed = true;
@@ -426,10 +503,17 @@ async fn ensure_required_token_groups(client: &Client, session: &FrogclawLoginSe
     Ok(changed)
 }
 
-fn selected_token<'a>(tokens: &'a [FrogclawToken], selected_token_id: Option<i64>) -> Option<&'a FrogclawToken> {
+fn selected_token<'a>(
+    tokens: &'a [FrogclawToken],
+    selected_token_id: Option<i64>,
+) -> Option<&'a FrogclawToken> {
     selected_token_id
         .and_then(|id| tokens.iter().find(|token| token.id == id))
-        .or_else(|| tokens.iter().find(|token| token_matches_group(token, "default")))
+        .or_else(|| {
+            tokens
+                .iter()
+                .find(|token| token_matches_group(token, "default"))
+        })
         .or_else(|| tokens.first())
 }
 
@@ -450,10 +534,9 @@ async fn ensure_provider_with_token(
     let providers = frogclaw_core::repo::provider::list_providers(&state.sea_db)
         .await
         .map_err(|e| e.to_string())?;
-    let (provider, created_provider) = if let Some(provider) = providers
-        .into_iter()
-        .find(|p| p.provider_type == provider_type && p.api_host.trim_end_matches('/') == FROGCLAW_BASE_URL)
-    {
+    let (provider, created_provider) = if let Some(provider) = providers.into_iter().find(|p| {
+        p.provider_type == provider_type && p.api_host.trim_end_matches('/') == FROGCLAW_BASE_URL
+    }) {
         (provider, false)
     } else {
         (
@@ -479,9 +562,10 @@ async fn ensure_provider_with_token(
     update.provider_type = Some(provider_type);
     update.api_host = Some(FROGCLAW_BASE_URL.to_string());
     update.enabled = Some(true);
-    let provider = frogclaw_core::repo::provider::update_provider(&state.sea_db, &provider.id, update)
-        .await
-        .map_err(|e| e.to_string())?;
+    let provider =
+        frogclaw_core::repo::provider::update_provider(&state.sea_db, &provider.id, update)
+            .await
+            .map_err(|e| e.to_string())?;
 
     let encrypted = encrypt_key(raw_key, &state.master_key).map_err(|e| e.to_string())?;
     let prefix = key_prefix(raw_key);
@@ -489,16 +573,31 @@ async fn ensure_provider_with_token(
         .await
         .map_err(|e| e.to_string())?;
     if keys.is_empty() {
-        frogclaw_core::repo::provider::add_provider_key(&state.sea_db, &provider.id, &encrypted, &prefix)
-            .await
-            .map_err(|e| e.to_string())?;
+        frogclaw_core::repo::provider::add_provider_key(
+            &state.sea_db,
+            &provider.id,
+            &encrypted,
+            &prefix,
+        )
+        .await
+        .map_err(|e| e.to_string())?;
     } else {
         for key in keys {
-            frogclaw_core::repo::provider::update_provider_key(&state.sea_db, &key.id, &encrypted, &prefix)
-                .await
-                .map_err(|e| e.to_string())?;
+            frogclaw_core::repo::provider::update_provider_key(
+                &state.sea_db,
+                &key.id,
+                &encrypted,
+                &prefix,
+            )
+            .await
+            .map_err(|e| e.to_string())?;
             if !key.enabled {
-                let _ = frogclaw_core::repo::provider::toggle_provider_key(&state.sea_db, &key.id, true).await;
+                let _ = frogclaw_core::repo::provider::toggle_provider_key(
+                    &state.sea_db,
+                    &key.id,
+                    true,
+                )
+                .await;
             }
         }
     }
@@ -524,7 +623,8 @@ async fn configure_system_providers(
         };
         let provider_name = format!("{FROGCLAW_PROVIDER_PREFIX}{}", sp.name);
         let (provider_id, created_provider, updated_key) =
-            ensure_provider_with_token(state, &provider_name, provider_type.clone(), &api_key).await?;
+            ensure_provider_with_token(state, &provider_name, provider_type.clone(), &api_key)
+                .await?;
         let models: Vec<Model> = available_models
             .iter()
             .filter(|model| model_supports_provider(model, &provider_type))
@@ -574,7 +674,10 @@ async fn configure_system_providers(
                 name: model.model_name.clone(),
                 group_name: Some("FrogClaw".into()),
                 model_type: ModelType::detect(&model.model_name),
-                capabilities: capabilities_for_model(&model.model_name, &ProviderType::OpenAIResponses),
+                capabilities: capabilities_for_model(
+                    &model.model_name,
+                    &ProviderType::OpenAIResponses,
+                ),
                 max_tokens: None,
                 enabled: true,
                 param_overrides: None,
@@ -599,6 +702,65 @@ async fn configure_system_providers(
     Ok(configured)
 }
 
+async fn configure_search_provider(
+    state: &AppState,
+    config: Option<&FrogclawSearchProviderConfig>,
+) -> Result<Option<FrogclawConfiguredSearchProvider>, String> {
+    let Some(config) = config else {
+        return Ok(None);
+    };
+    let name = config.name.trim();
+    let provider_type = config.provider_type.trim();
+    let api_key = config.api_key.trim();
+    if name.is_empty() || provider_type.is_empty() || api_key.is_empty() {
+        return Ok(None);
+    }
+
+    let encrypted = encrypt_key(api_key, &state.master_key).map_err(|e| e.to_string())?;
+    let input = CreateSearchProviderInput {
+        name: name.to_string(),
+        provider_type: provider_type.to_string(),
+        endpoint: Some(config.endpoint.trim().to_string()).filter(|v| !v.is_empty()),
+        api_key: Some(encrypted),
+        enabled: Some(true),
+        region: None,
+        language: None,
+        safe_search: None,
+        result_limit: Some(config.result_limit.max(1)),
+        timeout_ms: Some(config.timeout_ms.max(1000)),
+    };
+
+    let providers = frogclaw_core::repo::search_provider::list_search_providers(&state.sea_db)
+        .await
+        .map_err(|e| e.to_string())?;
+    if let Some(existing) = providers.into_iter().find(|provider| provider.name == name) {
+        let provider = frogclaw_core::repo::search_provider::update_search_provider(
+            &state.sea_db,
+            &existing.id,
+            input,
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+        return Ok(Some(FrogclawConfiguredSearchProvider {
+            provider_id: provider.id,
+            name: provider.name,
+            provider_type: provider.provider_type,
+            created_provider: false,
+        }));
+    }
+
+    let provider =
+        frogclaw_core::repo::search_provider::create_search_provider(&state.sea_db, input)
+            .await
+            .map_err(|e| e.to_string())?;
+    Ok(Some(FrogclawConfiguredSearchProvider {
+        provider_id: provider.id,
+        name: provider.name,
+        provider_type: provider.provider_type,
+        created_provider: true,
+    }))
+}
+
 #[tauri::command]
 pub async fn fetch_and_configure_frogclaw(
     state: State<'_, AppState>,
@@ -608,7 +770,10 @@ pub async fn fetch_and_configure_frogclaw(
 ) -> Result<FrogclawConfigureResult, String> {
     let (client, user) = login_and_client(&username, &password).await?;
     let mut session = fetch_session_data(&client, user).await?;
-    if ensure_required_token_groups(&client, &session).await.unwrap_or(false) {
+    if ensure_required_token_groups(&client, &session)
+        .await
+        .unwrap_or(false)
+    {
         session = fetch_session_data(&client, session.user.clone()).await?;
     }
 
@@ -616,19 +781,23 @@ pub async fn fetch_and_configure_frogclaw(
     account_log(
         "login",
         &format!(
-            "user={} tokens={} system_providers={} pricing_models={} selected_token={:?}",
+            "user={} tokens={} system_providers={} pricing_models={} search_provider={} selected_token={:?}",
             session.user.username,
             session.tokens.len(),
             session.system_providers.len(),
             session.pricing_models.len(),
+            session.search_provider.is_some(),
             selected
         ),
     );
 
     let configured_providers = configure_system_providers(&state, &session, selected).await?;
+    let configured_search_provider =
+        configure_search_provider(&state, session.search_provider.as_ref()).await?;
     Ok(FrogclawConfigureResult {
         session,
         configured_providers,
+        configured_search_provider,
         selected_token_id: selected,
     })
 }
