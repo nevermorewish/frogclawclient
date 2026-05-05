@@ -1,6 +1,6 @@
 # Agent 双引擎架构设计
 
-本文设计 FrogClawClient 的 Agent 引擎架构：保留当前内置 `open-agent-sdk` Agent，同时新增 `Claude Code` 引擎，并预留 `Codex CLI`、`Gemini CLI` 等后续引擎扩展位。首期以双引擎落地，但抽象层必须按多引擎设计，避免后续再拆一次。
+本文设计 FrogClaw 的 Agent 引擎架构：保留当前内置 `open-agent-sdk` Agent，同时新增 `Claude Code` 引擎，并预留 `Codex CLI`、`Gemini CLI` 等后续引擎扩展位。首期以双引擎落地，但抽象层必须按多引擎设计，避免后续再拆一次。
 
 ## 目标
 
@@ -38,7 +38,7 @@ resolveRuntime()
 - 前端只消费统一事件流，不知道底层是 native 还是 Claude Code。
 - 设置里有全局默认引擎；聊天页右下角有当前引擎提示/切换。
 
-FrogClawClient 可以采用同样思想，但后端是 Tauri Rust，建议使用 Rust trait 和 Tauri event。不要把字段命名限制为 `claude` 或 `sdk`，统一使用 `engine`。
+FrogClaw 可以采用同样思想，但后端是 Tauri Rust，建议使用 Rust trait 和 Tauri event。不要把字段命名限制为 `claude` 或 `sdk`，统一使用 `engine`。
 
 ## 总体结构
 
@@ -316,7 +316,7 @@ ClaudeCodeEngine
 - 支持 cancel。
 - 支持 stdout/stderr 日志。
 - 支持最终文本回写。
-- 权限先按 Claude Code 自己的交互/CLI 能力处理，后续再映射到 FrogClawClient 的 permission card。
+- 权限先按 Claude Code 自己的交互/CLI 能力处理，后续再映射到 FrogClaw 的 permission card。
 
 第二版再支持：
 

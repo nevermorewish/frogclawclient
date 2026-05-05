@@ -1,20 +1,20 @@
 ---
 layout: home
-title: FrogClawClient — Cliente de escritorio IA open-source & Pasarela
+title: FrogClaw — Cliente de escritorio IA open-source & Pasarela
 titleTemplate: false
 
 head:
   - - meta
     - name: description
-      content: FrogClawClient es un cliente de escritorio IA gratuito y de código abierto con pasarela IA integrada. Conecta OpenAI, Claude, Gemini, DeepSeek y más LLMs. Soporte para servidor MCP, base de conocimiento, privacidad primero.
+      content: FrogClaw es un cliente de escritorio IA gratuito y de código abierto con pasarela IA integrada. Conecta OpenAI, Claude, Gemini, DeepSeek y más LLMs. Soporte para servidor MCP, base de conocimiento, privacidad primero.
 
 hero:
-  name: FrogClawClient
+  name: FrogClaw
   text: Tu asistente IA de escritorio
   tagline: Chat multi-modelo, herramientas MCP, pasarela API, base de conocimiento — todo en un solo cliente open-source
   image:
     src: /logo.png
-    alt: FrogClawClient
+    alt: FrogClaw
   actions:
     - theme: brand
       text: Comenzar
@@ -24,7 +24,7 @@ hero:
       link: /es/download
     - theme: alt
       text: GitHub
-      link: https://github.com/FrogClawClient-Desktop/FrogClawClient
+      link: https://github.com/FrogClaw-Desktop/FrogClaw
 
 features:
   - icon: robot
@@ -38,7 +38,7 @@ features:
     details: Implementación completa del Model Context Protocol. Soporte para stdio, SSE, StreamableHTTP. Conecta herramientas externas con un clic. Herramientas MCP integradas como @frogclaw/fetch.
   - icon: cloud-server
     title: Pasarela API integrada
-    details: Servidor API local compatible con OpenAI. Usa FrogClawClient como backend para Claude Code, Codex, Gemini CLI y más. Gestión de claves, limitación de velocidad, SSL/TLS.
+    details: Servidor API local compatible con OpenAI. Usa FrogClaw como backend para Claude Code, Codex, Gemini CLI y más. Gestión de claves, limitación de velocidad, SSL/TLS.
   - icon: book
     title: Base de conocimiento & RAG
     details: Embeddings vectoriales locales con sqlite-vec. Respuestas IA basadas en tus documentos privados — los datos nunca abandonan tu máquina.

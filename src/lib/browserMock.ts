@@ -28,7 +28,7 @@ function setStore<T>(key: string, value: T): void {
 function generateBrowserResponse(userContent: string): string {
   const greeting = /^(你好|hi|hello|hey|嗨)/i.test(userContent.trim());
   if (greeting) {
-    return '你好！我是 FrogClawClient 的浏览器预览模式。在此模式下，我无法连接真实的 AI 服务，但你可以体验完整的聊天界面交互。\n\n如需真实 AI 对话，请通过 `cargo tauri dev` 启动 Tauri 后端。';
+    return '你好！我是 FrogClaw 的浏览器预览模式。在此模式下，我无法连接真实的 AI 服务，但你可以体验完整的聊天界面交互。\n\n如需真实 AI 对话，请通过 `cargo tauri dev` 启动 Tauri 后端。';
   }
   return `收到你的消息：「${userContent.length > 50 ? userContent.slice(0, 50) + '...' : userContent}」\n\n当前为浏览器预览模式，无法调用真实 AI 接口。此模式用于 UI 开发和体验测试。\n\n如需 AI 回复，请使用 \`cargo tauri dev\` 启动完整应用。`;
 }
@@ -1228,7 +1228,7 @@ export async function handleCommand<T>(cmd: string, args?: Record<string, unknow
       const filePath = (args as any)?.filePath || '';
       const file = getStore<any[]>('drawing_files', []).find((item: any) => item.storage_path === filePath);
       if (file?.data) return `data:${file.mime_type};base64,${file.data}` as T;
-      return svgDataUrl(filePath.split('/').pop() || 'FrogClawClient') as T;
+      return svgDataUrl(filePath.split('/').pop() || 'FrogClaw') as T;
     }
     case 'check_attachment_exists':
       return true as T;
@@ -1326,7 +1326,7 @@ export async function handleCommand<T>(cmd: string, args?: Record<string, unknow
       return { width: globalThis.innerWidth ?? 1280, height: globalThis.innerHeight ?? 800, focused: true, fullscreen: false } as T;
     case 'send_desktop_notification': {
       if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-        new Notification((args as any)?.title ?? 'FrogClawClient', { body: (args as any)?.body ?? '' });
+        new Notification((args as any)?.title ?? 'FrogClaw', { body: (args as any)?.body ?? '' });
       }
       return undefined as T;
     }

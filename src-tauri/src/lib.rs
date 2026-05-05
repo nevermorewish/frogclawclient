@@ -343,7 +343,7 @@ pub fn run() {
             // Canonical application home directory (~/.frogclaw/ on macOS/Linux,
             // %USERPROFILE%\.frogclaw\ on Windows).
             let app_dir = paths::frogclaw_home();
-            std::fs::create_dir_all(&app_dir).expect("failed to create FrogClawClient home dir");
+            std::fs::create_dir_all(&app_dir).expect("failed to create FrogClaw home dir");
             std::fs::create_dir_all(paths::default_workspace())
                 .expect("failed to create default workspace dir");
 
@@ -413,7 +413,7 @@ pub fn run() {
                     let msg = format!(
                         "数据库初始化失败: {}\n\n\
                          如果您从新版本回退到旧版本，数据库结构可能不兼容。\n\
-                         请使用最新版本的 FrogClawClient。",
+                         请使用最新版本的 FrogClaw。",
                         e
                     );
                     tracing::error!("{}", msg);
@@ -423,14 +423,14 @@ pub fn run() {
                         let escaped = msg.replace('\"', "\\\"").replace('\n', "\\n");
                         let _ = std::process::Command::new("osascript")
                             .args(["-e", &format!(
-                                "display dialog \"{}\" with title \"FrogClawClient\" buttons {{\"OK\"}} default button \"OK\" with icon stop",
+                                "display dialog \"{}\" with title \"FrogClaw\" buttons {{\"OK\"}} default button \"OK\" with icon stop",
                                 escaped
                             )])
                             .output();
                     }
                     #[cfg(target_os = "windows")]
                     {
-                        windows_utils::show_error_dialog("FrogClawClient", &msg);
+                        windows_utils::show_error_dialog("FrogClaw", &msg);
                     }
                     std::process::exit(1);
                 }
@@ -717,9 +717,9 @@ pub fn run() {
                 if lower.contains("webview2") || lower.contains("webview") || lower.contains("edge")
                 {
                     let user_ok = windows_utils::show_warning_ok_cancel(
-                        "FrogClawClient",
-                        "未检测到 Microsoft Edge WebView2 Runtime，FrogClawClient 无法启动。\n\n\
-                         点击「确定」打开下载页面进行安装，安装完成后重新启动 FrogClawClient。",
+                        "FrogClaw",
+                        "未检测到 Microsoft Edge WebView2 Runtime，FrogClaw 无法启动。\n\n\
+                         点击「确定」打开下载页面进行安装，安装完成后重新启动 FrogClaw。",
                     );
                     if user_ok {
                         let _ = std::process::Command::new("cmd")
@@ -728,7 +728,7 @@ pub fn run() {
                     }
                 } else {
                     windows_utils::show_error_dialog(
-                        "FrogClawClient",
+                        "FrogClaw",
                         &format!("应用启动失败：{}", error_msg),
                     );
                 }

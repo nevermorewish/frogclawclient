@@ -2,7 +2,7 @@
 
 ## 什么是 API 网关？
 
-FrogClawClient 内置了一个本地 API 网关服务器，可以将你在 FrogClawClient 中配置的 AI 服务商统一暴露为标准 API 接口。其他工具和客户端（如 Claude Code、Codex CLI、Cursor 等）可以通过这个网关访问你的所有模型，无需为每个工具分别配置 API 密钥。
+FrogClaw 内置了一个本地 API 网关服务器，可以将你在 FrogClaw 中配置的 AI 服务商统一暴露为标准 API 接口。其他工具和客户端（如 Claude Code、Codex CLI、Cursor 等）可以通过这个网关访问你的所有模型，无需为每个工具分别配置 API 密钥。
 
 网关支持以下兼容格式：
 
@@ -11,7 +11,7 @@ FrogClawClient 内置了一个本地 API 网关服务器，可以将你在 FrogC
 - **Gemini 原生** — Google AI API 格式
 
 ::: tip 使用场景
-如果你已经在 FrogClawClient 中配置了多个服务商和密钥，API 网关可以让其他开发工具直接复用这些配置，省去重复配置的麻烦。同时，网关提供统一的用量统计和访问控制。
+如果你已经在 FrogClaw 中配置了多个服务商和密钥，API 网关可以让其他开发工具直接复用这些配置，省去重复配置的麻烦。同时，网关提供统一的用量统计和访问控制。
 :::
 
 ## 快速上手
@@ -69,7 +69,7 @@ curl http://127.0.0.1:39876/v1/models \
 
 ### 自动自签名证书
 
-启用 SSL 后，FrogClawClient 会自动生成自签名证书，无需手动操作。证书文件存储在：
+启用 SSL 后，FrogClaw 会自动生成自签名证书，无需手动操作。证书文件存储在：
 
 ```
 ~/.frogclaw/ssl/
@@ -136,7 +136,7 @@ curl http://127.0.0.1:39876/v1/models \
 
 ## 配置模板
 
-FrogClawClient 内置了常见开发工具的配置模板，帮助你快速接入。以下是一些常用工具的配置方式：
+FrogClaw 内置了常见开发工具的配置模板，帮助你快速接入。以下是一些常用工具的配置方式：
 
 ### Claude Code CLI
 
@@ -192,13 +192,13 @@ gemini
 除 CLI 工具外，许多图形化工具也支持自定义 API 端点。通用配置方式：
 
 1. 在工具的设置中找到 API 配置或自定义端点选项
-2. 将 Base URL 设置为 FrogClawClient 网关地址
+2. 将 Base URL 设置为 FrogClaw 网关地址
 3. 将 API Key 设置为网关密钥
-4. 保存后即可使用 FrogClawClient 配置的所有模型
+4. 保存后即可使用 FrogClaw 配置的所有模型
 
 ::: tip 统一管理的优势
 通过 API 网关统一管理，你可以：
-- 在 FrogClawClient 中集中管理所有服务商密钥，其他工具只需一个网关密钥
+- 在 FrogClaw 中集中管理所有服务商密钥，其他工具只需一个网关密钥
 - 在用量统计中查看所有工具的使用情况
 - 利用多密钥轮询提高可靠性
 :::

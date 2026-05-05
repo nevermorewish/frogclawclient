@@ -2,13 +2,13 @@
 
 ## ¿Qué es MCP?
 
-El [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) es un estándar abierto que permite a los modelos de IA interactuar con herramientas y fuentes de datos externas. FrogClawClient actúa como cliente MCP — añades servidores MCP y la IA puede llamar a las herramientas que exponen durante una conversación.
+El [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) es un estándar abierto que permite a los modelos de IA interactuar con herramientas y fuentes de datos externas. FrogClaw actúa como cliente MCP — añades servidores MCP y la IA puede llamar a las herramientas que exponen durante una conversación.
 
 ---
 
 ## Protocolos de transporte
 
-FrogClawClient soporta tres protocolos de transporte para comunicarse con servidores MCP:
+FrogClaw soporta tres protocolos de transporte para comunicarse con servidores MCP:
 
 | Protocolo | Conexión | Caso de uso | Configuración |
 |-----------|---------|------------|---------------|

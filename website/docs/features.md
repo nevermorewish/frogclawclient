@@ -1,13 +1,13 @@
 # Features
 
-FrogClawClient is a full-featured desktop AI assistant that brings together multi-provider chat, powerful content rendering, tool integration, and a built-in API gateway — all running locally with strong data security.
+FrogClaw is a full-featured desktop AI assistant that brings together multi-provider chat, powerful content rendering, tool integration, and a built-in API gateway — all running locally with strong data security.
 
 ## Chat & Models
 
-Connect to the leading AI providers from a single, unified interface. FrogClawClient handles API differences behind the scenes so you can focus on the conversation.
+Connect to the leading AI providers from a single, unified interface. FrogClaw handles API differences behind the scenes so you can focus on the conversation.
 
 - **Multi-Provider Support** — Compatible with OpenAI, Anthropic Claude, Google Gemini, and all OpenAI-compatible APIs. Each provider is configured independently with its own API key, Base URL, and model list.
-- **Provider Import Links** — Provider websites can open FrogClawClient through an `frogclawclient://` link with a secure confirmation flow, then pre-fill name, Base URL, API key, and provider type. See [Configure Providers](./guide/providers#importing-from-a-website-link).
+- **Provider Import Links** — Provider websites can open FrogClaw through an `FrogClaw://` link with a secure confirmation flow, then pre-fill name, Base URL, API key, and provider type. See [Configure Providers](./guide/providers#importing-from-a-website-link).
 - **Model Management** — Fetch remote model lists automatically and customize generation parameters such as temperature, max tokens, top-p, and more on a per-conversation basis.
 - **Multi-Key Rotation** — Configure multiple API keys per provider with automatic rotation to distribute rate-limit pressure and maximize uptime.
 - **Streaming Output** — Real-time token-by-token rendering keeps you informed as the model generates. Collapsible thinking blocks let you inspect the model's chain-of-thought without cluttering the conversation.
@@ -19,7 +19,7 @@ Connect to the leading AI providers from a single, unified interface. FrogClawCl
 
 ## AI Agent
 
-FrogClawClient includes a built-in Agent mode that enables the AI to autonomously execute multi-step tasks with fine-grained permission control.
+FrogClaw includes a built-in Agent mode that enables the AI to autonomously execute multi-step tasks with fine-grained permission control.
 
 - **Agent Mode** — Switch any conversation to Agent mode for autonomous task execution. The AI can read and write files, run shell commands, analyze code, and perform complex multi-step workflows — all within a controlled environment.
 - **Three Permission Levels** — Choose the right safety level for your workflow:
@@ -36,7 +36,7 @@ Agent mode is currently in Beta. It supports OpenAI, Anthropic, and Gemini model
 
 ## Content Rendering
 
-FrogClawClient goes far beyond plain-text chat with a rich, interactive rendering pipeline.
+FrogClaw goes far beyond plain-text chat with a rich, interactive rendering pipeline.
 
 - **Markdown Rendering** — Full support for syntax-highlighted code blocks, LaTeX math formulas, tables, and task lists.
 - **Monaco Code Editor** — Code blocks embed the Monaco Editor (the engine behind VS Code) with syntax highlighting, one-click copy, and inline diff preview.
@@ -67,7 +67,7 @@ Extend the model's capabilities with external tools and a powerful command inter
 
 ## API Gateway
 
-FrogClawClient includes a built-in local API server that turns your desktop app into a powerful AI gateway for any compatible client.
+FrogClaw includes a built-in local API server that turns your desktop app into a powerful AI gateway for any compatible client.
 
 - **Local API Gateway** — Expose a local server with native support for OpenAI-compatible, Claude, and Gemini interfaces. Use it as a backend for CLI tools, scripts, or other applications.
 - **API Key Management** — Generate, revoke, and enable or disable access keys. Each key supports a description note for easy identification.
@@ -77,12 +77,12 @@ FrogClawClient includes a built-in local API server that turns your desktop app 
 - **Configuration Templates** — Pre-built integration templates for popular tools such as Claude Code, Codex CLI, OpenCode, and Gemini CLI so you can get started in seconds.
 
 ::: tip Why a Local Gateway?
-The gateway lets you use FrogClawClient as a unified AI backend for all your tools. Configure your CLI clients, IDE extensions, or custom scripts to point at the local gateway and benefit from key rotation, usage tracking, and access control — all without exposing your API keys to each tool individually.
+The gateway lets you use FrogClaw as a unified AI backend for all your tools. Configure your CLI clients, IDE extensions, or custom scripts to point at the local gateway and benefit from key rotation, usage tracking, and access control — all without exposing your API keys to each tool individually.
 :::
 
 ## Data & Security
 
-Your data never leaves your machine. FrogClawClient is designed with local-first security at every layer.
+Your data never leaves your machine. FrogClaw is designed with local-first security at every layer.
 
 - **AES-256 Encryption** — API keys and other sensitive data are encrypted locally with AES-256. The master encryption key is stored with `0600` file permissions (owner-only access on Unix systems).
 - **Isolated Data Directories** — Application state (database, encryption keys, vector indices) lives in `~/.frogclaw/`. User-visible files (images, documents, backups) are stored in `~/Documents/frogclaw/` for easy access and backup with standard OS tools.
@@ -91,18 +91,18 @@ Your data never leaves your machine. FrogClawClient is designed with local-first
 - **Conversation Export** — Export conversations as PNG screenshots, Markdown documents, plain text, or structured JSON.
 
 ::: warning Protect Your Master Key
-The file `~/.frogclaw/master.key` is the root of all encryption in FrogClawClient. Keep it safe and included in your backups. If this key is lost, encrypted data cannot be recovered.
+The file `~/.frogclaw/master.key` is the root of all encryption in FrogClaw. Keep it safe and included in your backups. If this key is lost, encrypted data cannot be recovered.
 :::
 
 ## Desktop Experience
 
-FrogClawClient is built as a native desktop application with the polish and integration you expect from a daily-use tool.
+FrogClaw is built as a native desktop application with the polish and integration you expect from a daily-use tool.
 
 - **Theme Switching** — Dark and light themes that follow the system preference or can be set manually.
 - **Interface Language** — Full support for Simplified Chinese and English, switchable at any time in settings.
 - **System Tray** — Minimize to the system tray on window close. Background services such as the API gateway continue running uninterrupted.
 - **Always on Top** — Pin the main window to stay above all other windows for quick-reference workflows.
 - **Global Shortcuts** — Customizable global keyboard shortcuts to summon the main window from anywhere, at any time.
-- **Auto Start** — Optionally launch FrogClawClient on system startup so it is always ready when you are.
+- **Auto Start** — Optionally launch FrogClaw on system startup so it is always ready when you are.
 - **Proxy Support** — Configure HTTP and SOCKS5 proxies for environments with restricted network access.
-- **Auto Update** — FrogClawClient automatically checks for new versions on startup and prompts you to update with a single click.
+- **Auto Update** — FrogClaw automatically checks for new versions on startup and prompts you to update with a single click.

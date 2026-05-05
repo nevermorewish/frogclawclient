@@ -1,4 +1,4 @@
-﻿name: Release
+name: Release
 
 on:
   push:
@@ -64,7 +64,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: 'FrogClawClient ${{ github.ref_name }}'
+          name: 'FrogClaw ${{ github.ref_name }}'
           body: ${{ steps.cliff.outputs.content }}
           draft: true
           prerelease: ${{ contains(github.ref_name, '-rc') }}
@@ -190,7 +190,7 @@ jobs:
           APPLE_SIGNING_IDENTITY: ${{ matrix.os == 'macos-latest' && '-' || '' }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'FrogClawClient ${{ github.ref_name }}'
+          releaseName: 'FrogClaw ${{ github.ref_name }}'
           releaseBody: ${{ needs.draft-release-notes.outputs.body }}
           releaseDraft: true
           prerelease: ${{ contains(github.ref_name, '-rc') }}
@@ -203,10 +203,10 @@ jobs:
         shell: pwsh
         run: |
           $releaseDir = "src-tauri/target/${{ matrix.target }}/release"
-          $exe = Join-Path $releaseDir "FrogClawClient.exe"
+          $exe = Join-Path $releaseDir "FrogClaw.exe"
           $resources = Join-Path $releaseDir "binaries"
           $arch = if ("${{ matrix.target }}" -match "aarch64") { "arm64" } else { "x64" }
-          $zipName = "FrogClawClient_${{ github.ref_name }}_windows-${arch}-portable.zip"
+          $zipName = "FrogClaw_${{ github.ref_name }}_windows-${arch}-portable.zip"
           $stage = Join-Path $env:RUNNER_TEMP "frogclaw-portable-${arch}"
           Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Path $stage | Out-Null
@@ -223,7 +223,7 @@ jobs:
           tag_name: ${{ github.ref_name }}
           draft: true
           token: ${{ secrets.GITHUB_TOKEN }}
-          files: FrogClawClient_${{ github.ref_name }}_windows-*-portable.zip
+          files: FrogClaw_${{ github.ref_name }}_windows-*-portable.zip
 
   # ── Build for Linux ARM64 (cross-compile) ──────────────
   release-linux-arm:
@@ -342,7 +342,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: 'FrogClawClient ${{ github.ref_name }}'
+          name: 'FrogClaw ${{ github.ref_name }}'
           draft: true
           prerelease: ${{ contains(github.ref_name, '-rc') }}
           token: ${{ secrets.GITHUB_TOKEN }}

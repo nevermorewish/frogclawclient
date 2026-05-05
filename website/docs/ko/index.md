@@ -1,20 +1,20 @@
 ---
 layout: home
-title: FrogClawClient — 오픈소스 AI 데스크톱 클라이언트 & 게이트웨이
+title: FrogClaw — 오픈소스 AI 데스크톱 클라이언트 & 게이트웨이
 titleTemplate: false
 
 head:
   - - meta
     - name: description
-      content: FrogClawClient은 AI 게이트웨이가 내장된 무료 오픈소스 AI 데스크톱 클라이언트입니다. OpenAI, Claude, Gemini, DeepSeek 등 멀티 모델 대화, MCP 서버, 지식 베이스, 개인정보 보호 우선.
+      content: FrogClaw은 AI 게이트웨이가 내장된 무료 오픈소스 AI 데스크톱 클라이언트입니다. OpenAI, Claude, Gemini, DeepSeek 등 멀티 모델 대화, MCP 서버, 지식 베이스, 개인정보 보호 우선.
 
 hero:
-  name: FrogClawClient
+  name: FrogClaw
   text: 당신의 AI 데스크톱 어시스턴트
   tagline: 멀티 모델 채팅, MCP 도구, API 게이트웨이, 지식 베이스 — 모두 하나의 오픈소스 클라이언트에서
   image:
     src: /logo.png
-    alt: FrogClawClient
+    alt: FrogClaw
   actions:
     - theme: brand
       text: 시작하기
@@ -24,7 +24,7 @@ hero:
       link: /ko/download
     - theme: alt
       text: GitHub
-      link: https://github.com/FrogClawClient-Desktop/FrogClawClient
+      link: https://github.com/FrogClaw-Desktop/FrogClaw
 
 features:
   - icon: robot

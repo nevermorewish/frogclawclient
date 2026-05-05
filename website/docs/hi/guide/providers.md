@@ -1,6 +1,6 @@
 # प्रदाता कॉन्फ़िगर करें
 
-FrogClawClient एक साथ किसी भी संख्या में AI प्रदाताओं से कनेक्ट होता है। प्रत्येक प्रदाता की अपनी API कीज़, मॉडल लिस्ट और पैरामीटर डिफ़ॉल्ट होते हैं।
+FrogClaw एक साथ किसी भी संख्या में AI प्रदाताओं से कनेक्ट होता है। प्रत्येक प्रदाता की अपनी API कीज़, मॉडल लिस्ट और पैरामीटर डिफ़ॉल्ट होते हैं।
 
 ## समर्थित प्रदाता
 
@@ -36,46 +36,46 @@ FrogClawClient एक साथ किसी भी संख्या में
 
 ## वेबसाइट लिंक से आयात करना
 
-प्रदाता वेबसाइट, रिले सेवा डैशबोर्ड, निजी मॉडल प्लेटफ़ॉर्म या लोकल गेटवे पेज **FrogClawClient में खोलें** लिंक दे सकते हैं। क्लिक करने पर ब्राउज़र FrogClawClient डेस्कटॉप ऐप खोलता है, FrogClawClient **Settings → Providers** पर जाता है, पुष्टि डायलॉग दिखाता है और उपयोगकर्ता की पुष्टि के बाद ही कॉन्फ़िगरेशन आयात करता है।
+प्रदाता वेबसाइट, रिले सेवा डैशबोर्ड, निजी मॉडल प्लेटफ़ॉर्म या लोकल गेटवे पेज **FrogClaw में खोलें** लिंक दे सकते हैं। क्लिक करने पर ब्राउज़र FrogClaw डेस्कटॉप ऐप खोलता है, FrogClaw **Settings → Providers** पर जाता है, पुष्टि डायलॉग दिखाता है और उपयोगकर्ता की पुष्टि के बाद ही कॉन्फ़िगरेशन आयात करता है।
 
 ### उपयोगकर्ता प्रवाह
 
-1. प्रदाता लिंक आयात सपोर्ट करने वाला FrogClawClient संस्करण इंस्टॉल करके खोलें।
-2. ब्राउज़र में प्रदाता का **FrogClawClient में खोलें** लिंक क्लिक करें।
-3. FrogClawClient में प्रदाता नाम, Base URL, प्रदाता प्रकार और API key prefix जांचें।
-4. FrogClawClient समान **Base URL + प्रकार** वाले मौजूदा प्रदाता को पुनः उपयोग करता है। यदि वह मौजूद नहीं है, तो नया प्रदाता बनाता है और API key केवल तब जोड़ता है जब वह पहले से मौजूद न हो।
+1. प्रदाता लिंक आयात सपोर्ट करने वाला FrogClaw संस्करण इंस्टॉल करके खोलें।
+2. ब्राउज़र में प्रदाता का **FrogClaw में खोलें** लिंक क्लिक करें।
+3. FrogClaw में प्रदाता नाम, Base URL, प्रदाता प्रकार और API key prefix जांचें।
+4. FrogClaw समान **Base URL + प्रकार** वाले मौजूदा प्रदाता को पुनः उपयोग करता है। यदि वह मौजूद नहीं है, तो नया प्रदाता बनाता है और API key केवल तब जोड़ता है जब वह पहले से मौजूद न हो।
 
-FrogClawClient API key को अपने-आप validate नहीं करता और मॉडल सूची अपने-आप fetch नहीं करता। आयात के बाद **Fetch Models** क्लिक करें या मॉडल ID मैन्युअल रूप से जोड़ें।
+FrogClaw API key को अपने-आप validate नहीं करता और मॉडल सूची अपने-आप fetch नहीं करता। आयात के बाद **Fetch Models** क्लिक करें या मॉडल ID मैन्युअल रूप से जोड़ें।
 
 ### लिंक फ़ॉर्मेट
 
 ```text
-frogclawclient://providers?name=<name>&baseurl=<base-url>&apikey=<api-key>&type=<provider-type>
+FrogClaw://providers?name=<name>&baseurl=<base-url>&apikey=<api-key>&type=<provider-type>
 ```
 
 उदाहरण:
 
 ```text
-frogclawclient://providers?name=OpenAI&baseurl=https%3A%2F%2Fapi.openai.com&apikey=sk-xxx&type=openai
+FrogClaw://providers?name=OpenAI&baseurl=https%3A%2F%2Fapi.openai.com&apikey=sk-xxx&type=openai
 ```
 
 ### पैरामीटर
 
 | पैरामीटर | आवश्यक | विवरण |
 |----------|--------|-------|
-| `name` | हाँ | FrogClawClient में दिखने वाला नाम, जैसे `OpenAI` या `My Relay` |
+| `name` | हाँ | FrogClaw में दिखने वाला नाम, जैसे `OpenAI` या `My Relay` |
 | `baseurl` | हाँ | URL-encoded Base URL। केवल `http` और `https` स्वीकार हैं; query और hash अस्वीकार किए जाते हैं। |
-| `apikey` | हाँ | FrogClawClient में सेव की जाने वाली API key। पुष्टि डायलॉग में FrogClawClient केवल prefix दिखाता है। |
+| `apikey` | हाँ | FrogClaw में सेव की जाने वाली API key। पुष्टि डायलॉग में FrogClaw केवल prefix दिखाता है। |
 | `type` | हाँ | प्रदाता प्रकार। मान्य values: `openai`, `openai_responses`, `anthropic`, `gemini`, `custom`. |
 
-`baseurl` FrogClawClient के मौजूदा force suffix का उपयोग कर सकता है, जैसे `https://example.com!`। लिंक से आयात करते समय `api_path` सेट नहीं होता; FrogClawClient चुने गए प्रदाता प्रकार का डिफ़ॉल्ट path इस्तेमाल करता है।
+`baseurl` FrogClaw के मौजूदा force suffix का उपयोग कर सकता है, जैसे `https://example.com!`। लिंक से आयात करते समय `api_path` सेट नहीं होता; FrogClaw चुने गए प्रदाता प्रकार का डिफ़ॉल्ट path इस्तेमाल करता है।
 
 ### वेबसाइट कॉन्फ़िगरेशन
 
 हर dynamic value को `encodeURIComponent` या `URLSearchParams` से encode करें:
 
 ```html
-<a id="open-frogclaw" href="#">FrogClawClient में खोलें</a>
+<a id="open-frogclaw" href="#">FrogClaw में खोलें</a>
 
 <script>
   const provider = {
@@ -92,7 +92,7 @@ frogclawclient://providers?name=OpenAI&baseurl=https%3A%2F%2Fapi.openai.com&apik
     type: provider.type,
   });
 
-  document.getElementById('open-frogclaw').href = `frogclawclient://providers?${params.toString()}`;
+  document.getElementById('open-frogclaw').href = `FrogClaw://providers?${params.toString()}`;
 </script>
 ```
 
@@ -103,14 +103,14 @@ URL में API key ब्राउज़र history, logs, extensions या 
 :::
 
 ::: tip टेस्टिंग
-`frogclawclient://` एक custom protocol है जिसे installed desktop app सिस्टम में register करती है। केवल वेबसाइट या Vite dev server चलाने से protocol register नहीं होता। यदि link FrogClawClient नहीं खोलता, तो पहले latest FrogClawClient desktop app install या rebuild करें।
+`FrogClaw://` एक custom protocol है जिसे installed desktop app सिस्टम में register करती है। केवल वेबसाइट या Vite dev server चलाने से protocol register नहीं होता। यदि link FrogClaw नहीं खोलता, तो पहले latest FrogClaw desktop app install या rebuild करें।
 :::
 
 ---
 
 ## मल्टी-की रोटेशन
 
-FrogClawClient लोड वितरण के लिए प्रति प्रदाता कई API कीज़ सपोर्ट करता है। प्रदाता डिटेल पैनल में **Add Key** क्लिक करें।
+FrogClaw लोड वितरण के लिए प्रति प्रदाता कई API कीज़ सपोर्ट करता है। प्रदाता डिटेल पैनल में **Add Key** क्लिक करें।
 
 ---
 
@@ -123,7 +123,7 @@ FrogClawClient लोड वितरण के लिए प्रति प्
 ## Ollama (लोकल मॉडल)
 
 1. [Ollama](https://ollama.com/) इंस्टॉल और स्टार्ट करें।
-2. FrogClawClient में **OpenAI** प्रकार के साथ नया प्रदाता बनाएं।
+2. FrogClaw में **OpenAI** प्रकार के साथ नया प्रदाता बनाएं।
 3. **Base URL** को `http://localhost:11434` पर सेट करें।
 4. लोकल रूप से डाउनलोड किए गए मॉडल खोजने के लिए **Fetch Models** क्लिक करें।
 

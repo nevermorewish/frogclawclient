@@ -2,7 +2,7 @@
 
 ## 什麼是 API 閘道？
 
-FrogClawClient 內建了一個本機 API 閘道伺服器，可以將您在 FrogClawClient 中設定的 AI 服務供應商統一暴露為標準 API 介面。其他工具和客戶端（如 Claude Code、Codex CLI、Cursor 等）可以透過這個閘道存取您的所有模型，無需為每個工具分別設定 API 金鑰。
+FrogClaw 內建了一個本機 API 閘道伺服器，可以將您在 FrogClaw 中設定的 AI 服務供應商統一暴露為標準 API 介面。其他工具和客戶端（如 Claude Code、Codex CLI、Cursor 等）可以透過這個閘道存取您的所有模型，無需為每個工具分別設定 API 金鑰。
 
 閘道支援以下相容格式：
 
@@ -11,7 +11,7 @@ FrogClawClient 內建了一個本機 API 閘道伺服器，可以將您在 FrogC
 - **Gemini 原生** — Google AI API 格式
 
 ::: tip 使用場景
-如果您已經在 FrogClawClient 中設定了多個服務供應商和金鑰，API 閘道可以讓其他開發工具直接復用這些設定，省去重複設定的麻煩。同時，閘道提供統一的用量統計和存取控制。
+如果您已經在 FrogClaw 中設定了多個服務供應商和金鑰，API 閘道可以讓其他開發工具直接復用這些設定，省去重複設定的麻煩。同時，閘道提供統一的用量統計和存取控制。
 :::
 
 ## 快速上手
@@ -69,7 +69,7 @@ curl http://127.0.0.1:39876/v1/models \
 
 ### 自動自簽憑證
 
-啟用 SSL 後，FrogClawClient 會自動產生自簽憑證，無需手動操作。憑證檔案儲存在：
+啟用 SSL 後，FrogClaw 會自動產生自簽憑證，無需手動操作。憑證檔案儲存在：
 
 ```
 ~/.frogclaw/ssl/
@@ -136,7 +136,7 @@ curl http://127.0.0.1:39876/v1/models \
 
 ## 設定範本
 
-FrogClawClient 內建了常見開發工具的設定範本，幫助您快速接入。以下是一些常用工具的設定方式：
+FrogClaw 內建了常見開發工具的設定範本，幫助您快速接入。以下是一些常用工具的設定方式：
 
 ### Claude Code CLI
 
@@ -192,13 +192,13 @@ gemini
 除 CLI 工具外，許多圖形化工具也支援自訂 API 端點。通用設定方式：
 
 1. 在工具的設定中找到 API 設定或自訂端點選項
-2. 將 Base URL 設定為 FrogClawClient 閘道位址
+2. 將 Base URL 設定為 FrogClaw 閘道位址
 3. 將 API Key 設定為閘道金鑰
-4. 儲存後即可使用 FrogClawClient 設定的所有模型
+4. 儲存後即可使用 FrogClaw 設定的所有模型
 
 ::: tip 統一管理的優勢
 透過 API 閘道統一管理，您可以：
-- 在 FrogClawClient 中集中管理所有服務供應商金鑰，其他工具只需一個閘道金鑰
+- 在 FrogClaw 中集中管理所有服務供應商金鑰，其他工具只需一個閘道金鑰
 - 在用量統計中查看所有工具的使用情況
 - 利用多金鑰輪詢提高可靠性
 :::

@@ -1,20 +1,20 @@
 ---
 layout: home
-title: FrogClawClient — Настольный ИИ-клиент с открытым исходным кодом & Шлюз
+title: FrogClaw — Настольный ИИ-клиент с открытым исходным кодом & Шлюз
 titleTemplate: false
 
 head:
   - - meta
     - name: description
-      content: FrogClawClient — бесплатный настольный ИИ-клиент с открытым исходным кодом и встроенным ИИ-шлюзом. Подключайте OpenAI, Claude, Gemini, DeepSeek и другие LLM. Поддержка MCP-серверов, база знаний, приоритет конфиденциальности.
+      content: FrogClaw — бесплатный настольный ИИ-клиент с открытым исходным кодом и встроенным ИИ-шлюзом. Подключайте OpenAI, Claude, Gemini, DeepSeek и другие LLM. Поддержка MCP-серверов, база знаний, приоритет конфиденциальности.
 
 hero:
-  name: FrogClawClient
+  name: FrogClaw
   text: Ваш ИИ-ассистент для рабочего стола
   tagline: Мультимодельный чат, инструменты MCP, API-шлюз, база знаний — всё в одном клиенте с открытым исходным кодом
   image:
     src: /logo.png
-    alt: FrogClawClient
+    alt: FrogClaw
   actions:
     - theme: brand
       text: Начать
@@ -24,7 +24,7 @@ hero:
       link: /ru/download
     - theme: alt
       text: GitHub
-      link: https://github.com/FrogClawClient-Desktop/FrogClawClient
+      link: https://github.com/FrogClaw-Desktop/FrogClaw
 
 features:
   - icon: robot
@@ -38,7 +38,7 @@ features:
     details: Полная реализация Model Context Protocol. Поддержка stdio, SSE, StreamableHTTP. Подключение внешних инструментов одним кликом. Встроенные MCP-инструменты, такие как @frogclaw/fetch.
   - icon: cloud-server
     title: Встроенный API-шлюз
-    details: Локальный API-сервер, совместимый с OpenAI. Используйте FrogClawClient как бэкенд для Claude Code, Codex, Gemini CLI и других. Управление ключами, ограничение частоты запросов, SSL/TLS.
+    details: Локальный API-сервер, совместимый с OpenAI. Используйте FrogClaw как бэкенд для Claude Code, Codex, Gemini CLI и других. Управление ключами, ограничение частоты запросов, SSL/TLS.
   - icon: book
     title: База знаний & RAG
     details: Локальные векторные эмбеддинги с sqlite-vec. Ответы ИИ на основе ваших приватных документов — данные никогда не покидают вашу машину.

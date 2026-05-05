@@ -1,20 +1,20 @@
 ---
 layout: home
-title: FrogClawClient — Client de bureau IA open-source & Passerelle
+title: FrogClaw — Client de bureau IA open-source & Passerelle
 titleTemplate: false
 
 head:
   - - meta
     - name: description
-      content: FrogClawClient est un client de bureau IA gratuit et open-source avec passerelle IA intégrée. Connectez OpenAI, Claude, Gemini, DeepSeek et d'autres LLMs. Support serveur MCP, base de connaissances, confidentialité d'abord.
+      content: FrogClaw est un client de bureau IA gratuit et open-source avec passerelle IA intégrée. Connectez OpenAI, Claude, Gemini, DeepSeek et d'autres LLMs. Support serveur MCP, base de connaissances, confidentialité d'abord.
 
 hero:
-  name: FrogClawClient
+  name: FrogClaw
   text: Votre assistant IA de bureau
   tagline: Chat multi-modèles, outils MCP, passerelle API, base de connaissances — tout en un seul client open-source
   image:
     src: /logo.png
-    alt: FrogClawClient
+    alt: FrogClaw
   actions:
     - theme: brand
       text: Commencer
@@ -24,7 +24,7 @@ hero:
       link: /fr/download
     - theme: alt
       text: GitHub
-      link: https://github.com/FrogClawClient-Desktop/FrogClawClient
+      link: https://github.com/FrogClaw-Desktop/FrogClaw
 
 features:
   - icon: robot
@@ -38,7 +38,7 @@ features:
     details: Implémentation complète du Model Context Protocol. Support stdio, SSE, StreamableHTTP. Connectez des outils externes en un clic. Outils MCP intégrés comme @frogclaw/fetch.
   - icon: cloud-server
     title: Passerelle API intégrée
-    details: Serveur API local compatible OpenAI. Utilisez FrogClawClient comme backend pour Claude Code, Codex, Gemini CLI et plus. Gestion des clés, limitation de débit, SSL/TLS.
+    details: Serveur API local compatible OpenAI. Utilisez FrogClaw comme backend pour Claude Code, Codex, Gemini CLI et plus. Gestion des clés, limitation de débit, SSL/TLS.
   - icon: book
     title: Base de connaissances & RAG
     details: Embeddings vectoriels locaux avec sqlite-vec. Réponses IA basées sur vos documents privés — les données ne quittent jamais votre machine.

@@ -578,7 +578,7 @@ export function HomePage() {
             {appVersion && <Text type="secondary" style={{ marginLeft: 12, fontSize: 14, fontWeight: 400 }}>v{appVersion}</Text>}
           </Title>
           <Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
-            检测本机 CLI 环境，登录 {FROGCLAW_BASE_URL} 获取令牌，并把可用供应商写入 FrogClawClient 配置。
+            检测本机 CLI 环境，登录 {FROGCLAW_BASE_URL} 获取令牌，并把可用供应商写入 FrogClaw 配置。
           </Paragraph>
         </div>
 

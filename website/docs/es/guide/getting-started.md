@@ -2,23 +2,23 @@
 
 ## Instalación
 
-Descarga el último instalador desde la [página de descarga](/es/download) o [GitHub Releases](https://github.com/FrogClawClient-Desktop/FrogClawClient/releases).
+Descarga el último instalador desde la [página de descarga](/es/download) o [GitHub Releases](https://github.com/FrogClaw-Desktop/FrogClaw/releases).
 
 ### macOS
 
 | Chip | Archivo |
 |------|---------|
-| Apple Silicon (M1 / M2 / M3 / M4) | `FrogClawClient_x.x.x_aarch64.dmg` |
-| Intel | `FrogClawClient_x.x.x_x64.dmg` |
+| Apple Silicon (M1 / M2 / M3 / M4) | `FrogClaw_x.x.x_aarch64.dmg` |
+| Intel | `FrogClaw_x.x.x_x64.dmg` |
 
-1. Abre el `.dmg` y arrastra **FrogClawClient** a la carpeta **Aplicaciones**.
-2. Inicia FrogClawClient. Si macOS bloquea la app, ve a **Configuración del Sistema → Privacidad y Seguridad** y haz clic en **Abrir de todas formas**.
+1. Abre el `.dmg` y arrastra **FrogClaw** a la carpeta **Aplicaciones**.
+2. Inicia FrogClaw. Si macOS bloquea la app, ve a **Configuración del Sistema → Privacidad y Seguridad** y haz clic en **Abrir de todas formas**.
 
 ::: warning macOS: "La app está dañada" o "No se puede verificar el desarrollador"
 Si ves alguno de estos mensajes, abre Terminal y ejecuta:
 
 ```bash
-xattr -c /Applications/FrogClawClient.app
+xattr -c /Applications/FrogClaw.app
 ```
 
 Luego inicia la app de nuevo. Esto elimina la marca de cuarentena que macOS aplica a las descargas no firmadas.
@@ -28,32 +28,32 @@ Luego inicia la app de nuevo. Esto elimina la marca de cuarentena que macOS apli
 
 | Arquitectura | Archivo |
 |-------------|---------|
-| x64 (la mayoría de PCs) | `FrogClawClient_x.x.x_x64-setup.exe` |
-| ARM64 | `FrogClawClient_x.x.x_arm64-setup.exe` |
+| x64 (la mayoría de PCs) | `FrogClaw_x.x.x_x64-setup.exe` |
+| ARM64 | `FrogClaw_x.x.x_arm64-setup.exe` |
 
-Ejecuta el instalador y sigue el asistente. Inicia FrogClawClient desde el menú Inicio o el acceso directo del escritorio.
+Ejecuta el instalador y sigue el asistente. Inicia FrogClaw desde el menú Inicio o el acceso directo del escritorio.
 
 ### Linux
 
 | Formato | Arquitectura | Archivo |
 |---------|-------------|---------|
-| Debian / Ubuntu | x64 | `FrogClawClient_x.x.x_amd64.deb` |
-| Debian / Ubuntu | ARM64 | `FrogClawClient_x.x.x_arm64.deb` |
-| Fedora / openSUSE | x64 | `FrogClawClient_x.x.x_x86_64.rpm` |
-| Fedora / openSUSE | ARM64 | `FrogClawClient_x.x.x_aarch64.rpm` |
-| Cualquier distro | x64 | `FrogClawClient_x.x.x_amd64.AppImage` |
-| Cualquier distro | ARM64 | `FrogClawClient_x.x.x_aarch64.AppImage` |
+| Debian / Ubuntu | x64 | `FrogClaw_x.x.x_amd64.deb` |
+| Debian / Ubuntu | ARM64 | `FrogClaw_x.x.x_arm64.deb` |
+| Fedora / openSUSE | x64 | `FrogClaw_x.x.x_x86_64.rpm` |
+| Fedora / openSUSE | ARM64 | `FrogClaw_x.x.x_aarch64.rpm` |
+| Cualquier distro | x64 | `FrogClaw_x.x.x_amd64.AppImage` |
+| Cualquier distro | ARM64 | `FrogClaw_x.x.x_aarch64.AppImage` |
 
 ```bash
 # Debian / Ubuntu
-sudo dpkg -i FrogClawClient_x.x.x_amd64.deb
+sudo dpkg -i FrogClaw_x.x.x_amd64.deb
 
 # Fedora / openSUSE
-sudo rpm -i FrogClawClient_x.x.x_x86_64.rpm
+sudo rpm -i FrogClaw_x.x.x_x86_64.rpm
 
 # AppImage (cualquier distro)
-chmod +x FrogClawClient_x.x.x_amd64.AppImage
-./FrogClawClient_x.x.x_amd64.AppImage
+chmod +x FrogClaw_x.x.x_amd64.AppImage
+./FrogClaw_x.x.x_amd64.AppImage
 ```
 
 ---
@@ -62,7 +62,7 @@ chmod +x FrogClawClient_x.x.x_amd64.AppImage
 
 ### 1. Abrir configuración
 
-Inicia FrogClawClient y haz clic en el **ícono de engranaje** en la parte inferior de la barra lateral, o presiona <kbd>Cmd/Ctrl</kbd>+<kbd>,</kbd>.
+Inicia FrogClaw y haz clic en el **ícono de engranaje** en la parte inferior de la barra lateral, o presiona <kbd>Cmd/Ctrl</kbd>+<kbd>,</kbd>.
 
 ### 2. Añadir un proveedor
 
@@ -92,7 +92,7 @@ Ve a **Configuración → Modelo predeterminado** y elige el proveedor y el mode
 1. Haz clic en **Nuevo chat** en la barra lateral (o presiona <kbd>Cmd/Ctrl</kbd>+<kbd>N</kbd>).
 2. Selecciona un modelo del selector de modelos en la parte superior del chat.
 3. Escribe un mensaje y presiona <kbd>Enter</kbd>.
-4. FrogClawClient transmite la respuesta en tiempo real. Los modelos que soportan bloques de pensamiento (ej. Claude, DeepSeek R1) muestran el proceso de razonamiento en una sección plegable.
+4. FrogClaw transmite la respuesta en tiempo real. Los modelos que soportan bloques de pensamiento (ej. Claude, DeepSeek R1) muestran el proceso de razonamiento en una sección plegable.
 
 ---
 

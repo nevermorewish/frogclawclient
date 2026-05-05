@@ -1,6 +1,6 @@
-﻿{
+{
   "app": {
-    "name": "FrogClawClient"
+    "name": "FrogClaw"
   },
   "nav": {
     "home": "الرئيسية",
@@ -933,7 +933,7 @@
     "maxCount": "الحد الأقصى للنسخ المحتفظ بها",
     "copies": "نسخ",
     "backupDir": "مجلد النسخ الاحتياطي",
-    "defaultDir": "مجلد النسخ الاحتياطي الافتراضي لـ FrogClawClient",
+    "defaultDir": "مجلد النسخ الاحتياطي الافتراضي لـ FrogClaw",
     "effectiveDir": "المجلد الفعلي",
     "formatSqliteDesc": "سريع، استعادة مباشرة",
     "formatJsonDesc": "قابل للقراءة، ملف أكبر",
@@ -1088,7 +1088,7 @@
     "reloadConfirmOk": "إعادة تحميل",
     "reloadConfirmCancel": "إلغاء",
     "closeConfirmTitle": "إغلاق التطبيق",
-    "closeConfirmContent": "هل أنت متأكد من رغبتك في إغلاق FrogClawClient؟",
+    "closeConfirmContent": "هل أنت متأكد من رغبتك في إغلاق FrogClaw؟",
     "closeConfirmOk": "إغلاق",
     "closeConfirmCancel": "إلغاء",
     "startMinimized": "تشغيل مصغّراً",
@@ -1198,7 +1198,7 @@
     "uninstallConfirm": "هل أنت متأكد من إلغاء تثبيت المهارة \"{{name}}\"؟",
     "detail": "تفاصيل المهارة",
     "source": {
-      "frogclaw": "FrogClawClient",
+      "frogclaw": "FrogClaw",
       "claude": "Claude",
       "agents": "Agents",
       "builtin": "مدمج",

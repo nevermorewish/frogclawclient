@@ -1,20 +1,20 @@
 ---
 layout: home
-title: FrogClawClient — ओपन-सोर्स AI डेस्कटॉप क्लाइंट & गेटवे
+title: FrogClaw — ओपन-सोर्स AI डेस्कटॉप क्लाइंट & गेटवे
 titleTemplate: false
 
 head:
   - - meta
     - name: description
-      content: FrogClawClient एक मुफ्त ओपन-सोर्स AI डेस्कटॉप क्लाइंट है जिसमें बिल्ट-इन AI गेटवे है। OpenAI, Claude, Gemini, DeepSeek और अधिक LLMs कनेक्ट करें। MCP सर्वर सपोर्ट, नॉलेज बेस, प्राइवेसी-फर्स्ट।
+      content: FrogClaw एक मुफ्त ओपन-सोर्स AI डेस्कटॉप क्लाइंट है जिसमें बिल्ट-इन AI गेटवे है। OpenAI, Claude, Gemini, DeepSeek और अधिक LLMs कनेक्ट करें। MCP सर्वर सपोर्ट, नॉलेज बेस, प्राइवेसी-फर्स्ट।
 
 hero:
-  name: FrogClawClient
+  name: FrogClaw
   text: आपका AI डेस्कटॉप असिस्टेंट
   tagline: मल्टी-मॉडल चैट, MCP टूल्स, API गेटवे, नॉलेज बेस — सब एक ओपन-सोर्स क्लाइंट में
   image:
     src: /logo.png
-    alt: FrogClawClient
+    alt: FrogClaw
   actions:
     - theme: brand
       text: शुरू करें
@@ -24,7 +24,7 @@ hero:
       link: /hi/download
     - theme: alt
       text: GitHub
-      link: https://github.com/FrogClawClient-Desktop/FrogClawClient
+      link: https://github.com/FrogClaw-Desktop/FrogClaw
 
 features:
   - icon: robot
@@ -38,7 +38,7 @@ features:
     details: Model Context Protocol का पूर्ण कार्यान्वयन। stdio, SSE, StreamableHTTP सपोर्ट। एक क्लिक में बाहरी टूल्स कनेक्ट करें। @frogclaw/fetch जैसे बिल्ट-इन MCP टूल्स।
   - icon: cloud-server
     title: बिल्ट-इन API गेटवे
-    details: लोकल OpenAI-कम्पैटिबल API सर्वर। FrogClawClient को Claude Code, Codex, Gemini CLI आदि के बैकएंड के रूप में उपयोग करें। की मैनेजमेंट, रेट लिमिटिंग, SSL/TLS।
+    details: लोकल OpenAI-कम्पैटिबल API सर्वर। FrogClaw को Claude Code, Codex, Gemini CLI आदि के बैकएंड के रूप में उपयोग करें। की मैनेजमेंट, रेट लिमिटिंग, SSL/TLS।
   - icon: book
     title: नॉलेज बेस & RAG
     details: sqlite-vec के साथ लोकल वेक्टर एम्बेडिंग। आपके प्राइवेट दस्तावेज़ों पर आधारित AI उत्तर — डेटा कभी आपकी मशीन नहीं छोड़ता।

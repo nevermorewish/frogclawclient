@@ -126,7 +126,7 @@ pub async fn fetch_remote_image(url: String) -> Result<RemoteImageResponse, Stri
 
     let response = client
         .get(parsed)
-        .header(USER_AGENT, "FrogClawClient/remote-image-fetch")
+        .header(USER_AGENT, "FrogClaw/remote-image-fetch")
         .send()
         .await
         .map_err(|e| format!("Failed to download image: {e}"))?;

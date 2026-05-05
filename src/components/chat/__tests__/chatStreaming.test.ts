@@ -48,14 +48,14 @@ describe('chat streaming helpers', () => {
     )).toBe(true);
   });
 
-  it('detects FrogClawClient display tags independently from model text', () => {
+  it('detects FrogClaw display tags independently from model text', () => {
     expect(hasFrogclawDisplayContent(
       '<knowledge-retrieval status="done" data-frogclaw="1">[]</knowledge-retrieval>',
     )).toBe(true);
     expect(hasFrogclawDisplayContent('answer')).toBe(false);
   });
 
-  it('splits leading FrogClawClient display tags from streamed model text', () => {
+  it('splits leading FrogClaw display tags from streamed model text', () => {
     const knowledge = '<knowledge-retrieval status="done" data-frogclaw="1">[]</knowledge-retrieval>\n\n';
     const memory = '<memory-retrieval status="done" data-frogclaw="1">[]</memory-retrieval>\n\n';
 

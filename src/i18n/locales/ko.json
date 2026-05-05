@@ -1,6 +1,6 @@
-﻿{
+{
   "app": {
-    "name": "FrogClawClient"
+    "name": "FrogClaw"
   },
   "nav": {
     "home": "홈",
@@ -933,7 +933,7 @@
     "maxCount": "최대 백업 보관 수",
     "copies": "개",
     "backupDir": "백업 디렉토리",
-    "defaultDir": "FrogClawClient 기본 백업 디렉토리",
+    "defaultDir": "FrogClaw 기본 백업 디렉토리",
     "effectiveDir": "유효 디렉토리",
     "formatSqliteDesc": "빠름, 직접 복원",
     "formatJsonDesc": "읽기 가능, 파일 크기 큼",
@@ -1088,7 +1088,7 @@
     "reloadConfirmOk": "새로고침",
     "reloadConfirmCancel": "취소",
     "closeConfirmTitle": "앱 종료",
-    "closeConfirmContent": "FrogClawClient을 종료하시겠습니까?",
+    "closeConfirmContent": "FrogClaw을 종료하시겠습니까?",
     "closeConfirmOk": "종료",
     "closeConfirmCancel": "취소",
     "startMinimized": "최소화 상태로 시작",
@@ -1198,7 +1198,7 @@
     "uninstallConfirm": "스킬 \"{{name}}\"을(를) 제거하시겠습니까?",
     "detail": "스킬 상세",
     "source": {
-      "frogclaw": "FrogClawClient",
+      "frogclaw": "FrogClaw",
       "claude": "Claude",
       "agents": "Agents",
       "builtin": "기본 제공",

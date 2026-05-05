@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>FrogClawClient open-agent-sdk 替换为 codex-rs 设计文档</title>
+  <title>FrogClaw open-agent-sdk 替换为 codex-rs 设计文档</title>
   <style>
     :root {
       color-scheme: light;
@@ -227,12 +227,12 @@
     <header>
       <h1>open-agent-sdk 替换为 codex-rs 设计文档</h1>
       <p class="summary">
-        本文定义 FrogClawClient 将当前内嵌 <code>open-agent-sdk</code> Agent 实现替换为本地
+        本文定义 FrogClaw 将当前内嵌 <code>open-agent-sdk</code> Agent 实现替换为本地
         <code>E:\frogclaw\codex\codex-rs</code> 的方案。替换目标不是再做双后端，而是让 Codex 成为项目唯一 Agent runtime，
-        UI 和业务层只面对 FrogClawClient 自己的稳定事件与命令接口。
+        UI 和业务层只面对 FrogClaw 自己的稳定事件与命令接口。
       </p>
       <div class="meta">
-        <div><span class="label">目标项目</span><strong>E:\frogclaw\frogclawclient</strong></div>
+        <div><span class="label">目标项目</span><strong>E:\frogclaw\FrogClaw</strong></div>
         <div><span class="label">Codex 源码</span><strong>E:\frogclaw\codex\codex-rs</strong></div>
         <div><span class="label">当前 SDK</span><strong>src-tauri/crates/open-agent-sdk</strong></div>
         <div><span class="label">文档日期</span><strong>2026-05-03</strong></div>
@@ -243,7 +243,7 @@
       <h2>1. 结论</h2>
       <div class="callout ok">
         <strong>采用 Codex app-server / protocol adapter 作为主方案。</strong>
-        FrogClawClient 不应直接把大量 <code>codex-rs</code> 内部 crate 类型暴露给 UI，也不应长期解析 CLI 文本输出。
+        FrogClaw 不应直接把大量 <code>codex-rs</code> 内部 crate 类型暴露给 UI，也不应长期解析 CLI 文本输出。
         推荐在 Tauri 后端增加 <code>CodexRuntime</code> 适配层，使用 Codex 的 app-server、client、protocol、core 能力，把 Codex 事件转换为现有 Agent UI 可消费的 FrogClaw 事件。
       </div>
       <p>
@@ -322,7 +322,7 @@
 
     <section>
       <h2>4. 目标架构</h2>
-      <pre class="flow">FrogClawClient UI
+      <pre class="flow">FrogClaw UI
         |
         | agent_query / agent_cancel / approval response
         v
@@ -383,7 +383,7 @@ E:\frogclaw\codex\codex-rs
             <td>谨慎使用。只在 app-server 协议缺少能力时局部引入。</td>
           </tr>
           <tr>
-            <td>复制 Codex 代码到 FrogClawClient</td>
+            <td>复制 Codex 代码到 FrogClaw</td>
             <td>把 Codex crate vendor 到当前仓库。</td>
             <td>不推荐。后续同步成本高，容易产生分叉。</td>
           </tr>
@@ -445,7 +445,7 @@ pub trait AgentRuntime: Send + Sync {
     <section>
       <h2>7. 动态配置生成与 app-server 启动</h2>
       <p>
-        FrogClawClient 不应要求用户手工维护 <code>~/.codex/config.toml</code>。替换后由 FrogClaw 设置层动态生成
+        FrogClaw 不应要求用户手工维护 <code>~/.codex/config.toml</code>。替换后由 FrogClaw 设置层动态生成
         Codex 专用配置目录，并在启动 Codex app-server 前传入 <code>CODEX_HOME</code> 和 provider API key 环境变量。
       </p>
 
@@ -646,7 +646,7 @@ ALTER TABLE agent_sessions ADD COLUMN runtime_error TEXT NULL;</pre>
 
     <section>
       <h2>10. 设置、存储与路径</h2>
-      <p>替换实现必须遵守 FrogClawClient 双根目录策略：</p>
+      <p>替换实现必须遵守 FrogClaw 双根目录策略：</p>
       <table>
         <thead>
           <tr>

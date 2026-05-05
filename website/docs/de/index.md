@@ -1,20 +1,20 @@
 ---
 layout: home
-title: FrogClawClient — Open-Source KI-Desktop-Client & Gateway
+title: FrogClaw — Open-Source KI-Desktop-Client & Gateway
 titleTemplate: false
 
 head:
   - - meta
     - name: description
-      content: FrogClawClient ist ein kostenloser Open-Source KI-Desktop-Client mit integriertem KI-Gateway. Verbinden Sie OpenAI, Claude, Gemini, DeepSeek und weitere LLMs. MCP-Server-Unterstützung, Wissensbasis, Datenschutz-first.
+      content: FrogClaw ist ein kostenloser Open-Source KI-Desktop-Client mit integriertem KI-Gateway. Verbinden Sie OpenAI, Claude, Gemini, DeepSeek und weitere LLMs. MCP-Server-Unterstützung, Wissensbasis, Datenschutz-first.
 
 hero:
-  name: FrogClawClient
+  name: FrogClaw
   text: Ihr KI-Desktop-Assistent
   tagline: Multi-Modell-Chat, MCP-Tools, API-Gateway, Wissensbasis — alles in einem Open-Source-Client
   image:
     src: /logo.png
-    alt: FrogClawClient
+    alt: FrogClaw
   actions:
     - theme: brand
       text: Erste Schritte
@@ -24,7 +24,7 @@ hero:
       link: /de/download
     - theme: alt
       text: GitHub
-      link: https://github.com/FrogClawClient-Desktop/FrogClawClient
+      link: https://github.com/FrogClaw-Desktop/FrogClaw
 
 features:
   - icon: robot
@@ -38,7 +38,7 @@ features:
     details: Vollständige Model Context Protocol-Implementierung. Unterstützung für stdio, SSE, StreamableHTTP. Mit einem Klick externe Tools verbinden. Integrierte MCP-Tools wie @frogclaw/fetch.
   - icon: cloud-server
     title: Integriertes API-Gateway
-    details: Lokaler OpenAI-kompatibler API-Server. Verwenden Sie FrogClawClient als Backend für Claude Code, Codex, Gemini CLI und mehr. Schlüsselverwaltung, Rate-Limiting, SSL/TLS.
+    details: Lokaler OpenAI-kompatibler API-Server. Verwenden Sie FrogClaw als Backend für Claude Code, Codex, Gemini CLI und mehr. Schlüsselverwaltung, Rate-Limiting, SSL/TLS.
   - icon: book
     title: Wissensbasis & RAG
     details: Lokale Vektoreinbettungen mit sqlite-vec. KI-Antworten basierend auf Ihren privaten Dokumenten — Daten verlassen nie Ihren Computer.

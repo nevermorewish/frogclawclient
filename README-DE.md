@@ -1,9 +1,9 @@
 [简体中文](./README.md) | [繁體中文](./README-ZH-TW.md) | [English](./README-EN.md) | [日本語](./README-JA.md) | [한국어](./README-KO.md) | [Français](./README-FR.md) | **Deutsch** | [Español](./README-ES.md) | [Русский](./README-RU.md) | [हिन्दी](./README-HI.md) | [العربية](./README-AR.md)
 
-[![FrogClawClient](https://socialify.git.ci/FrogClawClient-Desktop/FrogClawClient/image?description=1&font=JetBrains+Mono&forks=1&issues=1&logo=https%3A%2F%2Fgithub.com%2FFrogClawClient-Desktop%2FFrogClawClient%2Fblob%2Fmain%2Fsrc%2Fassets%2Fimage%2Flogo.png%3Fraw%3Dtrue&name=1&owner=1&pattern=Floating+Cogs&pulls=1&stargazers=1&theme=Auto)](https://github.com/FrogClawClient-Desktop/FrogClawClient)
+[![FrogClaw](https://socialify.git.ci/FrogClaw-Desktop/FrogClaw/image?description=1&font=JetBrains+Mono&forks=1&issues=1&logo=https%3A%2F%2Fgithub.com%2FFrogClaw-Desktop%2FFrogClaw%2Fblob%2Fmain%2Fsrc%2Fassets%2Fimage%2Flogo.png%3Fraw%3Dtrue&name=1&owner=1&pattern=Floating+Cogs&pulls=1&stargazers=1&theme=Auto)](https://github.com/FrogClaw-Desktop/FrogClaw)
 
 <p align="center">
-    <a href="https://www.producthunt.com/products/frogclaw?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-frogclaw" target="_blank" rel="noopener noreferrer"><img alt="FrogClawClient - Lightweight, high-perf cross-platform AI desktop client | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1118403&amp;theme=light&amp;t=1775627359538"></a>
+    <a href="https://www.producthunt.com/products/frogclaw?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-frogclaw" target="_blank" rel="noopener noreferrer"><img alt="FrogClaw - Lightweight, high-perf cross-platform AI desktop client | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1118403&amp;theme=light&amp;t=1775627359538"></a>
 </p>
 
 ## Screenshots
@@ -109,7 +109,7 @@
 
 ## Erste Schritte
 
-Gehen Sie zur [Releases](https://github.com/FrogClawClient-Desktop/FrogClawClient/releases)-Seite und laden Sie das Installationsprogramm für Ihre Plattform herunter.
+Gehen Sie zur [Releases](https://github.com/FrogClaw-Desktop/FrogClaw/releases)-Seite und laden Sie das Installationsprogramm für Ihre Plattform herunter.
 
 ## FAQ
 
@@ -117,8 +117,8 @@ Gehen Sie zur [Releases](https://github.com/FrogClawClient-Desktop/FrogClawClien
 
 Da die Anwendung nicht von Apple signiert ist, kann macOS eine der folgenden Meldungen anzeigen:
 
-- „FrogClawClient" ist beschädigt und kann nicht geöffnet werden
-- „FrogClawClient" kann nicht geöffnet werden, da Apple es nicht auf Schadsoftware überprüfen kann
+- „FrogClaw" ist beschädigt und kann nicht geöffnet werden
+- „FrogClaw" kann nicht geöffnet werden, da Apple es nicht auf Schadsoftware überprüfen kann
 
 **Lösungsschritte:**
 
@@ -133,7 +133,7 @@ Gehen Sie dann zu **Systemeinstellungen → Datenschutz & Sicherheit → Sicherh
 **2. Das Quarantäne-Attribut entfernen**
 
 ```bash
-sudo xattr -dr com.apple.quarantine /Applications/FrogClawClient.app
+sudo xattr -dr com.apple.quarantine /Applications/FrogClaw.app
 ```
 
 > Tipp: Sie können das App-Symbol in das Terminal ziehen, nachdem Sie `sudo xattr -dr com.apple.quarantine ` eingegeben haben.

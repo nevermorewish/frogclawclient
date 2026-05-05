@@ -1,6 +1,6 @@
 # Configurar proveedores
 
-FrogClawClient se conecta simultáneamente a cualquier número de proveedores de IA. Cada proveedor tiene sus propias claves API, lista de modelos y parámetros predeterminados.
+FrogClaw se conecta simultáneamente a cualquier número de proveedores de IA. Cada proveedor tiene sus propias claves API, lista de modelos y parámetros predeterminados.
 
 ## Proveedores soportados
 
@@ -36,46 +36,46 @@ FrogClawClient se conecta simultáneamente a cualquier número de proveedores de
 
 ## Importar desde un enlace web
 
-Los sitios de proveedores, paneles de servicios de relé, plataformas privadas de modelos o paneles de gateway local pueden ofrecer un enlace **Abrir en FrogClawClient**. Al hacer clic, el navegador abre la app de escritorio FrogClawClient, FrogClawClient va a **Configuración → Proveedores**, muestra un diálogo de confirmación e importa la configuración solo después de que el usuario confirme.
+Los sitios de proveedores, paneles de servicios de relé, plataformas privadas de modelos o paneles de gateway local pueden ofrecer un enlace **Abrir en FrogClaw**. Al hacer clic, el navegador abre la app de escritorio FrogClaw, FrogClaw va a **Configuración → Proveedores**, muestra un diálogo de confirmación e importa la configuración solo después de que el usuario confirme.
 
 ### Flujo de usuario
 
-1. Instala y abre una versión de FrogClawClient compatible con enlaces de proveedor.
-2. Haz clic en el enlace **Abrir en FrogClawClient** del proveedor en el navegador.
-3. Confirma el nombre, la URL base, el tipo de proveedor y el prefijo de la clave API en FrogClawClient.
-4. FrogClawClient reutiliza un proveedor existente con la misma **URL base + tipo**. Si no existe, crea uno nuevo y añade la clave API solo si aún no está guardada.
+1. Instala y abre una versión de FrogClaw compatible con enlaces de proveedor.
+2. Haz clic en el enlace **Abrir en FrogClaw** del proveedor en el navegador.
+3. Confirma el nombre, la URL base, el tipo de proveedor y el prefijo de la clave API en FrogClaw.
+4. FrogClaw reutiliza un proveedor existente con la misma **URL base + tipo**. Si no existe, crea uno nuevo y añade la clave API solo si aún no está guardada.
 
-FrogClawClient no valida la clave ni obtiene modelos automáticamente. Después de importar, haz clic en **Obtener modelos** o añade modelos manualmente.
+FrogClaw no valida la clave ni obtiene modelos automáticamente. Después de importar, haz clic en **Obtener modelos** o añade modelos manualmente.
 
 ### Formato del enlace
 
 ```text
-frogclawclient://providers?name=<name>&baseurl=<base-url>&apikey=<api-key>&type=<provider-type>
+FrogClaw://providers?name=<name>&baseurl=<base-url>&apikey=<api-key>&type=<provider-type>
 ```
 
 Ejemplo:
 
 ```text
-frogclawclient://providers?name=OpenAI&baseurl=https%3A%2F%2Fapi.openai.com&apikey=sk-xxx&type=openai
+FrogClaw://providers?name=OpenAI&baseurl=https%3A%2F%2Fapi.openai.com&apikey=sk-xxx&type=openai
 ```
 
 ### Parámetros
 
 | Parámetro | Obligatorio | Descripción |
 |-----------|-------------|-------------|
-| `name` | Sí | Nombre visible en FrogClawClient, por ejemplo `OpenAI` o `My Relay` |
+| `name` | Sí | Nombre visible en FrogClaw, por ejemplo `OpenAI` o `My Relay` |
 | `baseurl` | Sí | URL base codificada. Solo se aceptan `http` y `https`; se rechazan query y hash. |
-| `apikey` | Sí | Clave API que se guardará en FrogClawClient. FrogClawClient solo muestra un prefijo en el diálogo. |
+| `apikey` | Sí | Clave API que se guardará en FrogClaw. FrogClaw solo muestra un prefijo en el diálogo. |
 | `type` | Sí | Tipo de proveedor. Valores permitidos: `openai`, `openai_responses`, `anthropic`, `gemini`, `custom`. |
 
-`baseurl` puede usar el sufijo de fuerza existente de FrogClawClient, por ejemplo `https://example.com!`. La importación por enlace no configura `api_path`; FrogClawClient seguirá usando la ruta predeterminada del tipo de proveedor seleccionado.
+`baseurl` puede usar el sufijo de fuerza existente de FrogClaw, por ejemplo `https://example.com!`. La importación por enlace no configura `api_path`; FrogClaw seguirá usando la ruta predeterminada del tipo de proveedor seleccionado.
 
 ### Configuración del sitio web
 
 Codifica todos los valores dinámicos con `encodeURIComponent` o `URLSearchParams`:
 
 ```html
-<a id="open-frogclaw" href="#">Abrir en FrogClawClient</a>
+<a id="open-frogclaw" href="#">Abrir en FrogClaw</a>
 
 <script>
   const provider = {
@@ -92,7 +92,7 @@ Codifica todos los valores dinámicos con `encodeURIComponent` o `URLSearchParam
     type: provider.type,
   });
 
-  document.getElementById('open-frogclaw').href = `frogclawclient://providers?${params.toString()}`;
+  document.getElementById('open-frogclaw').href = `FrogClaw://providers?${params.toString()}`;
 </script>
 ```
 
@@ -103,14 +103,14 @@ Una clave API dentro de una URL puede quedar en el historial del navegador, logs
 :::
 
 ::: tip Pruebas
-`frogclawclient://` es un protocolo personalizado registrado por la app de escritorio instalada. Ejecutar solo el sitio web o el servidor de desarrollo Vite no registra el protocolo. Si el enlace no abre FrogClawClient, instala o recompila primero la app de escritorio más reciente.
+`FrogClaw://` es un protocolo personalizado registrado por la app de escritorio instalada. Ejecutar solo el sitio web o el servidor de desarrollo Vite no registra el protocolo. Si el enlace no abre FrogClaw, instala o recompila primero la app de escritorio más reciente.
 :::
 
 ---
 
 ## Rotación de claves múltiples
 
-FrogClawClient soporta múltiples claves API por proveedor. Haz clic en **Añadir clave** en el panel de detalles del proveedor.
+FrogClaw soporta múltiples claves API por proveedor. Haz clic en **Añadir clave** en el panel de detalles del proveedor.
 
 ---
 
@@ -127,7 +127,7 @@ Cada modelo puede tener sus propias anulaciones de parámetros predeterminados: 
 ### Ollama (modelos locales)
 
 1. Instala e inicia [Ollama](https://ollama.com/).
-2. En FrogClawClient, crea un nuevo proveedor con tipo **OpenAI**.
+2. En FrogClaw, crea un nuevo proveedor con tipo **OpenAI**.
 3. Establece la **URL base** a `http://localhost:11434`.
 4. Haz clic en **Obtener modelos** para descubrir los modelos descargados localmente.
 

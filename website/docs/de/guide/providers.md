@@ -1,6 +1,6 @@
 # Anbieter konfigurieren
 
-FrogClawClient verbindet sich gleichzeitig mit beliebig vielen KI-Anbietern. Jeder Anbieter hat seine eigenen API-Schlüssel, Modellliste und Parameterstandards.
+FrogClaw verbindet sich gleichzeitig mit beliebig vielen KI-Anbietern. Jeder Anbieter hat seine eigenen API-Schlüssel, Modellliste und Parameterstandards.
 
 ## Unterstützte Anbieter
 
@@ -36,46 +36,46 @@ FrogClawClient verbindet sich gleichzeitig mit beliebig vielen KI-Anbietern. Jed
 
 ## Import über Website-Link
 
-Anbieter-Websites, Relay-Dashboards, private Modellplattformen oder lokale Gateway-Seiten können einen Link **In FrogClawClient öffnen** bereitstellen. Beim Klick öffnet der Browser die FrogClawClient-Desktop-App, FrogClawClient wechselt zu **Einstellungen → Anbieter**, zeigt einen Bestätigungsdialog und importiert die Konfiguration erst nach Bestätigung durch den Benutzer.
+Anbieter-Websites, Relay-Dashboards, private Modellplattformen oder lokale Gateway-Seiten können einen Link **In FrogClaw öffnen** bereitstellen. Beim Klick öffnet der Browser die FrogClaw-Desktop-App, FrogClaw wechselt zu **Einstellungen → Anbieter**, zeigt einen Bestätigungsdialog und importiert die Konfiguration erst nach Bestätigung durch den Benutzer.
 
 ### Benutzerablauf
 
-1. Installieren und öffnen Sie eine FrogClawClient-Version, die Anbieterlinks unterstützt.
-2. Klicken Sie im Browser auf den Link **In FrogClawClient öffnen** des Anbieters.
-3. Prüfen Sie in FrogClawClient Anbietername, Base URL, Anbietertyp und API-Schlüssel-Präfix.
-4. FrogClawClient verwendet einen bestehenden Anbieter mit derselben Kombination aus **Base URL + Typ** wieder. Falls keiner existiert, wird ein neuer Anbieter erstellt; der API-Schlüssel wird nur hinzugefügt, wenn er noch nicht vorhanden ist.
+1. Installieren und öffnen Sie eine FrogClaw-Version, die Anbieterlinks unterstützt.
+2. Klicken Sie im Browser auf den Link **In FrogClaw öffnen** des Anbieters.
+3. Prüfen Sie in FrogClaw Anbietername, Base URL, Anbietertyp und API-Schlüssel-Präfix.
+4. FrogClaw verwendet einen bestehenden Anbieter mit derselben Kombination aus **Base URL + Typ** wieder. Falls keiner existiert, wird ein neuer Anbieter erstellt; der API-Schlüssel wird nur hinzugefügt, wenn er noch nicht vorhanden ist.
 
-FrogClawClient validiert den Schlüssel nicht automatisch und ruft Modelle nicht automatisch ab. Klicken Sie nach dem Import auf **Modelle abrufen** oder fügen Sie Modelle manuell hinzu.
+FrogClaw validiert den Schlüssel nicht automatisch und ruft Modelle nicht automatisch ab. Klicken Sie nach dem Import auf **Modelle abrufen** oder fügen Sie Modelle manuell hinzu.
 
 ### Linkformat
 
 ```text
-frogclawclient://providers?name=<name>&baseurl=<base-url>&apikey=<api-key>&type=<provider-type>
+FrogClaw://providers?name=<name>&baseurl=<base-url>&apikey=<api-key>&type=<provider-type>
 ```
 
 Beispiel:
 
 ```text
-frogclawclient://providers?name=OpenAI&baseurl=https%3A%2F%2Fapi.openai.com&apikey=sk-xxx&type=openai
+FrogClaw://providers?name=OpenAI&baseurl=https%3A%2F%2Fapi.openai.com&apikey=sk-xxx&type=openai
 ```
 
 ### Parameter
 
 | Parameter | Erforderlich | Beschreibung |
 |-----------|--------------|--------------|
-| `name` | Ja | Anzeigename in FrogClawClient, z. B. `OpenAI` oder `My Relay` |
+| `name` | Ja | Anzeigename in FrogClaw, z. B. `OpenAI` oder `My Relay` |
 | `baseurl` | Ja | URL-kodierte Base URL. Nur `http` und `https` sind erlaubt; query und hash werden abgelehnt. |
-| `apikey` | Ja | API-Schlüssel, der in FrogClawClient gespeichert wird. FrogClawClient zeigt im Bestätigungsdialog nur ein Präfix. |
+| `apikey` | Ja | API-Schlüssel, der in FrogClaw gespeichert wird. FrogClaw zeigt im Bestätigungsdialog nur ein Präfix. |
 | `type` | Ja | Anbietertyp. Erlaubte Werte: `openai`, `openai_responses`, `anthropic`, `gemini`, `custom`. |
 
-`baseurl` kann die bestehende Force-Suffix-Semantik von FrogClawClient verwenden, z. B. `https://example.com!`. Beim Import per Link wird `api_path` nicht gesetzt; FrogClawClient nutzt weiterhin den Standardpfad des gewählten Anbietertyps.
+`baseurl` kann die bestehende Force-Suffix-Semantik von FrogClaw verwenden, z. B. `https://example.com!`. Beim Import per Link wird `api_path` nicht gesetzt; FrogClaw nutzt weiterhin den Standardpfad des gewählten Anbietertyps.
 
 ### Website-Konfiguration
 
 Kodieren Sie alle dynamischen Werte mit `encodeURIComponent` oder `URLSearchParams`:
 
 ```html
-<a id="open-frogclaw" href="#">In FrogClawClient öffnen</a>
+<a id="open-frogclaw" href="#">In FrogClaw öffnen</a>
 
 <script>
   const provider = {
@@ -92,7 +92,7 @@ Kodieren Sie alle dynamischen Werte mit `encodeURIComponent` oder `URLSearchPara
     type: provider.type,
   });
 
-  document.getElementById('open-frogclaw').href = `frogclawclient://providers?${params.toString()}`;
+  document.getElementById('open-frogclaw').href = `FrogClaw://providers?${params.toString()}`;
 </script>
 ```
 
@@ -103,14 +103,14 @@ Ein API-Schlüssel in einer URL kann im Browserverlauf, in Logs, Erweiterungen o
 :::
 
 ::: tip Test
-`frogclawclient://` ist ein benutzerdefiniertes Protokoll, das von der installierten Desktop-App im System registriert wird. Nur die Website oder den Vite-Entwicklungsserver auszuführen registriert das Protokoll nicht. Wenn der Link FrogClawClient nicht öffnet, installieren oder bauen Sie zuerst die aktuelle FrogClawClient-Desktop-App neu.
+`FrogClaw://` ist ein benutzerdefiniertes Protokoll, das von der installierten Desktop-App im System registriert wird. Nur die Website oder den Vite-Entwicklungsserver auszuführen registriert das Protokoll nicht. Wenn der Link FrogClaw nicht öffnet, installieren oder bauen Sie zuerst die aktuelle FrogClaw-Desktop-App neu.
 :::
 
 ---
 
 ## Multi-Key-Rotation
 
-FrogClawClient unterstützt mehrere API-Schlüssel pro Anbieter. Klicken Sie auf **Schlüssel hinzufügen** im Anbieter-Detailpanel.
+FrogClaw unterstützt mehrere API-Schlüssel pro Anbieter. Klicken Sie auf **Schlüssel hinzufügen** im Anbieter-Detailpanel.
 
 ---
 
@@ -125,7 +125,7 @@ Jedes Modell kann eigene Standardparameterüberschreibungen haben: Temperatur, M
 ## Ollama (lokale Modelle)
 
 1. Installieren und starten Sie [Ollama](https://ollama.com/).
-2. Erstellen Sie in FrogClawClient einen neuen Anbieter mit Typ **OpenAI**.
+2. Erstellen Sie in FrogClaw einen neuen Anbieter mit Typ **OpenAI**.
 3. Setzen Sie die **Base URL** auf `http://localhost:11434`.
 4. Klicken Sie auf **Modelle abrufen**, um lokal heruntergeladene Modelle zu entdecken.
 

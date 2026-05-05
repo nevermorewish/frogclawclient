@@ -2,11 +2,11 @@
 
 ## Was ist das API-Gateway?
 
-FrogClawClient enthält einen integrierten lokalen API-Server, der Ihre konfigurierten Anbieter als **OpenAI-kompatible**, **Claude-native** und **Gemini-native** Endpoints exponiert. Jedes Tool oder jeder Client, der eines dieser Protokolle verwendet, kann FrogClawClient als Backend verwenden — keine separaten API-Schlüssel oder Relay-Dienste erforderlich.
+FrogClaw enthält einen integrierten lokalen API-Server, der Ihre konfigurierten Anbieter als **OpenAI-kompatible**, **Claude-native** und **Gemini-native** Endpoints exponiert. Jedes Tool oder jeder Client, der eines dieser Protokolle verwendet, kann FrogClaw als Backend verwenden — keine separaten API-Schlüssel oder Relay-Dienste erforderlich.
 
 Anwendungsfälle:
 
-- Führen Sie **Claude Code CLI**, **OpenAI Codex CLI**, **Gemini CLI** oder **OpenCode** über FrogClawClient aus.
+- Führen Sie **Claude Code CLI**, **OpenAI Codex CLI**, **Gemini CLI** oder **OpenCode** über FrogClaw aus.
 - Verbinden Sie Ihre IDE-Erweiterungen mit einem einzigen, lokal verwalteten Endpoint.
 - Teilen Sie einen Satz von Anbieter-Schlüsseln über viele Tools mit schlüsselbasiertem Rate-Limiting.
 
@@ -19,7 +19,7 @@ Anwendungsfälle:
 3. Standardmäßig lauscht der Server auf `127.0.0.1:8080` (HTTP).
 
 ::: tip
-Aktivieren Sie **Auto-Start** in den Gateway-Einstellungen, um den Server automatisch beim Start von FrogClawClient zu starten.
+Aktivieren Sie **Auto-Start** in den Gateway-Einstellungen, um den Server automatisch beim Start von FrogClaw zu starten.
 :::
 
 ---

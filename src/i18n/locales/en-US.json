@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "FrogClawClient"
+    "name": "FrogClaw"
   },
   "nav": {
     "home": "Home",
@@ -954,7 +954,7 @@
     "maxCount": "Max Backups to Keep",
     "copies": "copies",
     "backupDir": "Backup Directory",
-    "defaultDir": "FrogClawClient default backups directory",
+    "defaultDir": "FrogClaw default backups directory",
     "effectiveDir": "Effective directory",
     "formatSqliteDesc": "Fast, direct restore",
     "formatJsonDesc": "Readable, larger file",
@@ -1109,7 +1109,7 @@
     "reloadConfirmOk": "Reload",
     "reloadConfirmCancel": "Cancel",
     "closeConfirmTitle": "Quit Application",
-    "closeConfirmContent": "Are you sure you want to quit FrogClawClient?",
+    "closeConfirmContent": "Are you sure you want to quit FrogClaw?",
     "closeConfirmOk": "Quit",
     "closeConfirmCancel": "Cancel",
     "startMinimized": "Start Minimized",
@@ -1219,7 +1219,7 @@
     "uninstallConfirm": "Are you sure you want to uninstall skill \"{{name}}\"?",
     "detail": "Skill Details",
     "source": {
-      "frogclaw": "FrogClawClient",
+      "frogclaw": "FrogClaw",
       "claude": "Claude",
       "agents": "Agents",
       "builtin": "Built-in",

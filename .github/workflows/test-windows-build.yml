@@ -1,4 +1,4 @@
-﻿name: Test Windows Build
+name: Test Windows Build
 
 on:
   workflow_dispatch:
@@ -137,10 +137,10 @@ jobs:
       - name: Upload Windows build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: FrogClawClient-windows-x64-${{ github.run_number }}
+          name: FrogClaw-windows-x64-${{ github.run_number }}
           if-no-files-found: error
           path: |
-            src-tauri/target/x86_64-pc-windows-msvc/release/FrogClawClient.exe
+            src-tauri/target/x86_64-pc-windows-msvc/release/FrogClaw.exe
             src-tauri/target/x86_64-pc-windows-msvc/release/binaries/**
             src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
             src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*setup.exe
@@ -150,9 +150,9 @@ jobs:
         shell: pwsh
         run: |
           $releaseDir = "src-tauri/target/x86_64-pc-windows-msvc/release"
-          $exe = Join-Path $releaseDir "FrogClawClient.exe"
+          $exe = Join-Path $releaseDir "FrogClaw.exe"
           $resources = Join-Path $releaseDir "binaries"
-          $zipName = "FrogClawClient_${{ github.ref_name }}_windows-x64-portable.zip"
+          $zipName = "FrogClaw_${{ github.ref_name }}_windows-x64-portable.zip"
           $stage = Join-Path $env:RUNNER_TEMP "frogclaw-portable-x64"
           Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Path $stage | Out-Null
@@ -167,11 +167,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: 'FrogClawClient Test ${{ github.ref_name }}'
+          name: 'FrogClaw Test ${{ github.ref_name }}'
           draft: true
           prerelease: true
           token: ${{ secrets.GITHUB_TOKEN }}
           files: |
-            FrogClawClient_${{ github.ref_name }}_windows-x64-portable.zip
+            FrogClaw_${{ github.ref_name }}_windows-x64-portable.zip
             src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
             src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*setup.exe

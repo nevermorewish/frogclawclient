@@ -1,6 +1,6 @@
-﻿{
+{
   "app": {
-    "name": "FrogClawClient"
+    "name": "FrogClaw"
   },
   "nav": {
     "home": "首页",
@@ -954,7 +954,7 @@
     "maxCount": "最大保留数量",
     "copies": "份",
     "backupDir": "备份目录",
-    "defaultDir": "FrogClawClient 默认备份目录",
+    "defaultDir": "FrogClaw 默认备份目录",
     "effectiveDir": "当前生效目录",
     "formatSqliteDesc": "快速，可直接恢复",
     "formatJsonDesc": "可读性好，体积较大",
@@ -1109,7 +1109,7 @@
     "reloadConfirmOk": "刷新",
     "reloadConfirmCancel": "取消",
     "closeConfirmTitle": "退出应用",
-    "closeConfirmContent": "确定要退出 FrogClawClient 吗？",
+    "closeConfirmContent": "确定要退出 FrogClaw 吗？",
     "closeConfirmOk": "退出",
     "closeConfirmCancel": "取消",
     "startMinimized": "启动时最小化",
@@ -1219,7 +1219,7 @@
     "uninstallConfirm": "确定要卸载技能「{{name}}」吗？",
     "detail": "技能详情",
     "source": {
-      "frogclaw": "FrogClawClient",
+      "frogclaw": "FrogClaw",
       "claude": "Claude",
       "agents": "Agents",
       "builtin": "内置",

@@ -1,9 +1,9 @@
 [简体中文](./README.md) | [繁體中文](./README-ZH-TW.md) | [English](./README-EN.md) | [日本語](./README-JA.md) | [한국어](./README-KO.md) | [Français](./README-FR.md) | [Deutsch](./README-DE.md) | [Español](./README-ES.md) | [Русский](./README-RU.md) | **हिन्दी** | [العربية](./README-AR.md)
 
-[![FrogClawClient](https://socialify.git.ci/FrogClawClient-Desktop/FrogClawClient/image?description=1&font=JetBrains+Mono&forks=1&issues=1&logo=https%3A%2F%2Fgithub.com%2FFrogClawClient-Desktop%2FFrogClawClient%2Fblob%2Fmain%2Fsrc%2Fassets%2Fimage%2Flogo.png%3Fraw%3Dtrue&name=1&owner=1&pattern=Floating+Cogs&pulls=1&stargazers=1&theme=Auto)](https://github.com/FrogClawClient-Desktop/FrogClawClient)
+[![FrogClaw](https://socialify.git.ci/FrogClaw-Desktop/FrogClaw/image?description=1&font=JetBrains+Mono&forks=1&issues=1&logo=https%3A%2F%2Fgithub.com%2FFrogClaw-Desktop%2FFrogClaw%2Fblob%2Fmain%2Fsrc%2Fassets%2Fimage%2Flogo.png%3Fraw%3Dtrue&name=1&owner=1&pattern=Floating+Cogs&pulls=1&stargazers=1&theme=Auto)](https://github.com/FrogClaw-Desktop/FrogClaw)
 
 <p align="center">
-    <a href="https://www.producthunt.com/products/frogclaw?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-frogclaw" target="_blank" rel="noopener noreferrer"><img alt="FrogClawClient - Lightweight, high-perf cross-platform AI desktop client | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1118403&amp;theme=light&amp;t=1775627359538"></a>
+    <a href="https://www.producthunt.com/products/frogclaw?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-frogclaw" target="_blank" rel="noopener noreferrer"><img alt="FrogClaw - Lightweight, high-perf cross-platform AI desktop client | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1118403&amp;theme=light&amp;t=1775627359538"></a>
 </p>
 
 ## स्क्रीनशॉट
@@ -109,7 +109,7 @@
 
 ## शुरू करना
 
-[Releases](https://github.com/FrogClawClient-Desktop/FrogClawClient/releases) पेज पर जाएँ और अपने प्लेटफॉर्म के लिए इंस्टॉलर डाउनलोड करें।
+[Releases](https://github.com/FrogClaw-Desktop/FrogClaw/releases) पेज पर जाएँ और अपने प्लेटफॉर्म के लिए इंस्टॉलर डाउनलोड करें।
 
 ## अक्सर पूछे जाने वाले प्रश्न
 
@@ -117,8 +117,8 @@
 
 चूँकि एप्लिकेशन Apple द्वारा साइन नहीं किया गया है, macOS निम्नलिखित में से एक संकेत दिखा सकता है:
 
-- "FrogClawClient" क्षतिग्रस्त है और इसे नहीं खोला जा सकता
-- "FrogClawClient" को नहीं खोला जा सकता क्योंकि Apple इसे दुर्भावनापूर्ण सॉफ़्टवेयर के लिए जाँच नहीं कर सकता
+- "FrogClaw" क्षतिग्रस्त है और इसे नहीं खोला जा सकता
+- "FrogClaw" को नहीं खोला जा सकता क्योंकि Apple इसे दुर्भावनापूर्ण सॉफ़्टवेयर के लिए जाँच नहीं कर सकता
 
 **समाधान के चरण:**
 
@@ -133,7 +133,7 @@ sudo spctl --master-disable
 **2. क्वारंटाइन विशेषता हटाएँ**
 
 ```bash
-sudo xattr -dr com.apple.quarantine /Applications/FrogClawClient.app
+sudo xattr -dr com.apple.quarantine /Applications/FrogClaw.app
 ```
 
 > टिप: आप `sudo xattr -dr com.apple.quarantine ` टाइप करने के बाद टर्मिनल पर ऐप आइकन खींच सकते हैं।

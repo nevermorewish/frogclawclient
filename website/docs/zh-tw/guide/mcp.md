@@ -4,11 +4,11 @@
 
 [Model Context Protocol（MCP）](https://modelcontextprotocol.io/)是一種開放協定，讓 AI 模型能夠與外部工具和資料來源互動。透過 MCP，模型可以在對話中呼叫檔案操作、網頁擷取、資料庫查詢等各種工具，大幅擴展 AI 的實際能力。
 
-FrogClawClient 內建了 MCP 客戶端，您可以連接各種 MCP 伺服器來為 AI 對話增加工具呼叫能力。
+FrogClaw 內建了 MCP 客戶端，您可以連接各種 MCP 伺服器來為 AI 對話增加工具呼叫能力。
 
 ## 傳輸協定
 
-FrogClawClient 支援三種 MCP 傳輸協定，適用於不同的部署場景：
+FrogClaw 支援三種 MCP 傳輸協定，適用於不同的部署場景：
 
 | 協定 | 連線方式 | 適用場景 | 設定參數 |
 |------|---------|---------|---------|
@@ -17,7 +17,7 @@ FrogClawClient 支援三種 MCP 傳輸協定，適用於不同的部署場景：
 | **StreamableHTTP** | HTTP 串流傳輸 | 遠端 HTTP 伺服器，支援雙向串流 | `url` |
 
 ::: info Stdio vs 遠端
-大部分 MCP 伺服器以 Stdio 模式執行——FrogClawClient 在本機啟動一個程序並透過標準輸入/輸出通訊。如果您連接的是遠端部署的伺服器，則使用 SSE 或 StreamableHTTP 協定。
+大部分 MCP 伺服器以 Stdio 模式執行——FrogClaw 在本機啟動一個程序並透過標準輸入/輸出通訊。如果您連接的是遠端部署的伺服器，則使用 SSE 或 StreamableHTTP 協定。
 :::
 
 ## 新增 MCP 伺服器
@@ -32,11 +32,11 @@ FrogClawClient 支援三種 MCP 傳輸協定，適用於不同的部署場景：
 4. 根據所選協定填寫相應設定：
    - **Stdio**：填寫啟動指令（如 `npx`、`uvx`）和參數
    - **SSE / StreamableHTTP**：填寫伺服器 URL
-5. 儲存後 FrogClawClient 會自動連接並取得可用工具清單
+5. 儲存後 FrogClaw 會自動連接並取得可用工具清單
 
 ### JSON 匯入
 
-如果您有現成的 MCP 設定（如從其他工具匯出），可以直接貼上 JSON 快速匯入。FrogClawClient 支援標準的 `mcpServers` 設定格式。
+如果您有現成的 MCP 設定（如從其他工具匯出），可以直接貼上 JSON 快速匯入。FrogClaw 支援標準的 `mcpServers` 設定格式。
 
 #### Stdio 協定格式
 
@@ -81,7 +81,7 @@ FrogClawClient 支援三種 MCP 傳輸協定，適用於不同的部署場景：
 ```
 
 ::: tip 批次匯入
-您可以在一個 JSON 中包含多個伺服器，FrogClawClient 會一次性全部匯入。
+您可以在一個 JSON 中包含多個伺服器，FrogClaw 會一次性全部匯入。
 :::
 
 ## 設定範例
@@ -162,7 +162,7 @@ FrogClawClient 支援三種 MCP 傳輸協定，適用於不同的部署場景：
 
 ## 內建工具
 
-FrogClawClient 開箱即用地提供了一些內建 MCP 工具伺服器，無需額外安裝：
+FrogClaw 開箱即用地提供了一些內建 MCP 工具伺服器，無需額外安裝：
 
 ### @frogclaw/fetch — 網頁擷取
 
@@ -185,7 +185,7 @@ FrogClawClient 開箱即用地提供了一些內建 MCP 工具伺服器，無需
 
 ## 工具執行面板
 
-當模型在對話中呼叫 MCP 工具時，FrogClawClient 會在訊息中顯示工具執行面板，其中包含：
+當模型在對話中呼叫 MCP 工具時，FrogClaw 會在訊息中顯示工具執行面板，其中包含：
 
 - **工具名稱** — 被呼叫的工具和所屬伺服器
 - **輸入參數** — 模型傳給工具的參數

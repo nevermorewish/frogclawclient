@@ -1,4 +1,4 @@
-﻿name: 🐛 提交 BUG
+name: 🐛 提交 BUG
 description: 报告一个 Bug 以帮助我们改进
 labels: ["bug"]
 body:
@@ -26,7 +26,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: FrogClawClient 版本
+      label: FrogClaw 版本
       placeholder: "例如：v1.0.0，可在设置中查看"
     validations:
       required: true

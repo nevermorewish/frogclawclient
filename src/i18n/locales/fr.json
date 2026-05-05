@@ -1,6 +1,6 @@
-﻿{
+{
   "app": {
-    "name": "FrogClawClient"
+    "name": "FrogClaw"
   },
   "nav": {
     "home": "Accueil",
@@ -933,7 +933,7 @@
     "maxCount": "Nombre maximum de sauvegardes à conserver",
     "copies": "copies",
     "backupDir": "Répertoire de sauvegarde",
-    "defaultDir": "Répertoire de sauvegardes par défaut d'FrogClawClient",
+    "defaultDir": "Répertoire de sauvegardes par défaut d'FrogClaw",
     "effectiveDir": "Répertoire effectif",
     "formatSqliteDesc": "Restauration rapide et directe",
     "formatJsonDesc": "Lisible, fichier plus volumineux",
@@ -1088,7 +1088,7 @@
     "reloadConfirmOk": "Recharger",
     "reloadConfirmCancel": "Annuler",
     "closeConfirmTitle": "Quitter l'application",
-    "closeConfirmContent": "Voulez-vous vraiment quitter FrogClawClient ?",
+    "closeConfirmContent": "Voulez-vous vraiment quitter FrogClaw ?",
     "closeConfirmOk": "Quitter",
     "closeConfirmCancel": "Annuler",
     "startMinimized": "Démarrer réduit",
@@ -1198,7 +1198,7 @@
     "uninstallConfirm": "Voulez-vous vraiment désinstaller la compétence \"{{name}}\" ?",
     "detail": "Détails de la compétence",
     "source": {
-      "frogclaw": "FrogClawClient",
+      "frogclaw": "FrogClaw",
       "claude": "Claude",
       "agents": "Agents",
       "builtin": "Intégré",

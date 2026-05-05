@@ -15,7 +15,7 @@ import type { Skill, MarketplaceSkill } from '@/types';
 import { CopyButton } from '@/components/common/CopyButton';
 
 const INSTALL_TARGETS = [
-  { key: 'frogclaw', label: '~/.frogclaw/skills/', desc: 'FrogClawClient', icon: <Sparkles size={14} /> },
+  { key: 'frogclaw', label: '~/.frogclaw/skills/', desc: 'FrogClaw', icon: <Sparkles size={14} /> },
   { key: 'claude', label: '~/.claude/skills/', desc: 'Claude', icon: <FolderOpen size={14} /> },
   { key: 'agents', label: '~/.agents/skills/', desc: 'Agents', icon: <FolderOpen size={14} /> },
 ] as const;
@@ -417,7 +417,7 @@ export function SkillsPage() {
           onChange={(k) => setSourceFilter(k as 'all' | 'frogclaw' | 'claude' | 'agents')}
           items={[
             { key: 'all', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>{ALL_SOURCE_ICON}{t('skills.sourceAll')}</span> },
-            { key: 'frogclaw', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>{SOURCE_ICONS.frogclaw}FrogClawClient</span> },
+            { key: 'frogclaw', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>{SOURCE_ICONS.frogclaw}FrogClaw</span> },
             { key: 'claude', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>{SOURCE_ICONS.claude}Claude</span> },
             { key: 'agents', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>{SOURCE_ICONS.agents}Agents</span> },
           ]}

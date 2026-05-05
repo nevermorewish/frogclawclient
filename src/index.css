@@ -466,7 +466,7 @@ html[data-theme="dark"] .markstream-react .thematic-break {
   contain-intrinsic-size: auto;
 }
 
-/* Let FrogClawClient own chat bottom-lock behavior instead of browser scroll anchoring.
+/* Let FrogClaw own chat bottom-lock behavior instead of browser scroll anchoring.
  * Async math / diagram rendering can otherwise move the viewport without any
  * user input and trick the chat into thinking the user scrolled away. */
 [data-message-area] .ant-bubble-list-scroll-box {

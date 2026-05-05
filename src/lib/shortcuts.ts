@@ -275,7 +275,7 @@ export function detectShortcutConflicts(bindings: Partial<Record<ShortcutAction,
 }
 
 /**
- * Known external app shortcuts that commonly conflict with FrogClawClient.
+ * Known external app shortcuts that commonly conflict with FrogClaw.
  * Each entry maps a canonical accelerator (lowercase) to a list of
  * app names that use the same shortcut.
  */

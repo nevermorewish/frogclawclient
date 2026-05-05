@@ -1,6 +1,6 @@
-﻿{
+{
   "app": {
-    "name": "FrogClawClient"
+    "name": "FrogClaw"
   },
   "nav": {
     "home": "ホーム",
@@ -933,7 +933,7 @@
     "maxCount": "保持する最大バックアップ数",
     "copies": "件",
     "backupDir": "バックアップディレクトリ",
-    "defaultDir": "FrogClawClientデフォルトバックアップディレクトリ",
+    "defaultDir": "FrogClawデフォルトバックアップディレクトリ",
     "effectiveDir": "有効なディレクトリ",
     "formatSqliteDesc": "高速、直接復元",
     "formatJsonDesc": "読みやすい、ファイルが大きい",
@@ -1088,7 +1088,7 @@
     "reloadConfirmOk": "再読み込み",
     "reloadConfirmCancel": "キャンセル",
     "closeConfirmTitle": "アプリを終了",
-    "closeConfirmContent": "FrogClawClient を終了してもよろしいですか？",
+    "closeConfirmContent": "FrogClaw を終了してもよろしいですか？",
     "closeConfirmOk": "終了",
     "closeConfirmCancel": "キャンセル",
     "startMinimized": "最小化して起動",
@@ -1198,7 +1198,7 @@
     "uninstallConfirm": "スキル「{{name}}」をアンインストールしますか？",
     "detail": "スキル詳細",
     "source": {
-      "frogclaw": "FrogClawClient",
+      "frogclaw": "FrogClaw",
       "claude": "Claude",
       "agents": "Agents",
       "builtin": "ビルトイン",

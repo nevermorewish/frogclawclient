@@ -233,7 +233,7 @@ async fn install_from_github(owner: &str, repo: &str, target_dir: &Path) -> Resu
     let client = reqwest::Client::new();
     let response = client
         .get(&url)
-        .header("User-Agent", "FrogClawClient")
+        .header("User-Agent", "FrogClaw")
         .header("Accept", "application/vnd.github+json")
         .send()
         .await
@@ -472,7 +472,7 @@ pub async fn search_marketplace(
             let client = reqwest::Client::new();
             let response = client
                 .get(&url)
-                .header("User-Agent", "FrogClawClient")
+                .header("User-Agent", "FrogClaw")
                 .header("Accept", "application/vnd.github.v3+json")
                 .send()
                 .await
@@ -514,7 +514,7 @@ pub async fn search_marketplace(
             let client = reqwest::Client::new();
             let response = client
                 .get(&url)
-                .header("User-Agent", "FrogClawClient")
+                .header("User-Agent", "FrogClaw")
                 .send()
                 .await
                 .map_err(|e| format!("Search failed: {}", e))?;
@@ -598,7 +598,7 @@ pub async fn check_skill_updates() -> Result<Vec<SkillUpdateInfo>, String> {
         let client = reqwest::Client::new();
         let response = client
             .get(&url)
-            .header("User-Agent", "FrogClawClient")
+            .header("User-Agent", "FrogClaw")
             .header("Accept", "application/vnd.github.v3+json")
             .send()
             .await;

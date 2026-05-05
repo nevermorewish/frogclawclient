@@ -1,20 +1,20 @@
 ---
 layout: home
-title: FrogClawClient — オープンソース AI デスクトップクライアント & ゲートウェイ
+title: FrogClaw — オープンソース AI デスクトップクライアント & ゲートウェイ
 titleTemplate: false
 
 head:
   - - meta
     - name: description
-      content: FrogClawClient は無料のオープンソース AI デスクトップクライアントで、AI ゲートウェイを内蔵しています。OpenAI、Claude、Gemini、DeepSeek などのマルチモデル対話、MCP サーバー、ナレッジベース、プライバシー重視。
+      content: FrogClaw は無料のオープンソース AI デスクトップクライアントで、AI ゲートウェイを内蔵しています。OpenAI、Claude、Gemini、DeepSeek などのマルチモデル対話、MCP サーバー、ナレッジベース、プライバシー重視。
 
 hero:
-  name: FrogClawClient
+  name: FrogClaw
   text: あなたの AI デスクトップアシスタント
   tagline: マルチモデルチャット、MCP ツール、API ゲートウェイ、ナレッジベース — すべて一つのオープンソースクライアントで
   image:
     src: /logo.png
-    alt: FrogClawClient
+    alt: FrogClaw
   actions:
     - theme: brand
       text: はじめる
@@ -24,7 +24,7 @@ hero:
       link: /ja/download
     - theme: alt
       text: GitHub
-      link: https://github.com/FrogClawClient-Desktop/FrogClawClient
+      link: https://github.com/FrogClaw-Desktop/FrogClaw
 
 features:
   - icon: robot

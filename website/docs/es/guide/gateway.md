@@ -2,11 +2,11 @@
 
 ## ¿Qué es la pasarela API?
 
-FrogClawClient incluye un servidor API local integrado que expone tus proveedores configurados como endpoints **compatibles con OpenAI**, **nativos de Claude** y **nativos de Gemini**. Cualquier herramienta o cliente que utilice uno de estos protocolos puede usar FrogClawClient como backend — sin claves API separadas ni servicios de relé requeridos.
+FrogClaw incluye un servidor API local integrado que expone tus proveedores configurados como endpoints **compatibles con OpenAI**, **nativos de Claude** y **nativos de Gemini**. Cualquier herramienta o cliente que utilice uno de estos protocolos puede usar FrogClaw como backend — sin claves API separadas ni servicios de relé requeridos.
 
 Casos de uso:
 
-- Ejecuta **Claude Code CLI**, **OpenAI Codex CLI**, **Gemini CLI** u **OpenCode** a través de FrogClawClient.
+- Ejecuta **Claude Code CLI**, **OpenAI Codex CLI**, **Gemini CLI** u **OpenCode** a través de FrogClaw.
 - Conecta tus extensiones IDE a un único endpoint gestionado localmente.
 - Comparte un conjunto de claves de proveedor entre muchas herramientas con limitación de velocidad por clave.
 
@@ -19,7 +19,7 @@ Casos de uso:
 3. Por defecto, el servidor escucha en `127.0.0.1:8080` (HTTP).
 
 ::: tip
-Activa el **Inicio automático** en la configuración de la pasarela para iniciar el servidor automáticamente cuando FrogClawClient se inicie.
+Activa el **Inicio automático** en la configuración de la pasarela para iniciar el servidor automáticamente cuando FrogClaw se inicie.
 :::
 
 ---

@@ -1,20 +1,20 @@
 ---
 layout: home
-title: FrogClawClient — 開源 AI 桌面客戶端 & AI 閘道
+title: FrogClaw — 開源 AI 桌面客戶端 & AI 閘道
 titleTemplate: false
 
 head:
   - - meta
     - name: description
-      content: FrogClawClient 是一款免費開源的 AI 桌面客戶端，內建 AI 閘道。支援 OpenAI、Claude、Gemini、DeepSeek 等多模型對話，MCP 伺服器、知識庫、隱私優先。
+      content: FrogClaw 是一款免費開源的 AI 桌面客戶端，內建 AI 閘道。支援 OpenAI、Claude、Gemini、DeepSeek 等多模型對話，MCP 伺服器、知識庫、隱私優先。
 
 hero:
-  name: FrogClawClient
+  name: FrogClaw
   text: 您的 AI 桌面助手
   tagline: 多模型對話、MCP 工具、API 閘道、知識庫，一個開源客戶端全部搞定
   image:
     src: /logo.png
-    alt: FrogClawClient
+    alt: FrogClaw
   actions:
     - theme: brand
       text: 快速開始
@@ -24,7 +24,7 @@ hero:
       link: /zh-tw/download
     - theme: alt
       text: GitHub
-      link: https://github.com/FrogClawClient-Desktop/FrogClawClient
+      link: https://github.com/FrogClaw-Desktop/FrogClaw
 
 features:
   - icon: robot

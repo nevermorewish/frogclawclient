@@ -1,10 +1,10 @@
 # Configure Providers
 
-FrogClawClient connects to any number of AI providers simultaneously. Each provider has its own API keys, model list, and parameter defaults.
+FrogClaw connects to any number of AI providers simultaneously. Each provider has its own API keys, model list, and parameter defaults.
 
 ## Supported Providers
 
-FrogClawClient includes first-class support for the following providers. Any service that exposes an OpenAI-compatible API also works out of the box.
+FrogClaw includes first-class support for the following providers. Any service that exposes an OpenAI-compatible API also works out of the box.
 
 | Provider | Example Models |
 |----------|---------------|
@@ -42,48 +42,48 @@ For third-party relay services, keep the type set to **OpenAI** (or the matching
 
 ## Importing from a Website Link
 
-Provider websites can offer an **Open in FrogClawClient** link that opens the FrogClawClient desktop app and pre-fills the provider settings. FrogClawClient will switch to **Settings → Providers**, show a confirmation dialog, and import the provider only after the user confirms.
+Provider websites can offer an **Open in FrogClaw** link that opens the FrogClaw desktop app and pre-fills the provider settings. FrogClaw will switch to **Settings → Providers**, show a confirmation dialog, and import the provider only after the user confirms.
 
-This is useful for API vendors, relay services, private model platforms, and local gateway dashboards that want to help users configure FrogClawClient without copying every field manually.
+This is useful for API vendors, relay services, private model platforms, and local gateway dashboards that want to help users configure FrogClaw without copying every field manually.
 
 ### User Flow
 
-1. Install and open a version of FrogClawClient that supports provider links.
-2. Click the provider's **Open in FrogClawClient** link in your browser.
-3. Confirm the provider name, Base URL, provider type, and API key prefix in FrogClawClient.
-4. FrogClawClient creates a new provider or reuses an existing provider with the same **Base URL + type**, then adds the API key if it is not already present.
+1. Install and open a version of FrogClaw that supports provider links.
+2. Click the provider's **Open in FrogClaw** link in your browser.
+3. Confirm the provider name, Base URL, provider type, and API key prefix in FrogClaw.
+4. FrogClaw creates a new provider or reuses an existing provider with the same **Base URL + type**, then adds the API key if it is not already present.
 
-FrogClawClient does not validate the key or fetch models automatically. After importing, click **Fetch Models** or add models manually.
+FrogClaw does not validate the key or fetch models automatically. After importing, click **Fetch Models** or add models manually.
 
 ### Link Format
 
 ```text
-frogclawclient://providers?name=<name>&baseurl=<base-url>&apikey=<api-key>&type=<provider-type>
+FrogClaw://providers?name=<name>&baseurl=<base-url>&apikey=<api-key>&type=<provider-type>
 ```
 
 Example:
 
 ```text
-frogclawclient://providers?name=OpenAI&baseurl=https%3A%2F%2Fapi.openai.com&apikey=sk-xxx&type=openai
+FrogClaw://providers?name=OpenAI&baseurl=https%3A%2F%2Fapi.openai.com&apikey=sk-xxx&type=openai
 ```
 
 ### Parameters
 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
-| `name` | Yes | Display name shown in FrogClawClient, for example `OpenAI` or `My Relay` |
+| `name` | Yes | Display name shown in FrogClaw, for example `OpenAI` or `My Relay` |
 | `baseurl` | Yes | Provider Base URL, URL-encoded. Only `http` and `https` are accepted. Query strings and fragments are rejected. |
-| `apikey` | Yes | API key to save into FrogClawClient. FrogClawClient shows only a prefix in the confirmation dialog. |
+| `apikey` | Yes | API key to save into FrogClaw. FrogClaw shows only a prefix in the confirmation dialog. |
 | `type` | Yes | Provider type. Allowed values: `openai`, `openai_responses`, `anthropic`, `gemini`, `custom`. |
 
-`baseurl` can use FrogClawClient's existing force suffix, for example `https://example.com!`. FrogClawClient stores `api_path` as empty for imported providers and continues to use the default path for the selected provider type.
+`baseurl` can use FrogClaw's existing force suffix, for example `https://example.com!`. FrogClaw stores `api_path` as empty for imported providers and continues to use the default path for the selected provider type.
 
 ### Website Configuration
 
 Use `encodeURIComponent` for every dynamic value:
 
 ```html
-<a id="open-frogclaw" href="#">Open in FrogClawClient</a>
+<a id="open-frogclaw" href="#">Open in FrogClaw</a>
 
 <script>
   const provider = {
@@ -100,7 +100,7 @@ Use `encodeURIComponent` for every dynamic value:
     type: provider.type,
   });
 
-  document.getElementById('open-frogclaw').href = `frogclawclient://providers?${params.toString()}`;
+  document.getElementById('open-frogclaw').href = `FrogClaw://providers?${params.toString()}`;
 </script>
 ```
 
@@ -111,14 +111,14 @@ An API key in a URL may be visible to browser history, logs, extensions, or anal
 :::
 
 ::: tip Testing
-Custom URI schemes are registered by the installed desktop app. If `frogclawclient://...` does not open FrogClawClient, install or rebuild the latest FrogClawClient app first; running only the website or Vite dev server does not register the system scheme.
+Custom URI schemes are registered by the installed desktop app. If `FrogClaw://...` does not open FrogClaw, install or rebuild the latest FrogClaw app first; running only the website or Vite dev server does not register the system scheme.
 :::
 
 ---
 
 ## Multi-Key Rotation
 
-FrogClawClient supports multiple API keys per provider for load distribution and rate-limit avoidance.
+FrogClaw supports multiple API keys per provider for load distribution and rate-limit avoidance.
 
 ### Adding Keys
 
@@ -126,7 +126,7 @@ In the provider detail panel, click **Add Key** to add additional API keys. Each
 
 ### How Rotation Works
 
-FrogClawClient rotates through enabled keys automatically using a round-robin index. When a request completes, the rotation index advances to the next key. If a key is disabled or fails validation, it is skipped.
+FrogClaw rotates through enabled keys automatically using a round-robin index. When a request completes, the rotation index advances to the next key. If a key is disabled or fails validation, it is skipped.
 
 ### Validating Keys
 
@@ -158,18 +158,18 @@ Each model can have its own default parameter overrides. Open the model's settin
 
 ### Model Capabilities
 
-FrogClawClient tracks capabilities per model — such as **Vision**, **Function Calling**, and **Reasoning** — and displays them as tags. These capabilities affect which features are available during a conversation.
+FrogClaw tracks capabilities per model — such as **Vision**, **Function Calling**, and **Reasoning** — and displays them as tags. These capabilities affect which features are available during a conversation.
 
 ---
 
 ## Custom & Local Endpoints
 
-FrogClawClient works with any endpoint that implements the OpenAI chat completions API.
+FrogClaw works with any endpoint that implements the OpenAI chat completions API.
 
 ### Ollama (Local Models)
 
 1. Install and start [Ollama](https://ollama.com/).
-2. In FrogClawClient, create a new provider with type **OpenAI**.
+2. In FrogClaw, create a new provider with type **OpenAI**.
 3. Set the **Base URL** to `http://localhost:11434`.
 4. Click **Fetch Models** to discover the models you have pulled locally.
 
@@ -191,7 +191,7 @@ Go to **Settings → Default Model** to choose the provider and model that new c
 
 ### Topic Naming Model
 
-FrogClawClient can automatically generate a title for each conversation. In the default model settings, you can assign a separate, lightweight model for topic naming to save cost and latency. Configure a custom prompt and context window size for title generation.
+FrogClaw can automatically generate a title for each conversation. In the default model settings, you can assign a separate, lightweight model for topic naming to save cost and latency. Configure a custom prompt and context window size for title generation.
 
 ---
 

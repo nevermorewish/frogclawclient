@@ -1,8 +1,8 @@
-# FrogClawClient Storage Policy
+# FrogClaw Storage Policy
 
 ## Dual-Root Directory Model
 
-FrogClawClient uses two directory roots with distinct responsibilities:
+FrogClaw uses two directory roots with distinct responsibilities:
 
 | Root | Platform path | Purpose |
 |------|---------------|---------|

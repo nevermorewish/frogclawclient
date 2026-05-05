@@ -2025,10 +2025,10 @@ export function ChatView() {
 
   // Pre-load Shiki themes into the singleton highlighter when theme settings change
   useEffect(() => {
-    console.log('[FrogClawClient Theme Debug] themes changed:', { codeBlockDarkTheme, codeBlockLightTheme, codeBlockThemes, isDarkMode });
+    console.log('[FrogClaw Theme Debug] themes changed:', { codeBlockDarkTheme, codeBlockLightTheme, codeBlockThemes, isDarkMode });
     if (codeBlockThemes.length > 0) {
       registerHighlight({ themes: codeBlockThemes as any }).catch((err) => {
-        console.error('[FrogClawClient Theme Debug] registerHighlight failed:', err);
+        console.error('[FrogClaw Theme Debug] registerHighlight failed:', err);
       });
     }
   }, [codeBlockThemes, codeBlockDarkTheme, codeBlockLightTheme, isDarkMode]);

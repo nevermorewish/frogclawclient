@@ -1,6 +1,6 @@
-﻿{
+{
   "app": {
-    "name": "FrogClawClient"
+    "name": "FrogClaw"
   },
   "nav": {
     "home": "Inicio",
@@ -933,7 +933,7 @@
     "maxCount": "Máximo de copias de seguridad a conservar",
     "copies": "copias",
     "backupDir": "Directorio de copias de seguridad",
-    "defaultDir": "Directorio de copias de seguridad predeterminado de FrogClawClient",
+    "defaultDir": "Directorio de copias de seguridad predeterminado de FrogClaw",
     "effectiveDir": "Directorio efectivo",
     "formatSqliteDesc": "Restauración rápida y directa",
     "formatJsonDesc": "Legible, archivo más grande",
@@ -1088,7 +1088,7 @@
     "reloadConfirmOk": "Recargar",
     "reloadConfirmCancel": "Cancelar",
     "closeConfirmTitle": "Cerrar aplicación",
-    "closeConfirmContent": "¿Está seguro de que desea cerrar FrogClawClient?",
+    "closeConfirmContent": "¿Está seguro de que desea cerrar FrogClaw?",
     "closeConfirmOk": "Cerrar",
     "closeConfirmCancel": "Cancelar",
     "startMinimized": "Iniciar minimizado",
@@ -1198,7 +1198,7 @@
     "uninstallConfirm": "¿Estás seguro de que quieres desinstalar la habilidad \"{{name}}\"?",
     "detail": "Detalles de la habilidad",
     "source": {
-      "frogclaw": "FrogClawClient",
+      "frogclaw": "FrogClaw",
       "claude": "Claude",
       "agents": "Agents",
       "builtin": "Integrado",

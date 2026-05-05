@@ -1,20 +1,20 @@
 ---
 layout: home
-title: FrogClawClient — عميل سطح مكتب AI مفتوح المصدر وبوابة
+title: FrogClaw — عميل سطح مكتب AI مفتوح المصدر وبوابة
 titleTemplate: false
 
 head:
   - - meta
     - name: description
-      content: FrogClawClient عميل سطح مكتب AI مجاني ومفتوح المصدر مع بوابة AI مدمجة. اتصل بـ OpenAI وClaude وGemini وDeepSeek والمزيد. دعم خادم MCP وقاعدة المعرفة والخصوصية أولاً.
+      content: FrogClaw عميل سطح مكتب AI مجاني ومفتوح المصدر مع بوابة AI مدمجة. اتصل بـ OpenAI وClaude وGemini وDeepSeek والمزيد. دعم خادم MCP وقاعدة المعرفة والخصوصية أولاً.
 
 hero:
-  name: FrogClawClient
+  name: FrogClaw
   text: مساعد AI لسطح المكتب
   tagline: محادثة متعددة النماذج، أدوات MCP، بوابة API، قاعدة المعرفة — كل ذلك في عميل مفتوح المصدر واحد
   image:
     src: /logo.png
-    alt: FrogClawClient
+    alt: FrogClaw
   actions:
     - theme: brand
       text: ابدأ الآن
@@ -24,7 +24,7 @@ hero:
       link: /ar/download
     - theme: alt
       text: GitHub
-      link: https://github.com/FrogClawClient-Desktop/FrogClawClient
+      link: https://github.com/FrogClaw-Desktop/FrogClaw
 
 features:
   - icon: robot
@@ -38,7 +38,7 @@ features:
     details: تطبيق كامل لبروتوكول Model Context Protocol. دعم stdio وSSE وStreamableHTTP. اتصل بالأدوات الخارجية بنقرة واحدة. أدوات MCP مدمجة مثل @frogclaw/fetch.
   - icon: cloud-server
     title: بوابة API مدمجة
-    details: خادم API محلي متوافق مع OpenAI. استخدم FrogClawClient كخلفية لـ Claude Code وCodex وGemini CLI وغيرها. إدارة المفاتيح وتحديد المعدل وSSL/TLS.
+    details: خادم API محلي متوافق مع OpenAI. استخدم FrogClaw كخلفية لـ Claude Code وCodex وGemini CLI وغيرها. إدارة المفاتيح وتحديد المعدل وSSL/TLS.
   - icon: book
     title: قاعدة المعرفة والRAG
     details: تضمين متجه محلي مع sqlite-vec. إجابات AI بناءً على مستنداتك الخاصة — البيانات لا تغادر جهازك أبداً.

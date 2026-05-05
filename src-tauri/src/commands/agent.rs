@@ -1738,8 +1738,8 @@ async fn run_codex_app_server_stdio_query(
         "initialize",
         serde_json::json!({
             "clientInfo": {
-                "name": "frogclawclient",
-                "title": "FrogClawClient",
+                "name": "frogclaw",
+                "title": "FrogClaw",
                 "version": env!("CARGO_PKG_VERSION"),
             },
             "capabilities": {

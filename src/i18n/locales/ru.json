@@ -1,6 +1,6 @@
-﻿{
+{
   "app": {
-    "name": "FrogClawClient"
+    "name": "FrogClaw"
   },
   "nav": {
     "home": "Главная",
@@ -933,7 +933,7 @@
     "maxCount": "Макс. резервных копий",
     "copies": "шт.",
     "backupDir": "Директория резервных копий",
-    "defaultDir": "Директория по умолчанию FrogClawClient",
+    "defaultDir": "Директория по умолчанию FrogClaw",
     "effectiveDir": "Текущая директория",
     "formatSqliteDesc": "Быстро, прямое восстановление",
     "formatJsonDesc": "Читаемый формат, файл больше",
@@ -1088,7 +1088,7 @@
     "reloadConfirmOk": "Перезагрузить",
     "reloadConfirmCancel": "Отмена",
     "closeConfirmTitle": "Закрыть приложение",
-    "closeConfirmContent": "Вы уверены, что хотите закрыть FrogClawClient?",
+    "closeConfirmContent": "Вы уверены, что хотите закрыть FrogClaw?",
     "closeConfirmOk": "Закрыть",
     "closeConfirmCancel": "Отмена",
     "startMinimized": "Запускать свёрнутым",
@@ -1198,7 +1198,7 @@
     "uninstallConfirm": "Вы уверены, что хотите удалить навык \"{{name}}\"?",
     "detail": "Детали навыка",
     "source": {
-      "frogclaw": "FrogClawClient",
+      "frogclaw": "FrogClaw",
       "claude": "Claude",
       "agents": "Agents",
       "builtin": "Встроенный",

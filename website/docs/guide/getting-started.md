@@ -2,23 +2,23 @@
 
 ## Installation
 
-Download the latest installer from the [Download page](/download) or the [GitHub Releases](https://github.com/FrogClawClient-Desktop/FrogClawClient/releases).
+Download the latest installer from the [Download page](/download) or the [GitHub Releases](https://github.com/FrogClaw-Desktop/FrogClaw/releases).
 
 ### macOS
 
 | Chip | File |
 |------|------|
-| Apple Silicon (M1 / M2 / M3 / M4) | `FrogClawClient_x.x.x_aarch64.dmg` |
-| Intel | `FrogClawClient_x.x.x_x64.dmg` |
+| Apple Silicon (M1 / M2 / M3 / M4) | `FrogClaw_x.x.x_aarch64.dmg` |
+| Intel | `FrogClaw_x.x.x_x64.dmg` |
 
-1. Open the `.dmg` and drag **FrogClawClient** into the **Applications** folder.
-2. Launch FrogClawClient. If macOS blocks the app, go to **System Settings → Privacy & Security** and click **Open Anyway**.
+1. Open the `.dmg` and drag **FrogClaw** into the **Applications** folder.
+2. Launch FrogClaw. If macOS blocks the app, go to **System Settings → Privacy & Security** and click **Open Anyway**.
 
 ::: warning macOS: "App Is Damaged" or "Cannot Verify Developer"
 If you see either of these messages, open Terminal and run:
 
 ```bash
-xattr -c /Applications/FrogClawClient.app
+xattr -c /Applications/FrogClaw.app
 ```
 
 Then launch the app again. This removes the quarantine flag that macOS applies to unsigned downloads.
@@ -28,32 +28,32 @@ Then launch the app again. This removes the quarantine flag that macOS applies t
 
 | Architecture | File |
 |--------------|------|
-| x64 (most PCs) | `FrogClawClient_x.x.x_x64-setup.exe` |
-| ARM64 | `FrogClawClient_x.x.x_arm64-setup.exe` |
+| x64 (most PCs) | `FrogClaw_x.x.x_x64-setup.exe` |
+| ARM64 | `FrogClaw_x.x.x_arm64-setup.exe` |
 
-Run the installer and follow the wizard. Launch FrogClawClient from the Start Menu or the desktop shortcut.
+Run the installer and follow the wizard. Launch FrogClaw from the Start Menu or the desktop shortcut.
 
 ### Linux
 
 | Format | Architecture | File |
 |--------|--------------|------|
-| Debian / Ubuntu | x64 | `FrogClawClient_x.x.x_amd64.deb` |
-| Debian / Ubuntu | ARM64 | `FrogClawClient_x.x.x_arm64.deb` |
-| Fedora / openSUSE | x64 | `FrogClawClient_x.x.x_x86_64.rpm` |
-| Fedora / openSUSE | ARM64 | `FrogClawClient_x.x.x_aarch64.rpm` |
-| Any distro | x64 | `FrogClawClient_x.x.x_amd64.AppImage` |
-| Any distro | ARM64 | `FrogClawClient_x.x.x_aarch64.AppImage` |
+| Debian / Ubuntu | x64 | `FrogClaw_x.x.x_amd64.deb` |
+| Debian / Ubuntu | ARM64 | `FrogClaw_x.x.x_arm64.deb` |
+| Fedora / openSUSE | x64 | `FrogClaw_x.x.x_x86_64.rpm` |
+| Fedora / openSUSE | ARM64 | `FrogClaw_x.x.x_aarch64.rpm` |
+| Any distro | x64 | `FrogClaw_x.x.x_amd64.AppImage` |
+| Any distro | ARM64 | `FrogClaw_x.x.x_aarch64.AppImage` |
 
 ```bash
 # Debian / Ubuntu
-sudo dpkg -i FrogClawClient_x.x.x_amd64.deb
+sudo dpkg -i FrogClaw_x.x.x_amd64.deb
 
 # Fedora / openSUSE
-sudo rpm -i FrogClawClient_x.x.x_x86_64.rpm
+sudo rpm -i FrogClaw_x.x.x_x86_64.rpm
 
 # AppImage (any distro)
-chmod +x FrogClawClient_x.x.x_amd64.AppImage
-./FrogClawClient_x.x.x_amd64.AppImage
+chmod +x FrogClaw_x.x.x_amd64.AppImage
+./FrogClaw_x.x.x_amd64.AppImage
 ```
 
 ---
@@ -62,7 +62,7 @@ chmod +x FrogClawClient_x.x.x_amd64.AppImage
 
 ### 1. Open Settings
 
-Launch FrogClawClient and click the **gear icon** at the bottom of the sidebar, or press <kbd>Cmd/Ctrl</kbd>+<kbd>,</kbd>.
+Launch FrogClaw and click the **gear icon** at the bottom of the sidebar, or press <kbd>Cmd/Ctrl</kbd>+<kbd>,</kbd>.
 
 ### 2. Add a Provider
 
@@ -92,7 +92,7 @@ Go to **Settings → Default Model** and choose the provider and model that new 
 1. Click **New Chat** in the sidebar (or press <kbd>Cmd/Ctrl</kbd>+<kbd>N</kbd>).
 2. Select a model from the model selector at the top of the chat.
 3. Type a message and press <kbd>Enter</kbd>.
-4. FrogClawClient streams the response in real time. Models that support thinking blocks (e.g. Claude, DeepSeek R1) display the reasoning process in a collapsible section above the answer.
+4. FrogClaw streams the response in real time. Models that support thinking blocks (e.g. Claude, DeepSeek R1) display the reasoning process in a collapsible section above the answer.
 
 ---
 
@@ -131,7 +131,7 @@ Below are the default keyboard shortcuts. All shortcuts can be customized in **S
 | <kbd>Cmd/Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd> | Toggle API Gateway |
 
 ::: info
-Global shortcuts (show/hide window) work system-wide even when FrogClawClient is in the background. FrogClawClient detects conflicts with shortcuts from other applications and warns you in Settings.
+Global shortcuts (show/hide window) work system-wide even when FrogClaw is in the background. FrogClaw detects conflicts with shortcuts from other applications and warns you in Settings.
 :::
 
 ---
@@ -145,7 +145,7 @@ Open **Settings** to configure the desktop experience.
 | **Theme** | Dark, Light, or System (auto) |
 | **Language** | English, 简体中文 |
 | **System tray** | Minimize to tray, close to tray |
-| **Auto-start** | Launch FrogClawClient when your computer starts |
+| **Auto-start** | Launch FrogClaw when your computer starts |
 | **Always on top** | Keep the window above other applications |
 | **Proxy** | HTTP or SOCKS5 proxy with host and port |
 
@@ -155,7 +155,7 @@ Open **Settings** to configure the desktop experience.
 
 ### Data Directories
 
-FrogClawClient stores data in two locations:
+FrogClaw stores data in two locations:
 
 | Path | Contents |
 |------|----------|

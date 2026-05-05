@@ -11,8 +11,8 @@ const SITE_URL = 'https://app.frogclaw.top';
 const OG_IMAGE = `${SITE_URL}/og-image.png`;
 
 export default defineConfig({
-  title: 'FrogClawClient',
-  description: 'FrogClawClient — Open-source AI desktop client with built-in AI gateway, multi-model chat, MCP server support. Connect OpenAI, Claude, Gemini and more LLMs in one app.',
+  title: 'FrogClaw',
+  description: 'FrogClaw — Open-source AI desktop client with built-in AI gateway, multi-model chat, MCP server support. Connect OpenAI, Claude, Gemini and more LLMs in one app.',
 
   base: '/',
 
@@ -33,13 +33,13 @@ export default defineConfig({
     ['link', { rel: 'icon', href: '/favicon.ico' }],
     // Primary SEO meta
     ['meta', { name: 'theme-color', content: '#309731' }],
-    ['meta', { name: 'author', content: 'FrogClawClient Team' }],
-    ['meta', { name: 'keywords', content: 'FrogClawClient, AI desktop client, AI gateway, AI chat client, LLM client, multi-model AI, MCP server, OpenAI client, Claude client, Gemini client, AI assistant, desktop AI app, open source AI, ChatGPT alternative, AI aggregator, large language model, AI desktop application, Tauri AI app' }],
+    ['meta', { name: 'author', content: 'FrogClaw Team' }],
+    ['meta', { name: 'keywords', content: 'FrogClaw, AI desktop client, AI gateway, AI chat client, LLM client, multi-model AI, MCP server, OpenAI client, Claude client, Gemini client, AI assistant, desktop AI app, open source AI, ChatGPT alternative, AI aggregator, large language model, AI desktop application, Tauri AI app' }],
     ['meta', { name: 'robots', content: 'index, follow' }],
     // Open Graph
     ['meta', { property: 'og:type', content: 'website' }],
-    ['meta', { property: 'og:site_name', content: 'FrogClawClient' }],
-    ['meta', { property: 'og:title', content: 'FrogClawClient — Open-source AI Desktop Client & Gateway' }],
+    ['meta', { property: 'og:site_name', content: 'FrogClaw' }],
+    ['meta', { property: 'og:title', content: 'FrogClaw — Open-source AI Desktop Client & Gateway' }],
     ['meta', { property: 'og:description', content: 'Free, open-source AI desktop client with built-in gateway. Connect multiple LLMs (OpenAI, Claude, Gemini, DeepSeek) in one app. MCP server support, knowledge base, and more.' }],
     ['meta', { property: 'og:image', content: OG_IMAGE }],
     ['meta', { property: 'og:url', content: SITE_URL }],
@@ -47,7 +47,7 @@ export default defineConfig({
     ['meta', { property: 'og:locale:alternate', content: 'zh_CN' }],
     // Twitter Card
     ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
-    ['meta', { name: 'twitter:title', content: 'FrogClawClient — Open-source AI Desktop Client & Gateway' }],
+    ['meta', { name: 'twitter:title', content: 'FrogClaw — Open-source AI Desktop Client & Gateway' }],
     ['meta', { name: 'twitter:description', content: 'Free, open-source AI desktop client with built-in gateway. Multi-model chat, MCP server support, knowledge base.' }],
     ['meta', { name: 'twitter:image', content: OG_IMAGE }],
   ],
@@ -56,8 +56,8 @@ export default defineConfig({
     root: {
       label: '🇺🇸 English',
       lang: 'en',
-      title: 'FrogClawClient',
-      description: 'FrogClawClient — Open-source AI desktop client with built-in AI gateway, multi-model chat, MCP server support.',
+      title: 'FrogClaw',
+      description: 'FrogClaw — Open-source AI desktop client with built-in AI gateway, multi-model chat, MCP server support.',
       themeConfig: {
         nav: [
           { text: 'Home', link: '/' },
@@ -79,8 +79,8 @@ export default defineConfig({
       label: '🇨🇳 简体中文',
       lang: 'zh-CN',
       link: '/zh/',
-      title: 'FrogClawClient',
-      description: 'FrogClawClient — 开源 AI 桌面客户端，内置 AI 网关，支持多模型对话、MCP 服务器、知识库。',
+      title: 'FrogClaw',
+      description: 'FrogClaw — 开源 AI 桌面客户端，内置 AI 网关，支持多模型对话、MCP 服务器、知识库。',
       themeConfig: {
         nav: [
           { text: '首页', link: '/zh/' },
@@ -107,8 +107,8 @@ export default defineConfig({
       label: '🇭🇰 繁體中文',
       lang: 'zh-TW',
       link: '/zh-tw/',
-      title: 'FrogClawClient',
-      description: 'FrogClawClient — 開源 AI 桌面客戶端，內建 AI 網關，支援多模型對話、MCP 伺服器、知識庫。',
+      title: 'FrogClaw',
+      description: 'FrogClaw — 開源 AI 桌面客戶端，內建 AI 網關，支援多模型對話、MCP 伺服器、知識庫。',
       themeConfig: {
         nav: [
           { text: '首頁', link: '/zh-tw/' },
@@ -135,8 +135,8 @@ export default defineConfig({
       label: '🇯🇵 日本語',
       lang: 'ja',
       link: '/ja/',
-      title: 'FrogClawClient',
-      description: 'FrogClawClient — オープンソースのAIデスクトップクライアント。AIゲートウェイ内蔵、マルチモデルチャット、MCPサーバー対応。',
+      title: 'FrogClaw',
+      description: 'FrogClaw — オープンソースのAIデスクトップクライアント。AIゲートウェイ内蔵、マルチモデルチャット、MCPサーバー対応。',
       themeConfig: {
         nav: [
           { text: 'ホーム', link: '/ja/' },
@@ -163,8 +163,8 @@ export default defineConfig({
       label: '🇰🇷 한국어',
       lang: 'ko',
       link: '/ko/',
-      title: 'FrogClawClient',
-      description: 'FrogClawClient — 오픈소스 AI 데스크톱 클라이언트. AI 게이트웨이 내장, 멀티 모델 채팅, MCP 서버 지원.',
+      title: 'FrogClaw',
+      description: 'FrogClaw — 오픈소스 AI 데스크톱 클라이언트. AI 게이트웨이 내장, 멀티 모델 채팅, MCP 서버 지원.',
       themeConfig: {
         nav: [
           { text: '홈', link: '/ko/' },
@@ -191,8 +191,8 @@ export default defineConfig({
       label: '🇫🇷 Français',
       lang: 'fr',
       link: '/fr/',
-      title: 'FrogClawClient',
-      description: 'FrogClawClient — Client de bureau IA open-source avec passerelle IA intégrée, chat multi-modèles, support serveur MCP.',
+      title: 'FrogClaw',
+      description: 'FrogClaw — Client de bureau IA open-source avec passerelle IA intégrée, chat multi-modèles, support serveur MCP.',
       themeConfig: {
         nav: [
           { text: 'Accueil', link: '/fr/' },
@@ -219,8 +219,8 @@ export default defineConfig({
       label: '🇩🇪 Deutsch',
       lang: 'de',
       link: '/de/',
-      title: 'FrogClawClient',
-      description: 'FrogClawClient — Open-Source KI-Desktop-Client mit integriertem KI-Gateway, Multi-Modell-Chat, MCP-Server-Unterstützung.',
+      title: 'FrogClaw',
+      description: 'FrogClaw — Open-Source KI-Desktop-Client mit integriertem KI-Gateway, Multi-Modell-Chat, MCP-Server-Unterstützung.',
       themeConfig: {
         nav: [
           { text: 'Startseite', link: '/de/' },
@@ -247,8 +247,8 @@ export default defineConfig({
       label: '🇪🇸 Español',
       lang: 'es',
       link: '/es/',
-      title: 'FrogClawClient',
-      description: 'FrogClawClient — Cliente de escritorio IA de código abierto con pasarela IA integrada, chat multi-modelo, soporte de servidor MCP.',
+      title: 'FrogClaw',
+      description: 'FrogClaw — Cliente de escritorio IA de código abierto con pasarela IA integrada, chat multi-modelo, soporte de servidor MCP.',
       themeConfig: {
         nav: [
           { text: 'Inicio', link: '/es/' },
@@ -275,8 +275,8 @@ export default defineConfig({
       label: '🇷🇺 Русский',
       lang: 'ru',
       link: '/ru/',
-      title: 'FrogClawClient',
-      description: 'FrogClawClient — Настольный ИИ-клиент с открытым исходным кодом. Встроенный шлюз ИИ, чат с несколькими моделями, поддержка MCP-серверов.',
+      title: 'FrogClaw',
+      description: 'FrogClaw — Настольный ИИ-клиент с открытым исходным кодом. Встроенный шлюз ИИ, чат с несколькими моделями, поддержка MCP-серверов.',
       themeConfig: {
         nav: [
           { text: 'Главная', link: '/ru/' },
@@ -303,8 +303,8 @@ export default defineConfig({
       label: '🇮🇳 हिन्दी',
       lang: 'hi',
       link: '/hi/',
-      title: 'FrogClawClient',
-      description: 'FrogClawClient — ओपन-सोर्स AI डेस्कटॉप क्लाइंट। बिल्ट-इन AI गेटवे, मल्टी-मॉडल चैट, MCP सर्वर समर्थन।',
+      title: 'FrogClaw',
+      description: 'FrogClaw — ओपन-सोर्स AI डेस्कटॉप क्लाइंट। बिल्ट-इन AI गेटवे, मल्टी-मॉडल चैट, MCP सर्वर समर्थन।',
       themeConfig: {
         nav: [
           { text: 'होम', link: '/hi/' },
@@ -331,8 +331,8 @@ export default defineConfig({
       label: '🇸🇦 العربية',
       lang: 'ar',
       link: '/ar/',
-      title: 'FrogClawClient',
-      description: 'FrogClawClient — عميل سطح مكتب AI مفتوح المصدر مع بوابة AI مدمجة، دردشة متعددة النماذج، دعم خوادم MCP.',
+      title: 'FrogClaw',
+      description: 'FrogClaw — عميل سطح مكتب AI مفتوح المصدر مع بوابة AI مدمجة، دردشة متعددة النماذج، دعم خوادم MCP.',
       themeConfig: {
         nav: [
           { text: 'الرئيسية', link: '/ar/' },
@@ -360,7 +360,7 @@ export default defineConfig({
   themeConfig: {
     logo: '/logo.png',
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/FrogClawClient-Desktop/FrogClawClient' },
+      { icon: 'github', link: 'https://github.com/FrogClaw-Desktop/FrogClaw' },
     ],
     search: {
       provider: 'local',

@@ -17,20 +17,20 @@ sqlite-vec = "0.1.8-alpha.1"
 libsqlite3-sys = "0.30"
 
 [package]
-name = "frogclawclient"
+name = "frogclaw"
 version = "0.0.1"
-description = "FrogClawClient - AI Chat Desktop App"
+description = "FrogClaw - AI Chat Desktop App"
 authors = ["you"]
 license = "AGPL-3.0-only"
 edition = "2021"
-default-run = "FrogClawClient"
+default-run = "FrogClaw"
 
 [lib]
-name = "frogclawclient_lib"
+name = "frogclaw_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [[bin]]
-name = "FrogClawClient"
+name = "FrogClaw"
 path = "src/main.rs"
 
 [build-dependencies]

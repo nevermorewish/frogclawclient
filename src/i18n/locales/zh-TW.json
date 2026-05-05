@@ -1,6 +1,6 @@
-﻿{
+{
   "app": {
-    "name": "FrogClawClient"
+    "name": "FrogClaw"
   },
   "nav": {
     "home": "首頁",
@@ -933,7 +933,7 @@
     "maxCount": "最大保留數量",
     "copies": "份",
     "backupDir": "備份目錄",
-    "defaultDir": "FrogClawClient 預設備份目錄",
+    "defaultDir": "FrogClaw 預設備份目錄",
     "effectiveDir": "目前生效目錄",
     "formatSqliteDesc": "快速，可直接還原",
     "formatJsonDesc": "可讀性好，體積較大",
@@ -1088,7 +1088,7 @@
     "reloadConfirmOk": "重新載入",
     "reloadConfirmCancel": "取消",
     "closeConfirmTitle": "結束應用程式",
-    "closeConfirmContent": "確定要結束 FrogClawClient 嗎？",
+    "closeConfirmContent": "確定要結束 FrogClaw 嗎？",
     "closeConfirmOk": "結束",
     "closeConfirmCancel": "取消",
     "startMinimized": "啟動時最小化",
@@ -1198,7 +1198,7 @@
     "uninstallConfirm": "確定要解除安裝技能「{{name}}」嗎？",
     "detail": "技能詳情",
     "source": {
-      "frogclaw": "FrogClawClient",
+      "frogclaw": "FrogClaw",
       "claude": "Claude",
       "agents": "Agents",
       "builtin": "內建",

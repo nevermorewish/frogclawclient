@@ -2,23 +2,23 @@
 
 ## Установка
 
-Скачайте последний установщик со [страницы загрузки](/ru/download) или [GitHub Releases](https://github.com/FrogClawClient-Desktop/FrogClawClient/releases).
+Скачайте последний установщик со [страницы загрузки](/ru/download) или [GitHub Releases](https://github.com/FrogClaw-Desktop/FrogClaw/releases).
 
 ### macOS
 
 | Чип | Файл |
 |-----|------|
-| Apple Silicon (M1 / M2 / M3 / M4) | `FrogClawClient_x.x.x_aarch64.dmg` |
-| Intel | `FrogClawClient_x.x.x_x64.dmg` |
+| Apple Silicon (M1 / M2 / M3 / M4) | `FrogClaw_x.x.x_aarch64.dmg` |
+| Intel | `FrogClaw_x.x.x_x64.dmg` |
 
-1. Откройте `.dmg` и перетащите **FrogClawClient** в папку **«Программы»**.
-2. Запустите FrogClawClient. Если macOS блокирует приложение, перейдите в **Системные настройки → Конфиденциальность и безопасность** и нажмите **Всё равно открыть**.
+1. Откройте `.dmg` и перетащите **FrogClaw** в папку **«Программы»**.
+2. Запустите FrogClaw. Если macOS блокирует приложение, перейдите в **Системные настройки → Конфиденциальность и безопасность** и нажмите **Всё равно открыть**.
 
 ::: warning macOS: «Приложение повреждено» или «Разработчик не верифицирован»
 Если вы видите одно из этих сообщений, откройте Терминал и выполните:
 
 ```bash
-xattr -c /Applications/FrogClawClient.app
+xattr -c /Applications/FrogClaw.app
 ```
 
 Затем снова запустите приложение. Это удаляет флаг карантина, который macOS применяет к неподписанным загрузкам.
@@ -28,32 +28,32 @@ xattr -c /Applications/FrogClawClient.app
 
 | Архитектура | Файл |
 |------------|------|
-| x64 (большинство ПК) | `FrogClawClient_x.x.x_x64-setup.exe` |
-| ARM64 | `FrogClawClient_x.x.x_arm64-setup.exe` |
+| x64 (большинство ПК) | `FrogClaw_x.x.x_x64-setup.exe` |
+| ARM64 | `FrogClaw_x.x.x_arm64-setup.exe` |
 
-Запустите установщик и следуйте мастеру. Запустите FrogClawClient из меню «Пуск» или ярлыка на рабочем столе.
+Запустите установщик и следуйте мастеру. Запустите FrogClaw из меню «Пуск» или ярлыка на рабочем столе.
 
 ### Linux
 
 | Формат | Архитектура | Файл |
 |--------|------------|------|
-| Debian / Ubuntu | x64 | `FrogClawClient_x.x.x_amd64.deb` |
-| Debian / Ubuntu | ARM64 | `FrogClawClient_x.x.x_arm64.deb` |
-| Fedora / openSUSE | x64 | `FrogClawClient_x.x.x_x86_64.rpm` |
-| Fedora / openSUSE | ARM64 | `FrogClawClient_x.x.x_aarch64.rpm` |
-| Любой дистрибутив | x64 | `FrogClawClient_x.x.x_amd64.AppImage` |
-| Любой дистрибутив | ARM64 | `FrogClawClient_x.x.x_aarch64.AppImage` |
+| Debian / Ubuntu | x64 | `FrogClaw_x.x.x_amd64.deb` |
+| Debian / Ubuntu | ARM64 | `FrogClaw_x.x.x_arm64.deb` |
+| Fedora / openSUSE | x64 | `FrogClaw_x.x.x_x86_64.rpm` |
+| Fedora / openSUSE | ARM64 | `FrogClaw_x.x.x_aarch64.rpm` |
+| Любой дистрибутив | x64 | `FrogClaw_x.x.x_amd64.AppImage` |
+| Любой дистрибутив | ARM64 | `FrogClaw_x.x.x_aarch64.AppImage` |
 
 ```bash
 # Debian / Ubuntu
-sudo dpkg -i FrogClawClient_x.x.x_amd64.deb
+sudo dpkg -i FrogClaw_x.x.x_amd64.deb
 
 # Fedora / openSUSE
-sudo rpm -i FrogClawClient_x.x.x_x86_64.rpm
+sudo rpm -i FrogClaw_x.x.x_x86_64.rpm
 
 # AppImage (любой дистрибутив)
-chmod +x FrogClawClient_x.x.x_amd64.AppImage
-./FrogClawClient_x.x.x_amd64.AppImage
+chmod +x FrogClaw_x.x.x_amd64.AppImage
+./FrogClaw_x.x.x_amd64.AppImage
 ```
 
 ---
@@ -62,7 +62,7 @@ chmod +x FrogClawClient_x.x.x_amd64.AppImage
 
 ### 1. Открыть настройки
 
-Запустите FrogClawClient и нажмите на **значок шестерёнки** внизу боковой панели, или нажмите <kbd>Cmd/Ctrl</kbd>+<kbd>,</kbd>.
+Запустите FrogClaw и нажмите на **значок шестерёнки** внизу боковой панели, или нажмите <kbd>Cmd/Ctrl</kbd>+<kbd>,</kbd>.
 
 ### 2. Добавить провайдера
 
@@ -92,7 +92,7 @@ chmod +x FrogClawClient_x.x.x_amd64.AppImage
 1. Нажмите **Новый чат** в боковой панели (или нажмите <kbd>Cmd/Ctrl</kbd>+<kbd>N</kbd>).
 2. Выберите модель из селектора моделей вверху чата.
 3. Введите сообщение и нажмите <kbd>Enter</kbd>.
-4. FrogClawClient транслирует ответ в реальном времени. Модели с поддержкой блоков размышлений (например, Claude, DeepSeek R1) отображают процесс рассуждений в сворачиваемом разделе.
+4. FrogClaw транслирует ответ в реальном времени. Модели с поддержкой блоков размышлений (например, Claude, DeepSeek R1) отображают процесс рассуждений в сворачиваемом разделе.
 
 ---
 

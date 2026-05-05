@@ -2,7 +2,7 @@
 
 ## ما هو MCP؟
 
-[بروتوكول Model Context Protocol (MCP)](https://modelcontextprotocol.io/) معيار مفتوح يتيح لنماذج AI التفاعل مع الأدوات ومصادر البيانات الخارجية. يعمل FrogClawClient كعميل MCP — تضيف خوادم MCP ويمكن لـ AI استدعاء الأدوات التي تكشفها خلال المحادثة.
+[بروتوكول Model Context Protocol (MCP)](https://modelcontextprotocol.io/) معيار مفتوح يتيح لنماذج AI التفاعل مع الأدوات ومصادر البيانات الخارجية. يعمل FrogClaw كعميل MCP — تضيف خوادم MCP ويمكن لـ AI استدعاء الأدوات التي تكشفها خلال المحادثة.
 
 ---
 

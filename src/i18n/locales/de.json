@@ -1,6 +1,6 @@
-﻿{
+{
   "app": {
-    "name": "FrogClawClient"
+    "name": "FrogClaw"
   },
   "nav": {
     "home": "Start",
@@ -933,7 +933,7 @@
     "maxCount": "Maximale Anzahl an Sicherungen",
     "copies": "Kopien",
     "backupDir": "Sicherungsverzeichnis",
-    "defaultDir": "Standard-Sicherungsverzeichnis von FrogClawClient",
+    "defaultDir": "Standard-Sicherungsverzeichnis von FrogClaw",
     "effectiveDir": "Effektives Verzeichnis",
     "formatSqliteDesc": "Schnelle, direkte Wiederherstellung",
     "formatJsonDesc": "Lesbar, größere Datei",
@@ -1088,7 +1088,7 @@
     "reloadConfirmOk": "Neu laden",
     "reloadConfirmCancel": "Abbrechen",
     "closeConfirmTitle": "Anwendung beenden",
-    "closeConfirmContent": "Möchten Sie FrogClawClient wirklich beenden?",
+    "closeConfirmContent": "Möchten Sie FrogClaw wirklich beenden?",
     "closeConfirmOk": "Beenden",
     "closeConfirmCancel": "Abbrechen",
     "startMinimized": "Minimiert starten",
@@ -1198,7 +1198,7 @@
     "uninstallConfirm": "Möchten Sie die Fähigkeit \"{{name}}\" wirklich deinstallieren?",
     "detail": "Fähigkeiten-Details",
     "source": {
-      "frogclaw": "FrogClawClient",
+      "frogclaw": "FrogClaw",
       "claude": "Claude",
       "agents": "Agents",
       "builtin": "Eingebaut",

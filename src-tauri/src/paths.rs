@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-/// Returns the canonical FrogClawClient home directory and ensures it exists.
+/// Returns the canonical FrogClaw home directory and ensures it exists.
 ///
 /// - macOS / Linux: `~/.frogclaw/`
 /// - Windows:       `%USERPROFILE%\.frogclaw\`

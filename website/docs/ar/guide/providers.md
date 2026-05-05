@@ -1,6 +1,6 @@
 # إعداد المزوّدين
 
-يتصل FrogClawClient بأي عدد من مزوّدي AI في آنٍ واحد. لكل مزوّد مفاتيح API الخاصة به وقائمة نماذج وإعدادات معاملات افتراضية.
+يتصل FrogClaw بأي عدد من مزوّدي AI في آنٍ واحد. لكل مزوّد مفاتيح API الخاصة به وقائمة نماذج وإعدادات معاملات افتراضية.
 
 ## المزوّدون المدعومون
 
@@ -36,46 +36,46 @@
 
 ## الاستيراد من رابط موقع ويب
 
-يمكن لمواقع المزوّدين أو لوحات خدمات الوساطة أو منصات النماذج الخاصة أو صفحات البوابة المحلية توفير رابط **فتح في FrogClawClient**. عند النقر عليه يفتح المتصفح تطبيق FrogClawClient لسطح المكتب، وينتقل FrogClawClient إلى **الإعدادات ← المزوّدون**، ويعرض مربع تأكيد، ثم يستورد الإعدادات فقط بعد تأكيد المستخدم.
+يمكن لمواقع المزوّدين أو لوحات خدمات الوساطة أو منصات النماذج الخاصة أو صفحات البوابة المحلية توفير رابط **فتح في FrogClaw**. عند النقر عليه يفتح المتصفح تطبيق FrogClaw لسطح المكتب، وينتقل FrogClaw إلى **الإعدادات ← المزوّدون**، ويعرض مربع تأكيد، ثم يستورد الإعدادات فقط بعد تأكيد المستخدم.
 
 ### تدفق الاستخدام
 
-1. ثبّت وافتح إصداراً من FrogClawClient يدعم روابط المزوّدين.
-2. انقر على رابط **فتح في FrogClawClient** الذي يقدمه المزوّد في المتصفح.
-3. راجع في FrogClawClient اسم المزوّد و Base URL ونوع المزوّد وبادئة مفتاح API.
-4. يعيد FrogClawClient استخدام مزوّد موجود له نفس **Base URL + النوع**. إذا لم يوجد، ينشئ مزوّداً جديداً ويضيف مفتاح API فقط إذا لم يكن محفوظاً من قبل.
+1. ثبّت وافتح إصداراً من FrogClaw يدعم روابط المزوّدين.
+2. انقر على رابط **فتح في FrogClaw** الذي يقدمه المزوّد في المتصفح.
+3. راجع في FrogClaw اسم المزوّد و Base URL ونوع المزوّد وبادئة مفتاح API.
+4. يعيد FrogClaw استخدام مزوّد موجود له نفس **Base URL + النوع**. إذا لم يوجد، ينشئ مزوّداً جديداً ويضيف مفتاح API فقط إذا لم يكن محفوظاً من قبل.
 
-لا يتحقق FrogClawClient من المفتاح تلقائياً ولا يجلب النماذج تلقائياً. بعد الاستيراد، انقر **جلب النماذج** أو أضف النماذج يدوياً.
+لا يتحقق FrogClaw من المفتاح تلقائياً ولا يجلب النماذج تلقائياً. بعد الاستيراد، انقر **جلب النماذج** أو أضف النماذج يدوياً.
 
 ### صيغة الرابط
 
 ```text
-frogclawclient://providers?name=<name>&baseurl=<base-url>&apikey=<api-key>&type=<provider-type>
+FrogClaw://providers?name=<name>&baseurl=<base-url>&apikey=<api-key>&type=<provider-type>
 ```
 
 مثال:
 
 ```text
-frogclawclient://providers?name=OpenAI&baseurl=https%3A%2F%2Fapi.openai.com&apikey=sk-xxx&type=openai
+FrogClaw://providers?name=OpenAI&baseurl=https%3A%2F%2Fapi.openai.com&apikey=sk-xxx&type=openai
 ```
 
 ### المعاملات
 
 | المعامل | مطلوب | الوصف |
 |---------|--------|-------|
-| `name` | نعم | اسم العرض في FrogClawClient، مثل `OpenAI` أو `My Relay` |
+| `name` | نعم | اسم العرض في FrogClaw، مثل `OpenAI` أو `My Relay` |
 | `baseurl` | نعم | Base URL بعد ترميزه كرابط. يُقبل `http` و `https` فقط، ويتم رفض query و hash. |
-| `apikey` | نعم | مفتاح API المراد حفظه في FrogClawClient. يعرض FrogClawClient البادئة فقط في مربع التأكيد. |
+| `apikey` | نعم | مفتاح API المراد حفظه في FrogClaw. يعرض FrogClaw البادئة فقط في مربع التأكيد. |
 | `type` | نعم | نوع المزوّد. القيم المسموحة: `openai`، `openai_responses`، `anthropic`، `gemini`، `custom`. |
 
-يمكن أن يستخدم `baseurl` لاحقة الإجبار الموجودة في FrogClawClient، مثل `https://example.com!`. عند الاستيراد عبر الرابط لا يتم تعيين `api_path`، ويواصل FrogClawClient استخدام المسار الافتراضي لنوع المزوّد المختار.
+يمكن أن يستخدم `baseurl` لاحقة الإجبار الموجودة في FrogClaw، مثل `https://example.com!`. عند الاستيراد عبر الرابط لا يتم تعيين `api_path`، ويواصل FrogClaw استخدام المسار الافتراضي لنوع المزوّد المختار.
 
 ### إعداد الرابط في الموقع
 
 قم بترميز كل القيم الديناميكية باستخدام `encodeURIComponent` أو `URLSearchParams`:
 
 ```html
-<a id="open-frogclaw" href="#">فتح في FrogClawClient</a>
+<a id="open-frogclaw" href="#">فتح في FrogClaw</a>
 
 <script>
   const provider = {
@@ -92,7 +92,7 @@ frogclawclient://providers?name=OpenAI&baseurl=https%3A%2F%2Fapi.openai.com&apik
     type: provider.type,
   });
 
-  document.getElementById('open-frogclaw').href = `frogclawclient://providers?${params.toString()}`;
+  document.getElementById('open-frogclaw').href = `FrogClaw://providers?${params.toString()}`;
 </script>
 ```
 
@@ -103,14 +103,14 @@ frogclawclient://providers?name=OpenAI&baseurl=https%3A%2F%2Fapi.openai.com&apik
 :::
 
 ::: tip الاختبار
-`frogclawclient://` بروتوكول مخصص يسجله تطبيق سطح المكتب المثبت في النظام. تشغيل الموقع أو خادم Vite فقط لا يسجل البروتوكول. إذا لم يفتح الرابط FrogClawClient، فثبّت أو أعد بناء أحدث تطبيق FrogClawClient لسطح المكتب أولاً.
+`FrogClaw://` بروتوكول مخصص يسجله تطبيق سطح المكتب المثبت في النظام. تشغيل الموقع أو خادم Vite فقط لا يسجل البروتوكول. إذا لم يفتح الرابط FrogClaw، فثبّت أو أعد بناء أحدث تطبيق FrogClaw لسطح المكتب أولاً.
 :::
 
 ---
 
 ## تدوير مفاتيح متعددة
 
-يدعم FrogClawClient مفاتيح API متعددة لكل مزوّد. انقر **إضافة مفتاح** في لوحة تفاصيل المزوّد.
+يدعم FrogClaw مفاتيح API متعددة لكل مزوّد. انقر **إضافة مفتاح** في لوحة تفاصيل المزوّد.
 
 ---
 
@@ -123,7 +123,7 @@ frogclawclient://providers?name=OpenAI&baseurl=https%3A%2F%2Fapi.openai.com&apik
 ## Ollama (النماذج المحلية)
 
 1. ثبّت وأطلق [Ollama](https://ollama.com/).
-2. في FrogClawClient، أنشئ مزوّداً جديداً من النوع **OpenAI**.
+2. في FrogClaw، أنشئ مزوّداً جديداً من النوع **OpenAI**.
 3. اضبط **Base URL** على `http://localhost:11434`.
 4. انقر **جلب النماذج** لاكتشاف النماذج المحمّلة محلياً.
 

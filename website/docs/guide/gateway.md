@@ -2,11 +2,11 @@
 
 ## What is the API Gateway?
 
-FrogClawClient includes a built-in local API server that exposes your configured providers as **OpenAI-compatible**, **Claude-native**, and **Gemini-native** endpoints. Any tool or client that speaks one of these protocols can use FrogClawClient as its backend — no separate API keys or relay services required.
+FrogClaw includes a built-in local API server that exposes your configured providers as **OpenAI-compatible**, **Claude-native**, and **Gemini-native** endpoints. Any tool or client that speaks one of these protocols can use FrogClaw as its backend — no separate API keys or relay services required.
 
 Use cases:
 
-- Run **Claude Code CLI**, **OpenAI Codex CLI**, **Gemini CLI**, or **OpenCode** through FrogClawClient.
+- Run **Claude Code CLI**, **OpenAI Codex CLI**, **Gemini CLI**, or **OpenCode** through FrogClaw.
 - Feed your IDE extensions through a single, locally managed endpoint.
 - Share one set of provider keys across many tools with per-key rate limiting.
 
@@ -19,7 +19,7 @@ Use cases:
 3. By default the server listens on `127.0.0.1:8080` (HTTP). You can change the listen address and port in the **Settings** tab.
 
 ::: tip
-Enable **Auto-start** in the gateway settings to launch the server automatically when FrogClawClient starts.
+Enable **Auto-start** in the gateway settings to launch the server automatically when FrogClaw starts.
 :::
 
 ---
@@ -49,7 +49,7 @@ The gateway can serve HTTPS alongside or instead of HTTP.
 
 1. Open the **Settings** tab.
 2. Enable **SSL/TLS** and select **Generate** mode.
-3. FrogClawClient creates a self-signed certificate and private key at:
+3. FrogClaw creates a self-signed certificate and private key at:
 
    ```
    ~/.frogclaw/ssl/cert.pem
@@ -98,7 +98,7 @@ Click any log entry to inspect the full request and response. Use the **Clear Lo
 
 ## Configuration Templates
 
-FrogClawClient ships with ready-made configuration snippets for popular CLI tools. Go to the **Templates** tab, pick a tool, and click **Copy** to get the configuration you need.
+FrogClaw ships with ready-made configuration snippets for popular CLI tools. Go to the **Templates** tab, pick a tool, and click **Copy** to get the configuration you need.
 
 ### Claude Code CLI
 
@@ -152,14 +152,14 @@ Replace `frogclaw-xxxx` with a key generated in the **API Keys** tab. If SSL is 
 
 Below is a general pattern for connecting any OpenAI-compatible client:
 
-1. **Generate a gateway API key** in FrogClawClient.
+1. **Generate a gateway API key** in FrogClaw.
 2. **Set the base URL** in your tool's configuration to `http://127.0.0.1:8080/v1` (or the HTTPS equivalent).
 3. **Set the API key** to the gateway key you generated.
-4. **Select a model** that you have configured in one of your FrogClawClient providers.
-5. Start using the tool — all requests route through FrogClawClient to the upstream provider.
+4. **Select a model** that you have configured in one of your FrogClaw providers.
+5. Start using the tool — all requests route through FrogClaw to the upstream provider.
 
 ::: tip
-If a tool requires a specific API format (e.g. Claude or Gemini native), FrogClawClient automatically detects the request format and routes it to the correct provider. You do not need to configure separate endpoints per format.
+If a tool requires a specific API format (e.g. Claude or Gemini native), FrogClaw automatically detects the request format and routes it to the correct provider. You do not need to configure separate endpoints per format.
 :::
 
 ---
