@@ -43,20 +43,39 @@ function getToolIcon(toolName: string): React.ReactNode {
   return <Wrench size={14} />;
 }
 
+function decodeToolText(value: string): string {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&#34;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/\\\\/g, '\\');
+}
+
+function shortenCommandText(value: string, maxLen = 120): string {
+  let text = decodeToolText(value).replace(/\s+/g, ' ').trim();
+  text = text.replace(/^"?[A-Z]:\\WINDOWS\\System32\\WindowsPowerShell\\v1\.0\\powershell\.exe"?\s*/i, 'powershell ');
+  text = text.replace(/^"?powershell(?:\.exe)?"?\s+-NoProfile\s+-ExecutionPolicy\s+Bypass\s+/i, 'powershell ');
+  text = text.replace(/^"?cmd(?:\.exe)?"?\s*\/[cs]\s*/i, '');
+  if (text.length <= maxLen) return text;
+  return `${text.slice(0, maxLen - 1)}…`;
+}
+
 function getInputSummary(input?: string): string | undefined {
   if (!input) return undefined;
   try {
     const parsed = JSON.parse(input);
-    if (parsed.command) return parsed.command;
-    if (parsed.path) return parsed.path;
-    if (parsed.file_path) return parsed.file_path;
-    if (parsed.pattern) return parsed.pattern;
+    if (parsed.command) return shortenCommandText(Array.isArray(parsed.command) ? parsed.command.join(' ') : String(parsed.command));
+    if (parsed.path) return shortenCommandText(String(parsed.path));
+    if (parsed.file_path) return shortenCommandText(String(parsed.file_path));
+    if (parsed.pattern) return shortenCommandText(String(parsed.pattern));
     const firstVal = Object.values(parsed)[0];
-    if (typeof firstVal === 'string') return firstVal.length > 80 ? firstVal.slice(0, 80) + '…' : firstVal;
+    if (typeof firstVal === 'string') return shortenCommandText(firstVal);
   } catch {
     // not json
   }
-  return input.length > 80 ? input.slice(0, 80) + '…' : input;
+  return shortenCommandText(input);
 }
 
 export function ToolCallCard({ toolCalls }: ToolCallChainProps) {
@@ -123,7 +142,7 @@ export function ToolCallCard({ toolCalls }: ToolCallChainProps) {
       return {
         key: tc.toolUseId,
         icon: getToolIcon(tc.toolName),
-        title: tc.toolName,
+        title: shortenCommandText(tc.toolName, 42),
         description: (
           <Typography.Text
             type="secondary"

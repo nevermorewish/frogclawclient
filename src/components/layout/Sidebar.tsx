@@ -15,6 +15,7 @@ import {
   ScrollText,
   Settings,
   Sparkles,
+  Trash2,
   User,
   XCircle,
 } from 'lucide-react';
@@ -76,7 +77,7 @@ function projectIcon() {
 export function Sidebar() {
   const { t } = useTranslation();
   const { token } = theme.useToken();
-  const { message } = AntdApp.useApp();
+  const { message, modal } = AntdApp.useApp();
   const activePage = useUIStore((s) => s.activePage);
   const setActivePage = useUIStore((s) => s.setActivePage);
   const enterSettings = useUIStore((s) => s.enterSettings);
@@ -95,6 +96,7 @@ export function Sidebar() {
   const fetchConversations = useConversationStore((s) => s.fetchConversations);
   const setActiveConversation = useConversationStore((s) => s.setActiveConversation);
   const createConversation = useConversationStore((s) => s.createConversation);
+  const deleteConversation = useConversationStore((s) => s.deleteConversation);
   const streamingConversationId = useConversationStore((s) => s.streamingConversationId);
 
   const [loginOpen, setLoginOpen] = useState(false);
@@ -194,6 +196,18 @@ export function Sidebar() {
   const handleSelectConversation = (conversationId: string) => {
     setActiveConversation(conversationId);
     setActivePage('chat');
+  };
+
+  const handleDeleteConversation = (conversation: Conversation) => {
+    modal.confirm({
+      title: t('chat.deleteConfirm'),
+      content: conversation.title,
+      mask: { blur: true },
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        await deleteConversation(conversation.id);
+      },
+    });
   };
 
   const handleCreateProject = async () => {
@@ -480,10 +494,17 @@ export function Sidebar() {
                           const isActive = activeConversationId === conversation.id && activePage === 'chat';
                           const isStreaming = streamingConversationId === conversation.id;
                           return (
-                            <button
+                            <div
                               key={conversation.id}
-                              type="button"
+                              role="button"
+                              tabIndex={0}
                               onClick={() => handleSelectConversation(conversation.id)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault();
+                                  handleSelectConversation(conversation.id);
+                                }
+                              }}
                               className="flex items-center transition-colors"
                               style={{
                                 width: '100%',
@@ -509,7 +530,28 @@ export function Sidebar() {
                                   {formatTime(conversation.updated_at)}
                                 </span>
                               )}
-                            </button>
+                              <Tooltip title={t('chat.delete')}>
+                                <Button
+                                  type="text"
+                                  danger
+                                  size="small"
+                                  aria-label={t('chat.delete')}
+                                  icon={<Trash2 size={13} />}
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    handleDeleteConversation(conversation);
+                                  }}
+                                  style={{
+                                    width: 22,
+                                    height: 22,
+                                    minWidth: 22,
+                                    padding: 0,
+                                    flexShrink: 0,
+                                  }}
+                                />
+                              </Tooltip>
+                            </div>
                           );
                         })
                       )}

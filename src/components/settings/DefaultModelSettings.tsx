@@ -5,6 +5,7 @@ import { useSettingsStore, useProviderStore } from '@/stores';
 import { useEffect, useCallback, useState } from 'react';
 import type { AppSettings, ModelType } from '@/types';
 import { ModelSelect, parseModelValue } from '@/components/shared/ModelSelect';
+import { EmbeddingModelSelect } from '@/components/shared/EmbeddingModelSelect';
 import { ModelParamSliders } from '@/components/common/ModelParamSliders';
 import { SettingsGroup } from './SettingsGroup';
 
@@ -183,6 +184,54 @@ function ModelParamsModal({
 
 // ── Model Card ─────────────────────────────────────────────
 
+function EmbeddingModelCard({
+  title,
+  description,
+  placeholder,
+}: {
+  title: string;
+  description: string;
+  placeholder: string;
+}) {
+  const { token } = theme.useToken();
+  const settings = useSettingsStore((s) => s.settings);
+  const saveSettings = useSettingsStore((s) => s.saveSettings);
+  const currentValue = settings.default_embedding_provider_id && settings.default_embedding_model_id
+    ? `${settings.default_embedding_provider_id}::${settings.default_embedding_model_id}`
+    : undefined;
+
+  const handleChange = useCallback(
+    (value: string | undefined) => {
+      if (!value) {
+        saveSettings({ default_embedding_provider_id: null, default_embedding_model_id: null });
+        return;
+      }
+      const parsed = parseModelValue(value);
+      if (parsed) {
+        saveSettings({
+          default_embedding_provider_id: parsed.providerId,
+          default_embedding_model_id: parsed.modelId,
+        });
+      }
+    },
+    [saveSettings],
+  );
+
+  return (
+    <SettingsGroup title={title}>
+      <div style={{ fontSize: 12, color: token.colorTextDescription, marginBottom: 12 }}>
+        {description}
+      </div>
+      <EmbeddingModelSelect
+        value={currentValue}
+        onChange={handleChange}
+        placeholder={placeholder}
+        style={{ width: '100%' }}
+      />
+    </SettingsGroup>
+  );
+}
+
 function ModelCard({
   title,
   description,
@@ -324,6 +373,12 @@ export function DefaultModelSettings() {
         defaultTopP={1.0}
         defaultMaxTokens={4096}
         modelType="Chat"
+      />
+
+      <EmbeddingModelCard
+        title={t('settings.defaultEmbeddingModel', '向量模型')}
+        description={t('settings.defaultEmbeddingModelDesc', '用于项目记忆、长期记忆和知识库索引的默认向量模型。项目记忆会默认使用此模型启用。')}
+        placeholder={t('settings.memory.embeddingModelPlaceholder', '选择向量模型')}
       />
 
       <ModelCard

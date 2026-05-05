@@ -1,6 +1,11 @@
 use crate::AppState;
 use frogclaw_core::types::*;
+use frogclaw_providers::{resolve_base_url_for_type, ProviderRequestContext};
 use tauri::{AppHandle, Emitter, State};
+
+fn normalize_project_path(value: &str) -> String {
+    value.trim().replace('\\', "/").trim_end_matches('/').to_lowercase()
+}
 
 async fn index_memory_item_if_configured(
     app: AppHandle,
@@ -178,6 +183,132 @@ pub async fn add_project_memory_item(
     .map_err(|e| e.to_string())?;
 
     index_memory_item_if_configured(app, &state, item).await
+}
+
+#[tauri::command]
+pub async fn summarize_project_memory(
+    state: State<'_, AppState>,
+    project_path: String,
+    project_name: Option<String>,
+) -> Result<usize, String> {
+    let profile = frogclaw_core::repo::memory::ensure_project_profile(
+        &state.sea_db,
+        &project_path,
+        project_name.as_deref(),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    let before_count = frogclaw_core::repo::memory::list_items(
+        &state.sea_db,
+        &profile.namespace_id,
+    )
+    .await
+    .map_err(|e| e.to_string())?
+    .len();
+
+    let target_path = normalize_project_path(&project_path);
+    let mut conversations = frogclaw_core::repo::conversation::list_conversations(&state.sea_db)
+        .await
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .filter(|conversation| {
+            conversation
+                .working_directory
+                .as_deref()
+                .map(normalize_project_path)
+                .as_deref()
+                == Some(target_path.as_str())
+        })
+        .collect::<Vec<_>>();
+    conversations.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    if conversations.is_empty() {
+        return Err("当前项目没有可总结的会话".to_string());
+    }
+
+    let mut user_parts = Vec::new();
+    let mut assistant_parts = Vec::new();
+    let mut runtime_conversation = None;
+    for conversation in conversations.iter().take(8) {
+        let messages = frogclaw_core::repo::message::list_messages(&state.sea_db, &conversation.id)
+            .await
+            .map_err(|e| e.to_string())?;
+        if messages.iter().any(|msg| matches!(msg.role, MessageRole::Assistant)) {
+            runtime_conversation.get_or_insert_with(|| conversation.clone());
+        }
+        for msg in messages.iter().rev().take(16).rev() {
+            let content = msg.content.trim();
+            if content.is_empty() {
+                continue;
+            }
+            match msg.role {
+                MessageRole::User => user_parts.push(format!("会话「{}」用户：{}", conversation.title, content)),
+                MessageRole::Assistant => assistant_parts.push(format!("会话「{}」助手：{}", conversation.title, content)),
+                _ => {}
+            }
+        }
+    }
+    if user_parts.is_empty() || assistant_parts.is_empty() {
+        return Err("当前项目没有可总结的用户/助手消息".to_string());
+    }
+    let mut conversation = runtime_conversation.unwrap_or_else(|| conversations[0].clone());
+    conversation.working_directory = Some(project_path.clone());
+    conversation.project_name = project_name.clone();
+
+    let provider = frogclaw_core::repo::provider::get_provider(
+        &state.sea_db,
+        &conversation.provider_id,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    let key_row = frogclaw_core::repo::provider::get_active_key(
+        &state.sea_db,
+        &conversation.provider_id,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    let api_key = frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
+        .map_err(|e| e.to_string())?;
+    let settings = frogclaw_core::repo::settings::get_settings(&state.sea_db)
+        .await
+        .unwrap_or_default();
+    let proxy_config = ProviderProxyConfig::resolve(&provider.proxy_config, &settings);
+    let ctx = ProviderRequestContext {
+        api_key,
+        key_id: key_row.id,
+        provider_id: provider.id.clone(),
+        base_url: Some(resolve_base_url_for_type(
+            &provider.api_host,
+            &provider.provider_type,
+        )),
+        api_path: provider.api_path.clone(),
+        proxy_config,
+        custom_headers: provider
+            .custom_headers
+            .as_ref()
+            .and_then(|s| serde_json::from_str(s).ok()),
+    };
+
+    crate::commands::conversations::auto_capture_project_memory(
+        &state.sea_db,
+        &state.master_key,
+        state.vector_store.as_ref(),
+        &provider,
+        &ctx,
+        &conversation,
+        &conversation.model_id,
+        &user_parts.join("\n\n"),
+        &assistant_parts.join("\n\n"),
+    )
+    .await;
+
+    let after_count = frogclaw_core::repo::memory::list_items(
+        &state.sea_db,
+        &profile.namespace_id,
+    )
+    .await
+    .map_err(|e| e.to_string())?
+    .len();
+    Ok(after_count.saturating_sub(before_count))
 }
 
 #[tauri::command]

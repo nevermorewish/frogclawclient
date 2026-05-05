@@ -12,7 +12,7 @@ type Channel = {
   appSecret: string;
   label?: string;
   enabled?: boolean;
-  assignment?: 'frogclaw' | 'none';
+  assignment?: 'aiagent' | 'native_cli';
   sandbox?: boolean;
 };
 
@@ -76,6 +76,15 @@ function channelsPath() {
   return path.join(configDir, 'im-channels.json');
 }
 
+function normalizeAssignment(value: unknown): 'aiagent' | 'native_cli' {
+  if (value === 'native_cli' || value === 'none') return 'native_cli';
+  return 'aiagent';
+}
+
+function assignmentLabel(value: unknown) {
+  return normalizeAssignment(value) === 'native_cli' ? '原生 CLI' : 'AI Agent';
+}
+
 function loadChannels(): Channel[] {
   try {
     const p = channelsPath();
@@ -91,7 +100,7 @@ function loadChannels(): Channel[] {
         appSecret: ch.appSecret || ch.app_secret || '',
         label: ch.label || '',
         enabled: ch.enabled !== false,
-        assignment: ch.assignment || 'frogclaw',
+        assignment: normalizeAssignment(ch.assignment),
         sandbox: Boolean(ch.sandbox),
       }))
       .filter((ch: Channel) => ch.appId && ch.appSecret);
@@ -132,19 +141,19 @@ function notifyStatus() {
         appId: bot.channel.appId,
         platform: 'feishu',
         label: bot.channel.label || '',
-        assignment: bot.channel.assignment || 'frogclaw',
+        assignment: normalizeAssignment(bot.channel.assignment),
         status: bot.status,
         error: bot.error,
-        agent: bot.channel.assignment === 'none' ? null : 'frogclaw',
+        agent: normalizeAssignment(bot.channel.assignment),
       })),
       ...[...qqBots.values()].map((bot) => ({
         appId: bot.channel.appId,
         platform: 'qq',
         label: bot.channel.label || '',
-        assignment: bot.channel.assignment || 'frogclaw',
+        assignment: normalizeAssignment(bot.channel.assignment),
         status: bot.status,
         error: bot.error,
-        agent: bot.channel.assignment === 'none' ? null : 'frogclaw',
+        agent: normalizeAssignment(bot.channel.assignment),
       })),
     ],
   });
@@ -194,6 +203,12 @@ function buildResultCard(state: {
 function truncate(text: string) {
   if (text.length <= 28000) return text;
   return `${text.slice(0, 14000)}\n\n... (truncated) ...\n\n${text.slice(-14000)}`;
+}
+
+function previewText(text: string, maxLen = 120) {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= maxLen) return normalized;
+  return `${normalized.slice(0, maxLen)}...`;
 }
 
 async function sendText(client: lark.Client, chatId: string, text: string, userId?: string) {
@@ -337,7 +352,15 @@ function createDispatcher(bot: Bot) {
         const chatId = msg.chat_id;
         const chatType = msg.chat_type;
         const userId = sender?.sender_id?.open_id || sender?.sender_id?.user_id || '';
-        if (!messageId || !chatId || !userId) return;
+        if (!messageId || !chatId || !userId) {
+          log('warn', 'feishu message ignored: missing ids', {
+            messageId: Boolean(messageId),
+            chatId: Boolean(chatId),
+            userId: Boolean(userId),
+            messageType: msg.message_type,
+          });
+          return;
+        }
 
         let parsed: any = {};
         try { parsed = JSON.parse(msg.content || '{}'); } catch {}
@@ -349,16 +372,18 @@ function createDispatcher(bot: Bot) {
 
         const mentions = Array.isArray(msg.mentions) ? msg.mentions : [];
         const mentioned = mentions.some((m: any) => m?.id?.open_id === bot.botOpenId || m?.id?.user_id === bot.botOpenId);
-        if (chatType !== 'p2p' && !mentioned) return;
+        log('info', 'feishu message received', {
+          appId: bot.channel.appId,
+          chatType,
+          messageType: msg.message_type,
+          mentioned,
+          text: previewText(text),
+          files: msg.message_type === 'image' || msg.message_type === 'file',
+        });
 
         if (chatType === 'p2p') {
           bot.recentPrivateUsers.add(userId);
           saveKnownUsers(bot.channel.appId, bot.recentPrivateUsers);
-        }
-
-        if (bot.channel.assignment === 'none') {
-          await sendText(bot.client, chatId, '该飞书机器人还未启用，请在 FrogClawClient 的 IM 通道中启用。', userId);
-          return;
         }
 
         const sessionKey = `feishu:${bot.channel.appId}:${chatId}:${userId}`;
@@ -407,7 +432,7 @@ function createDispatcher(bot: Bot) {
         };
 
         try {
-          await callParentStream({ sessionKey, prompt: text || '请分析附件', files }, async (evt) => {
+          await callParentStream({ sessionKey, prompt: text || '请分析附件', files, assignment: normalizeAssignment(bot.channel.assignment) }, async (evt) => {
             if (evt.type === 'system') {
               state.status = 'running';
               state.model = evt.model || state.model;
@@ -459,7 +484,7 @@ async function connectBot(channel: Channel) {
     await ws.start({ eventDispatcher: createDispatcher(bot) });
     bot.ws = ws;
     bot.status = 'running';
-    const card = buildNotificationCard('已连接 FrogClawClient', 'green', `飞书机器人已上线${channel.label ? ` (${channel.label})` : ''}\n\n**后端:** FrogClawClient 对话`);
+    const card = buildNotificationCard('已连接 FrogClawClient', 'green', `飞书机器人已上线${channel.label ? ` (${channel.label})` : ''}\n\n**后端:** ${assignmentLabel(channel.assignment)}`);
     for (const userId of bot.recentPrivateUsers) {
       await client.im.v1.message.create({
         params: { receive_id_type: 'open_id' },
@@ -479,10 +504,6 @@ async function handleQQMessage(bot: QQBot, msg: QQMessage) {
   const text = (msg.text || '').trim();
   const lower = text.toLowerCase();
 
-  if (bot.channel.assignment === 'none') {
-    await bot.client.sendText(msg.replyCtx, '该 QQ 机器人还未启用，请在 FrogClawClient 的 IM 通道中分配后端。');
-    return;
-  }
   if (lower === '/new' || lower === '/reset') {
     await fetch(`${parentBaseUrl}/reset`, {
       method: 'POST',
@@ -524,6 +545,7 @@ async function handleQQMessage(bot: QQBot, msg: QQMessage) {
         sessionKey,
         prompt: text || '请分析附件',
         files: msg.imagePaths,
+        assignment: normalizeAssignment(bot.channel.assignment),
       },
       async (evt) => {
         if (evt.type === 'system') {
@@ -679,6 +701,9 @@ server.listen(args.port, '127.0.0.1', () => {
   const port = typeof addr === 'object' && addr ? addr.port : args.port;
   process.stdout.write(`FROGCLAW_PLATFORM_READY port=${port}\n`);
   log('info', `listening on 127.0.0.1:${port}, parent=${parentBaseUrl}`);
+  reconcile()
+    .then((count) => log('info', `auto-connected ${count} IM bot(s)`))
+    .catch((e: any) => log('error', 'auto-connect failed:', e.message || String(e)));
 });
 
 process.on('SIGTERM', () => disconnectAll().finally(() => process.exit(0)));

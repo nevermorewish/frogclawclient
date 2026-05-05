@@ -292,6 +292,8 @@ export interface AppSettings {
   default_top_p: number | null;
   default_frequency_penalty: number | null;
   default_context_count: number | null;
+  default_embedding_provider_id: string | null;
+  default_embedding_model_id: string | null;
   title_summary_provider_id: string | null;
   title_summary_model_id: string | null;
   title_summary_temperature: number | null;

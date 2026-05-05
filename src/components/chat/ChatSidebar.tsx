@@ -644,21 +644,21 @@ export function ChatSidebar() {
         const childCount = childrenMap.get(conv.id)?.length ?? 0
         const expanded = isExpanded(conv.id)
 
-        let label: React.ReactNode
+        let titleNode: React.ReactNode
         if (conv.is_pinned && !isChild) {
-          label = (
+          titleNode = (
             <span className="flex items-center gap-1">
               <span className="truncate">{conv.title}</span>
               <Pin size={12} style={{ color: token.colorTextQuaternary, flexShrink: 0 }} />
             </span>
           )
         } else {
-          label = conv.title
+          titleNode = conv.title
         }
 
         // Wrap label with expand/collapse toggle for parents with children
         if (childCount > 0) {
-          label = (
+          titleNode = (
             <span className="flex items-center gap-1" style={{ overflow: 'hidden' }}>
               <span
                 onClick={(e) => {
@@ -681,10 +681,31 @@ export function ChatSidebar() {
                   }}
                 />
               </span>
-              <span className="truncate">{typeof label === 'string' ? label : label}</span>
+              <span className="truncate">{titleNode}</span>
             </span>
           )
         }
+
+        const label = multiSelectMode ? titleNode : (
+          <span className="frogclaw-chat-conversation-label-row">
+            <span className="min-w-0 flex-1 truncate">{titleNode}</span>
+            <Tooltip title={directDeleteHint}>
+              <Button
+                type="text"
+                danger
+                size="small"
+                aria-label={t('chat.delete')}
+                className="frogclaw-chat-conversation-inline-delete"
+                icon={<Trash2 size={14} />}
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  handleDelete({ key: conv.id }, event)
+                }}
+              />
+            </Tooltip>
+          </span>
+        )
 
         if (multiSelectMode) {
           return {
@@ -753,7 +774,7 @@ export function ChatSidebar() {
 
       return items
     },
-    [filteredConversations, multiSelectMode, selectedIds, buildIcon, toggleSelect, token.colorTextQuaternary, categories, t, expandedParentIds],
+    [filteredConversations, multiSelectMode, selectedIds, buildIcon, toggleSelect, token.colorTextQuaternary, categories, t, expandedParentIds, directDeleteHint, handleDelete],
   )
 
   const groupLabels: Record<string, string> = useMemo(
@@ -1043,10 +1064,7 @@ export function ChatSidebar() {
         }
       }
       return {
-        trigger: (_conversation: ConversationItemType, info: { originNode: React.ReactNode }) => {
-          if (!directDeleteMode) {
-            return <Tooltip title={directDeleteHint}>{info.originNode}</Tooltip>
-          }
+        trigger: (_conversation: ConversationItemType, _info: { originNode: React.ReactNode }) => {
           return (
             <Tooltip title={directDeleteHint}>
               <Button
@@ -1414,15 +1432,35 @@ export function ChatSidebar() {
                   align-items: center;
                   justify-content: center;
                 }
-                .ant-conversations .ant-conversations-item-active .frogclaw-chat-conversation-menu-delete {
-                  opacity: 0;
-                }
                 .ant-conversations .ant-conversations-item:hover .frogclaw-chat-conversation-menu-delete,
+                .frogclaw-chat-conversation-menu-delete,
                 .frogclaw-chat-conversation-menu-delete:focus-visible {
                   opacity: 0.85;
                 }
                 .frogclaw-chat-conversation-menu-delete:hover {
                   opacity: 1 !important;
+                }
+                .frogclaw-chat-conversation-label-row {
+                  display: flex;
+                  align-items: center;
+                  gap: 6px;
+                  min-width: 0;
+                  width: 100%;
+                }
+                .frogclaw-chat-conversation-inline-delete {
+                  width: 22px;
+                  height: 22px;
+                  min-width: 22px;
+                  padding: 0;
+                  display: inline-flex;
+                  align-items: center;
+                  justify-content: center;
+                  opacity: 0.58;
+                  flex-shrink: 0;
+                }
+                .ant-conversations .ant-conversations-item:hover .frogclaw-chat-conversation-inline-delete,
+                .frogclaw-chat-conversation-inline-delete:focus-visible {
+                  opacity: 1;
                 }
                 .ant-conversations .ant-conversations-group-label {
                   flex: 1;

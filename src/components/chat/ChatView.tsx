@@ -886,6 +886,48 @@ const toolCallStatusColors: Record<string, string> = {
   cancelled: '#8c8c8c',
 };
 
+function decodeToolText(value: string): string {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&#34;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/\\\\/g, '\\');
+}
+
+function shortenCommandText(value: string, maxLen = 120): string {
+  let text = decodeToolText(value).replace(/\s+/g, ' ').trim();
+  text = text.replace(/^"?[A-Z]:\\WINDOWS\\System32\\WindowsPowerShell\\v1\.0\\powershell\.exe"?\s*/i, 'powershell ');
+  text = text.replace(/^"?powershell(?:\.exe)?"?\s+-NoProfile\s+-ExecutionPolicy\s+Bypass\s+/i, 'powershell ');
+  text = text.replace(/^"?cmd(?:\.exe)?"?\s*\/[cs]\s*/i, '');
+  if (text.length <= maxLen) return text;
+  return `${text.slice(0, maxLen - 1)}…`;
+}
+
+function getToolInputSummary(input?: Record<string, unknown> | null): string {
+  if (!input) return '';
+  const candidates = [
+    input.command,
+    input.cmd,
+    input.cmdline,
+    input.script,
+    input.path,
+    input.file_path,
+    input.pattern,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim()) {
+      return shortenCommandText(candidate);
+    }
+    if (Array.isArray(candidate) && candidate.length > 0) {
+      return shortenCommandText(candidate.map((item) => String(item)).join(' '));
+    }
+  }
+  const firstString = Object.values(input).find((value): value is string => typeof value === 'string' && value.trim().length > 0);
+  return firstString ? shortenCommandText(firstString) : '';
+}
+
 function ToolCallNode(props: NodeComponentProps<{
   type: 'tool-call';
   content: string;
@@ -898,10 +940,11 @@ function ToolCallNode(props: NodeComponentProps<{
   const [expanded, setExpanded] = useState(false);
 
   const execId = getCustomAttr(node.attrs, 'id') ?? '';
-  const toolName = getCustomAttr(node.attrs, 'name') ?? '';
-  const summary = String(node.content ?? '');
-
+  const rawToolName = getCustomAttr(node.attrs, 'name') ?? '';
   const tc = toolCalls[execId];
+  const toolName = shortenCommandText(tc?.toolName || rawToolName, 42);
+  const summary = getToolInputSummary(tc?.input) || shortenCommandText(String(node.content ?? ''));
+
   const status = tc?.executionStatus ?? 'success';
   const statusColor = toolCallStatusColors[status] || token.colorTextSecondary;
   const isLoading = status === 'queued' || status === 'running';
@@ -963,6 +1006,7 @@ function ToolCallNode(props: NodeComponentProps<{
       </div>
       {expanded && hasDetails && (
         <div
+          onClick={(event) => event.stopPropagation()}
           style={{
             margin: '2px 0 0',
             padding: '6px 10px',

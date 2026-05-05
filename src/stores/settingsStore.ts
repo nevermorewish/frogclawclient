@@ -25,6 +25,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   default_top_p: null,
   default_frequency_penalty: null,
   default_context_count: null,
+  default_embedding_provider_id: null,
+  default_embedding_model_id: null,
   title_summary_provider_id: null,
   title_summary_model_id: null,
   title_summary_temperature: null,

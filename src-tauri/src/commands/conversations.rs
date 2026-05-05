@@ -101,7 +101,7 @@ async fn resolve_auto_memory_summary_runtime(
     Some((provider, ctx, model_id))
 }
 
-async fn auto_capture_project_memory(
+pub(crate) async fn auto_capture_project_memory(
     db: &DatabaseConnection,
     master_key: &[u8; 32],
     vector_store: &frogclaw_core::vector_store::VectorStore,
@@ -113,9 +113,11 @@ async fn auto_capture_project_memory(
     assistant_content: &str,
 ) {
     let Some(project_path) = conversation.working_directory.as_deref() else {
+        tracing::info!("[project-memory] skip auto capture: conversation has no working directory");
         return;
     };
     if user_content.trim().len() < 3 || assistant_content.trim().len() < 3 {
+        tracing::info!("[project-memory] skip auto capture: content too short");
         return;
     }
 
@@ -132,16 +134,20 @@ async fn auto_capture_project_memory(
             return;
         }
     };
-    let Some(embedding_provider) = profile.embedding_provider.clone() else {
-        tracing::debug!("[project-memory] skip auto capture: embedding provider not configured");
-        return;
-    };
+    let embedding_provider = profile.embedding_provider.clone();
+    tracing::info!(
+        "[project-memory] auto capture start project={} namespace={} embedding_configured={}",
+        profile.project_name,
+        profile.namespace_id,
+        embedding_provider.is_some()
+    );
 
     let prompt = format!(
         "从下面这一轮对话中抽取值得在该项目长期记住的信息。只返回 JSON 数组，不要 Markdown。\
 每项格式为 {{\"title\":\"简短标题\",\"content\":\"完整但简洁的记忆内容\"}}。\
-只保留稳定事实、用户偏好、项目路径、工程约束、已确认决策、错误解决方案。\
-如果没有值得记住的信息，返回 []。\n\nUSER:\n{}\n\nASSISTANT:\n{}",
+保留稳定事实、用户偏好、项目路径、工程约束、已确认决策、错误解决方案。\
+对于编译、测试、排查、修改代码、配置环境等项目操作，也要记录实际执行结果、关键命令、失败原因和最终处理方式。\
+只有闲聊、模型身份询问、问候、无项目价值内容才返回 []。\n\nUSER:\n{}\n\nASSISTANT:\n{}",
         user_content.chars().take(4000).collect::<String>(),
         assistant_content.chars().take(6000).collect::<String>(),
     );
@@ -207,9 +213,15 @@ async fn auto_capture_project_memory(
 
     let candidates = parse_auto_memory_candidates(&response.content);
     if candidates.is_empty() {
+        tracing::info!(
+            "[project-memory] auto capture produced 0 candidates project={} response={}",
+            profile.project_name,
+            response.content.chars().take(240).collect::<String>()
+        );
         return;
     }
 
+    let mut saved_count = 0usize;
     for candidate in candidates {
         let item = match frogclaw_core::repo::memory::add_item(
             db,
@@ -228,37 +240,54 @@ async fn auto_capture_project_memory(
                 continue;
             }
         };
+        saved_count += 1;
 
-        let _ = frogclaw_core::repo::memory::update_item_index_status(
-            db,
-            &item.id,
-            "indexing",
-            None,
-        )
-        .await;
-        let result = crate::indexing::index_memory_item(
-            db,
-            master_key,
-            vector_store,
-            &profile.namespace_id,
-            &item.id,
-            &item.content,
-            &embedding_provider,
-            profile.embedding_dimensions.map(|v| v as usize),
-        )
-        .await;
-        let (status, err_msg) = match result {
-            Ok(_) => ("ready", None),
-            Err(err) => ("failed", Some(err.to_string())),
-        };
-        let _ = frogclaw_core::repo::memory::update_item_index_status(
-            db,
-            &item.id,
-            status,
-            err_msg.as_deref(),
-        )
-        .await;
+        if let Some(ref embedding_provider) = embedding_provider {
+            let _ = frogclaw_core::repo::memory::update_item_index_status(
+                db,
+                &item.id,
+                "indexing",
+                None,
+            )
+            .await;
+            let result = crate::indexing::index_memory_item(
+                db,
+                master_key,
+                vector_store,
+                &profile.namespace_id,
+                &item.id,
+                &item.content,
+                embedding_provider,
+                profile.embedding_dimensions.map(|v| v as usize),
+            )
+            .await;
+            let (status, err_msg) = match result {
+                Ok(_) => ("ready", None),
+                Err(err) => ("failed", Some(err.to_string())),
+            };
+            let _ = frogclaw_core::repo::memory::update_item_index_status(
+                db,
+                &item.id,
+                status,
+                err_msg.as_deref(),
+            )
+            .await;
+        } else {
+            let _ = frogclaw_core::repo::memory::update_item_index_status(
+                db,
+                &item.id,
+                "skipped",
+                Some("embedding provider not configured"),
+            )
+            .await;
+        }
     }
+    tracing::info!(
+        "[project-memory] auto capture saved {} items project={} namespace={}",
+        saved_count,
+        profile.project_name,
+        profile.namespace_id
+    );
 }
 
 fn provider_type_to_registry_key(pt: &ProviderType) -> &'static str {

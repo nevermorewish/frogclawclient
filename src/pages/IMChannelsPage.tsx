@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 
 type ImPlatform = 'feishu' | 'qq';
-type Assignment = 'frogclaw' | 'none';
+type Assignment = 'aiagent' | 'native_cli';
 
 type ImChannel = {
   id: string;
@@ -87,9 +87,14 @@ function createChannel(platform: ImPlatform = 'feishu'): ImChannel {
     appSecret: '',
     label: '',
     enabled: true,
-    assignment: 'frogclaw',
+    assignment: 'aiagent',
     sandbox: false,
   };
+}
+
+function normalizeAssignment(value?: string | null): Assignment {
+  if (value === 'native_cli' || value === 'none') return 'native_cli';
+  return 'aiagent';
 }
 
 function platformTag(platform: ImPlatform) {
@@ -115,7 +120,7 @@ export function IMChannelsPage() {
   const selectedPlatform = Form.useWatch('platform', form) ?? 'feishu';
 
   const activeCount = useMemo(
-    () => channels.filter((ch) => ch.enabled && ch.assignment !== 'none').length,
+    () => channels.filter((ch) => ch.enabled).length,
     [channels],
   );
 
@@ -130,7 +135,7 @@ export function IMChannelsPage() {
         ...ch,
         platform: ch.platform === 'qq' ? 'qq' : 'feishu',
         enabled: ch.enabled !== false,
-        assignment: ch.assignment === 'none' ? 'none' : 'frogclaw',
+        assignment: normalizeAssignment(ch.assignment),
         sandbox: Boolean(ch.sandbox),
       })));
       setStatus(remoteStatus);
@@ -174,7 +179,7 @@ export function IMChannelsPage() {
       appId: value.appId,
       appSecret: value.appSecret,
       enabled: value.enabled !== false,
-      assignment: value.assignment === 'none' ? 'none' : 'frogclaw',
+      assignment: normalizeAssignment(value.assignment),
       sandbox: Boolean(value.sandbox),
     });
   };
@@ -264,11 +269,11 @@ export function IMChannelsPage() {
       render: (_, record) => (
         <Select<Assignment>
           size="small"
-          value={record.assignment === 'none' ? 'none' : 'frogclaw'}
+          value={normalizeAssignment(record.assignment)}
           style={{ width: 130 }}
           options={[
-            { value: 'frogclaw', label: 'FrogClaw 对话' },
-            { value: 'none', label: '未分配' },
+            { value: 'aiagent', label: 'AI Agent' },
+            { value: 'native_cli', label: '原生 CLI' },
           ]}
           onChange={(assignment) => void patchChannel(record, { assignment })}
         />
@@ -301,7 +306,7 @@ export function IMChannelsPage() {
             </span>
             <div>
               <Typography.Title level={4} style={{ margin: 0 }}>IM 通道</Typography.Title>
-              <Typography.Text type="secondary">配置飞书和 QQ 机器人，消息会进入 FrogClawClient 项目对话。</Typography.Text>
+              <Typography.Text type="secondary">配置飞书和 QQ 机器人，消息可进入 AI Agent 或原生 CLI。</Typography.Text>
             </div>
           </Space>
           <Space>
@@ -335,7 +340,7 @@ export function IMChannelsPage() {
         okButtonProps={{ icon: <Save size={15} /> }}
         destroyOnHidden
       >
-        <Form form={form} layout="vertical" initialValues={{ platform: 'feishu', enabled: true, assignment: 'frogclaw', sandbox: false }}>
+        <Form form={form} layout="vertical" initialValues={{ platform: 'feishu', enabled: true, assignment: 'aiagent', sandbox: false }}>
           <Form.Item label="平台" name="platform" rules={[{ required: true }]}>
             <Select
               options={[
@@ -361,8 +366,8 @@ export function IMChannelsPage() {
           <Form.Item label="后端" name="assignment" rules={[{ required: true }]}>
             <Select
               options={[
-                { value: 'frogclaw', label: 'FrogClaw 对话' },
-                { value: 'none', label: '未分配' },
+                { value: 'aiagent', label: 'AI Agent' },
+                { value: 'native_cli', label: '原生 CLI' },
               ]}
             />
           </Form.Item>
@@ -382,7 +387,7 @@ export function IMChannelsPage() {
             </Button>
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
               <CircleOff size={12} style={{ verticalAlign: -2, marginRight: 4 }} />
-              选择“未分配”会保留凭证但不接入对话。
+              AI Agent 使用 Codex app server，原生 CLI 使用本机 CLI 引擎。
             </Typography.Text>
           </Space>
         </Form>

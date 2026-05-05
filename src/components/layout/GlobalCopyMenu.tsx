@@ -1,16 +1,14 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
-import { Copy, TextCursorInput, Bug, Scissors, ClipboardPaste, BoxSelect } from 'lucide-react';
+import { Copy, TextCursorInput, Scissors, ClipboardPaste, BoxSelect } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { theme, message } from 'antd';
-import { invoke } from '@tauri-apps/api/core';
 import { useConversationStore } from '@/stores';
 
 /**
  * Global right-click context menu.
- * - On textarea/input → Cut + Copy + Paste + Select All + (DevTools in dev)
- * - Text selected → Copy + (Fill to Input in chat) + (DevTools in dev)
- * - No text, dev mode → DevTools only
- * - No text, prod mode → suppress native menu
+ * - On textarea/input → Cut + Copy + Paste + Select All
+ * - Text selected → Copy + (Fill to Input in chat)
+ * - No text → suppress native menu
  * - Skips when a component-specific context menu already handled the event.
  */
 export function GlobalCopyMenu() {
@@ -25,8 +23,6 @@ export function GlobalCopyMenu() {
   const targetInputRef = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null);
   const selectionRangeRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
   const activeConversationId = useConversationStore((s) => s.activeConversationId);
-  const isDev = import.meta.env.DEV;
-
   useEffect(() => {
     // Save textarea selection before Chromium's auto word-selection on right-click
     const savedSelRef = { start: -1, end: -1, el: null as HTMLTextAreaElement | HTMLInputElement | null };
@@ -89,9 +85,6 @@ export function GlobalCopyMenu() {
       if (sel) {
         setHasSelection(true);
         setMenuPos({ x: e.clientX, y: e.clientY });
-      } else if (isDev) {
-        setHasSelection(false);
-        setMenuPos({ x: e.clientX, y: e.clientY });
       } else {
         setMenuPos(null);
       }
@@ -109,7 +102,7 @@ export function GlobalCopyMenu() {
       document.removeEventListener('click', dismissHandler);
       document.removeEventListener('scroll', dismissHandler, true);
     };
-  }, [isDev]);
+  }, []);
 
   const handleCopy = useCallback(() => {
     const text = selectedTextRef.current;
@@ -165,11 +158,6 @@ export function GlobalCopyMenu() {
     if (text) {
       window.dispatchEvent(new CustomEvent('frogclaw:fill-input', { detail: text }));
     }
-    setMenuPos(null);
-  }, []);
-
-  const handleOpenDevtools = useCallback(() => {
-    void invoke('open_devtools');
     setMenuPos(null);
   }, []);
 
@@ -229,14 +217,7 @@ export function GlobalCopyMenu() {
     }
   }
 
-  if (isDev) {
-    items.push({
-      key: 'devtools',
-      icon: <Bug size={14} />,
-      label: t('common.openDevtools'),
-      onClick: handleOpenDevtools,
-    });
-  }
+  if (items.length === 0) return null;
 
   return (
     <div

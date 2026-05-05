@@ -14,6 +14,12 @@ type LogSource = {
 
 const SOURCES: LogSource[] = [
   {
+    key: 'ai_agent',
+    label: 'AI Agent 日志',
+    command: 'codex_app_server_read_log',
+    pathHint: '~/.frogclaw/ai-agent.log',
+  },
+  {
     key: 'sidecar',
     label: 'Sidecar 日志',
     command: 'platform_read_log',
@@ -25,12 +31,6 @@ const SOURCES: LogSource[] = [
     command: 'install_read_log',
     pathHint: '~/.frogclaw/install.log',
   },
-  {
-    key: 'codex_app_server',
-    label: 'Codex App Server',
-    command: 'codex_app_server_read_log',
-    pathHint: '~/.frogclaw/codex-app-server.log',
-  },
 ];
 
 const CATEGORY_FILTERS = [
@@ -38,7 +38,7 @@ const CATEGORY_FILTERS = [
   { key: 'feishu', label: '飞书', pattern: /feishu|飞书/i },
   { key: 'qq', label: 'QQ', pattern: /qqbot|QQ|qq/i },
   { key: 'install', label: 'Install', pattern: /install|安装|node|git|claude|codex|gemini/i },
-  { key: 'codex', label: 'Codex', pattern: /codex|app-server|thread\/start|turn\/start|JSON-RPC/i },
+  { key: 'ai_agent', label: 'AI Agent', pattern: /ai agent|codex|app-server|thread\/start|turn\/start|JSON-RPC/i },
   { key: 'warn', label: 'Warn', pattern: /\bwarn\b|warning|警告/i },
   { key: 'error', label: 'Error', pattern: /\berror\b|failed|失败|\[err\]/i },
 ];
@@ -147,7 +147,7 @@ export function LogsPage() {
             </span>
             <div>
               <Typography.Title level={4} style={{ margin: 0 }}>系统日志</Typography.Title>
-              <Typography.Text type="secondary">查看安装日志、Sidecar 日志、Codex app-server 日志和 IM 通道运行信息。</Typography.Text>
+              <Typography.Text type="secondary">查看 AI Agent 日志、Sidecar 日志、安装日志和 IM 通道运行信息。</Typography.Text>
             </div>
           </Space>
           <Space wrap>

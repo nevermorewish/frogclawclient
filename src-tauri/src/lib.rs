@@ -222,6 +222,7 @@ pub fn run() {
             commands::memory::update_project_memory_profile,
             commands::memory::list_project_memory_items,
             commands::memory::add_project_memory_item,
+            commands::memory::summarize_project_memory,
             commands::memory::create_memory_namespace,
             commands::memory::delete_memory_namespace,
             commands::memory::update_memory_namespace,
@@ -474,6 +475,7 @@ pub fn run() {
                 agent_always_allowed: Arc::new(Mutex::new(std::collections::HashMap::new())),
             });
             app.manage(commands::platform_bridge::PlatformBridgeState::default());
+            commands::agent::init_ai_agent_log_file();
 
             {
                 let app_handle = app.handle().clone();

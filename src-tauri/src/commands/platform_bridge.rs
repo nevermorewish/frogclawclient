@@ -68,6 +68,7 @@ struct BridgeMessageRequest {
     session_key: String,
     prompt: String,
     files: Option<Vec<String>>,
+    assignment: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -130,6 +131,13 @@ fn log_path() -> Result<PathBuf, String> {
     Ok(config_dir()?.join("platform-sidecar.log"))
 }
 
+fn normalize_im_assignment(value: Option<String>) -> Option<String> {
+    match value.as_deref() {
+        Some("native_cli") | Some("none") => Some("native_cli".to_string()),
+        _ => Some("aiagent".to_string()),
+    }
+}
+
 fn is_platform_port_open() -> bool {
     let addr = SocketAddr::from(([127, 0, 0, 1], 18788));
     TcpStream::connect_timeout(&addr, Duration::from_millis(150)).is_ok()
@@ -178,13 +186,21 @@ fn read_channels_file() -> Result<ImChannelsFile, String> {
         return Ok(ImChannelsFile::default());
     }
     let raw = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-    serde_json::from_str(&raw).map_err(|e| e.to_string())
+    let mut file: ImChannelsFile = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
+    for channel in &mut file.channels {
+        channel.assignment = normalize_im_assignment(channel.assignment.take());
+    }
+    Ok(file)
 }
 
 fn write_channels_file(file: &ImChannelsFile) -> Result<(), String> {
     let path = channels_path()?;
     let tmp = path.with_extension("json.tmp");
-    let raw = serde_json::to_string_pretty(file).map_err(|e| e.to_string())?;
+    let mut normalized = file.clone();
+    for channel in &mut normalized.channels {
+        channel.assignment = normalize_im_assignment(channel.assignment.take());
+    }
+    let raw = serde_json::to_string_pretty(&normalized).map_err(|e| e.to_string())?;
     std::fs::write(&tmp, raw).map_err(|e| e.to_string())?;
     std::fs::rename(tmp, path).map_err(|e| e.to_string())
 }
@@ -367,6 +383,7 @@ async fn stream_project_conversation(
     tx: mpsc::Sender<Result<Event, std::convert::Infallible>>,
     start: Instant,
 ) -> Result<(), String> {
+    let assignment = normalize_im_assignment(req.assignment.clone()).unwrap_or_else(|| "aiagent".to_string());
     let prompt = match req.files.as_ref().filter(|files| !files.is_empty()) {
         Some(files) => format!("{}\n\n[IM attachments]\n{}", req.prompt, files.join("\n")),
         None => req.prompt.clone(),
@@ -458,6 +475,7 @@ async fn stream_project_conversation(
         "type": "system",
         "model": model.model_id,
         "conversationId": conversation.id,
+        "assignment": assignment,
     })))
     .await
     .ok();
@@ -577,6 +595,7 @@ pub async fn platform_start(
         return platform_status(bridge).await;
     }
     if is_platform_port_open() {
+        let _ = request_platform_reload();
         return platform_status(bridge).await;
     }
 
@@ -661,7 +680,7 @@ pub async fn install_read_log(max_bytes: Option<u64>) -> Result<String, String> 
 
 #[tauri::command]
 pub async fn codex_app_server_read_log(max_bytes: Option<u64>) -> Result<String, String> {
-    read_log_file(config_dir()?.join("codex-app-server.log"), max_bytes)
+    read_log_file(config_dir()?.join("ai-agent.log"), max_bytes)
 }
 
 #[tauri::command]
@@ -669,7 +688,7 @@ pub async fn get_log_file_path(source: String) -> Result<String, String> {
     let file_name = match source.as_str() {
         "install" => "install.log",
         "sidecar" | "platform" => "platform-sidecar.log",
-        "codex_app_server" | "codex" => "codex-app-server.log",
+        "ai_agent" | "codex_app_server" | "codex" => "ai-agent.log",
         other => return Err(format!("Unknown log source: {other}")),
     };
     Ok(config_dir()?.join(file_name).display().to_string())

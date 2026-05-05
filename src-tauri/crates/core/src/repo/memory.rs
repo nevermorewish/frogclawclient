@@ -58,6 +58,16 @@ fn fallback_project_name(project_path: &str) -> String {
 }
 
 async fn default_project_embedding_provider(db: &DatabaseConnection) -> Result<Option<String>> {
+    let settings = crate::repo::settings::get_settings(db).await?;
+    if let (Some(provider_id), Some(model_id)) = (
+        settings.default_embedding_provider_id.as_deref(),
+        settings.default_embedding_model_id.as_deref(),
+    ) {
+        if !provider_id.trim().is_empty() && !model_id.trim().is_empty() {
+            return Ok(Some(format!("{}::{}", provider_id, model_id)));
+        }
+    }
+
     let rows = models::Entity::find()
         .inner_join(providers::Entity)
         .filter(providers::Column::Enabled.eq(1))
@@ -106,7 +116,7 @@ async fn namespace_to_project_profile(
         project_path: normalize_project_path(project_path),
         project_name: project_name.to_string(),
         namespace_id: ns.id,
-        enabled: ns.embedding_provider.is_some(),
+        enabled: true,
         embedding_provider: ns.embedding_provider,
         embedding_dimensions: ns.embedding_dimensions,
         retrieval_threshold: ns.retrieval_threshold,

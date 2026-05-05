@@ -6,6 +6,35 @@ import { useTranslation } from 'react-i18next';
 
 const { Text } = Typography;
 
+function decodeToolText(value: string): string {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&#34;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/\\\\/g, '\\');
+}
+
+function shortenCommandText(value: string, maxLen = 120): string {
+  let text = decodeToolText(value).replace(/\s+/g, ' ').trim();
+  text = text.replace(/^"?[A-Z]:\\WINDOWS\\System32\\WindowsPowerShell\\v1\.0\\powershell\.exe"?\s*/i, 'powershell ');
+  text = text.replace(/^"?powershell(?:\.exe)?"?\s+-NoProfile\s+-ExecutionPolicy\s+Bypass\s+/i, 'powershell ');
+  text = text.replace(/^"?cmd(?:\.exe)?"?\s*\/[cs]\s*/i, '');
+  if (text.length <= maxLen) return text;
+  return `${text.slice(0, maxLen - 1)}…`;
+}
+
+function getToolInputSummary(input: Record<string, unknown>): string {
+  const candidates = [input.command, input.cmd, input.cmdline, input.script, input.path, input.file_path, input.pattern];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim()) return shortenCommandText(candidate);
+    if (Array.isArray(candidate) && candidate.length > 0) return shortenCommandText(candidate.map((item) => String(item)).join(' '));
+  }
+  const firstString = Object.values(input).find((value): value is string => typeof value === 'string' && value.trim().length > 0);
+  return firstString ? shortenCommandText(firstString) : '';
+}
+
 interface PermissionCardProps {
   conversationId: string;
   toolUseId: string;
@@ -39,6 +68,8 @@ const PermissionCard: React.FC<PermissionCardProps> = ({
   };
 
   const inputStr = JSON.stringify(input, null, 2);
+  const inputSummary = getToolInputSummary(input);
+  const displayToolName = shortenCommandText(toolName, 42);
 
   const borderColor =
     status === 'pending'
@@ -63,12 +94,24 @@ const PermissionCard: React.FC<PermissionCardProps> = ({
         <Space align="center">
           <Shield size={16} />
           <Text strong>{t('common.permissionRequired', 'Permission Required')}</Text>
-          <Tag>{toolName}</Tag>
+          <Tag>{displayToolName}</Tag>
         </Space>
+        {inputSummary && (
+          <Text
+            type="secondary"
+            ellipsis
+            style={{ fontSize: 12, fontFamily: 'monospace', maxWidth: '100%' }}
+          >
+            {inputSummary}
+          </Text>
+        )}
 
         {/* Input preview */}
         <div
-          onClick={() => setExpanded(!expanded)}
+          onClick={(event) => {
+            event.stopPropagation();
+            setExpanded(!expanded);
+          }}
           style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
         >
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -78,6 +121,7 @@ const PermissionCard: React.FC<PermissionCardProps> = ({
         </div>
         {expanded && (
           <pre
+            onClick={(event) => event.stopPropagation()}
             style={{
               margin: 0,
               padding: 8,

@@ -31,7 +31,7 @@ type ImChannel = {
   id: string;
   platform: 'feishu' | 'qq';
   enabled: boolean;
-  assignment?: 'frogclaw' | 'none' | null;
+  assignment?: 'aiagent' | 'native_cli' | 'frogclaw' | 'none' | null;
 };
 
 type PlatformStatus = {
@@ -513,8 +513,8 @@ function IMChannelCard({ step }: { step: number }) {
     void load();
   }, [load]);
 
-  const hasFeishu = channels.some((ch) => ch.platform === 'feishu' && ch.enabled && ch.assignment !== 'none');
-  const hasQQ = channels.some((ch) => ch.platform === 'qq' && ch.enabled && ch.assignment !== 'none');
+  const hasFeishu = channels.some((ch) => ch.platform === 'feishu' && ch.enabled);
+  const hasQQ = channels.some((ch) => ch.platform === 'qq' && ch.enabled);
   const running = Boolean(status?.running);
   const goToChannels = () => setActivePage('im');
 
@@ -522,7 +522,7 @@ function IMChannelCard({ step }: { step: number }) {
     <SetupCard
       step={step}
       title="IM 通道设置"
-      description="配置飞书和 QQ 机器人，让消息进入 FrogClawClient 项目对话"
+      description="配置飞书和 QQ 机器人，让消息进入 AI Agent 或原生 CLI"
       icon={<MessageSquare size={20} />}
       completed={running && (hasFeishu || hasQQ)}
     >
@@ -536,7 +536,7 @@ function IMChannelCard({ step }: { step: number }) {
         }}
       >
         <Text style={{ fontSize: 12, color: '#2563eb' }}>
-          Sidecar 默认随应用启动。添加飞书或 QQ 通道并分配 FrogClaw 对话后，机器人会自动连接。
+          Sidecar 默认随应用启动。添加飞书或 QQ 通道并选择 AI Agent 或原生 CLI 后，机器人会自动连接。
         </Text>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>

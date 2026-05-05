@@ -274,7 +274,7 @@ export function InputArea() {
       .then((profile) => {
         if (cancelled || !profile) return;
         const current = useConversationStore.getState().enabledMemoryNamespaceIds;
-        const nextIds = profile.embeddingProvider ? [profile.namespaceId] : [];
+        const nextIds = profile.enabled ? [profile.namespaceId] : [];
         if (current.length === nextIds.length && current.every((id, index) => id === nextIds[index])) return;
         setEnabledMemoryNamespaceIds(nextIds);
       })

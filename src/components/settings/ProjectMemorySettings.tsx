@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { App, Button, Empty, Form, Input, InputNumber, Modal, Spin, Table, Tag, Tooltip, theme } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { Brain, CheckCircle2, Clock3, Database, FolderOpen, Plus, RefreshCw, Settings, TriangleAlert } from 'lucide-react';
+import { Brain, CheckCircle2, Clock3, Database, FolderOpen, Plus, RefreshCw, Settings, Sparkles, Trash2, TriangleAlert } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useMemoryStore } from '@/stores';
+import { useMemoryStore, useSettingsStore } from '@/stores';
 import { EmbeddingModelSelect } from '@/components/shared/EmbeddingModelSelect';
+import { invoke } from '@/lib/invoke';
 import type { MemoryItem, ProjectMemoryProfile } from '@/types';
 
 const INDEX_STATUS_COLOR: Record<string, string> = {
@@ -43,9 +44,6 @@ function ProjectRow({
         <span className="min-w-0 flex-1 truncate" style={{ fontWeight: 600, color: active ? token.colorPrimary : token.colorText }}>
           {profile.projectName}
         </span>
-        <Tag color={profile.enabled ? 'green' : 'default'} style={{ margin: 0 }}>
-          {profile.enabled ? '启用' : '未配置'}
-        </Tag>
       </div>
       <div className="mt-1 truncate" style={{ color: token.colorTextSecondary, fontSize: 12 }}>
         {profile.itemCount} 条记忆 · {profile.pendingCount} 待处理 · {profile.failedCount} 失败
@@ -60,7 +58,8 @@ function ProjectRow({
 export default function ProjectMemorySettings() {
   const { t } = useTranslation();
   const { token } = theme.useToken();
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
+  const settings = useSettingsStore((s) => s.settings);
   const {
     projectProfiles,
     selectedProjectPath,
@@ -75,6 +74,9 @@ export default function ProjectMemorySettings() {
 
   const [itemModalOpen, setItemModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [summarizing, setSummarizing] = useState(false);
+  const tableWrapRef = useRef<HTMLDivElement | null>(null);
+  const [tableScrollY, setTableScrollY] = useState<number>(360);
   const [itemForm] = Form.useForm<{ title: string; content: string }>();
   const [settingsForm] = Form.useForm<{
     embeddingProvider?: string;
@@ -100,10 +102,30 @@ export default function ProjectMemorySettings() {
     void loadProjectItems(selectedProfile.projectPath, selectedProfile.projectName);
   }, [loadProjectItems, selectedProfile, selectedProjectPath, setSelectedProjectPath]);
 
+  useLayoutEffect(() => {
+    const element = tableWrapRef.current;
+    if (!element) return;
+    const updateHeight = () => {
+      const rect = element.getBoundingClientRect();
+      setTableScrollY(Math.max(220, Math.floor(rect.height - 64)));
+    };
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(element);
+    window.addEventListener('resize', updateHeight);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateHeight);
+    };
+  }, [selectedProfile]);
+
   const openSettings = () => {
     if (!selectedProfile) return;
+    const defaultEmbeddingProvider = settings.default_embedding_provider_id && settings.default_embedding_model_id
+      ? `${settings.default_embedding_provider_id}::${settings.default_embedding_model_id}`
+      : undefined;
     settingsForm.setFieldsValue({
-      embeddingProvider: selectedProfile.embeddingProvider,
+      embeddingProvider: selectedProfile.embeddingProvider ?? defaultEmbeddingProvider,
       embeddingDimensions: selectedProfile.embeddingDimensions,
       retrievalTopK: selectedProfile.retrievalTopK ?? 6,
       retrievalThreshold: selectedProfile.retrievalThreshold ?? 0.35,
@@ -135,6 +157,43 @@ export default function ProjectMemorySettings() {
     itemForm.resetFields();
     setItemModalOpen(false);
     message.success('记忆已添加');
+  };
+
+  const handleSummarizeConversation = async () => {
+    if (!selectedProfile) return;
+    setSummarizing(true);
+    try {
+      const count = await invoke<number>('summarize_project_memory', {
+        projectPath: selectedProfile.projectPath,
+        projectName: selectedProfile.projectName,
+      });
+      await loadProjectItems(selectedProfile.projectPath, selectedProfile.projectName);
+      await loadProjectProfiles();
+      message.success(count > 0 ? `已总结 ${count} 条会话记忆` : '本次会话没有可新增的项目记忆');
+    } catch (e) {
+      message.error(`总结失败：${String(e)}`);
+    } finally {
+      setSummarizing(false);
+    }
+  };
+
+  const handleDeleteItem = (item: MemoryItem) => {
+    if (!selectedProfile) return;
+    modal.confirm({
+      title: '删除这条项目记忆？',
+      content: item.title,
+      okButtonProps: { danger: true },
+      mask: { blur: true },
+      onOk: async () => {
+        await invoke('delete_memory_item', {
+          namespaceId: selectedProfile.namespaceId,
+          id: item.id,
+        });
+        await loadProjectItems(selectedProfile.projectPath, selectedProfile.projectName);
+        await loadProjectProfiles();
+        message.success('记忆已删除');
+      },
+    });
   };
 
   const columns: ColumnsType<MemoryItem> = [
@@ -175,6 +234,23 @@ export default function ProjectMemorySettings() {
       dataIndex: 'updatedAt',
       width: 190,
     },
+    {
+      title: '操作',
+      key: 'actions',
+      width: 82,
+      fixed: 'right',
+      render: (_value, record) => (
+        <Tooltip title="删除">
+          <Button
+            type="text"
+            danger
+            size="small"
+            icon={<Trash2 size={14} />}
+            onClick={() => handleDeleteItem(record)}
+          />
+        </Tooltip>
+      ),
+    },
   ];
 
   return (
@@ -208,7 +284,7 @@ export default function ProjectMemorySettings() {
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1 overflow-y-auto p-4">
+      <main className="min-w-0 flex-1 overflow-hidden p-4">
         {!selectedProfile ? (
           <div className="flex h-full items-center justify-center">
             <Spin spinning={loading}>
@@ -216,19 +292,26 @@ export default function ProjectMemorySettings() {
             </Spin>
           </div>
         ) : (
-          <div className="mx-auto max-w-[1180px]">
-            <div className="mb-4 flex items-start justify-between gap-4">
-              <div>
+          <div className="mx-auto flex h-full min-h-0 max-w-[1180px] flex-col">
+            <div className="mb-4 flex shrink-0 flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0">
                 <h2 style={{ margin: 0, fontSize: 20 }}>{selectedProfile.projectName}</h2>
-                <div style={{ color: token.colorTextSecondary, fontSize: 12 }}>{selectedProfile.projectPath}</div>
+                <div className="truncate" style={{ color: token.colorTextSecondary, fontSize: 12 }}>{selectedProfile.projectPath}</div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button icon={<Settings size={15} />} onClick={openSettings}>项目设置</Button>
+                <Button
+                  icon={<Sparkles size={15} />}
+                  loading={summarizing}
+                  onClick={() => void handleSummarizeConversation()}
+                >
+                  手动总结会话记忆
+                </Button>
                 <Button type="primary" icon={<Plus size={15} />} onClick={() => setItemModalOpen(true)}>添加记忆</Button>
               </div>
             </div>
 
-            <div className="mb-4 grid grid-cols-4 gap-3">
+            <div className="mb-4 grid shrink-0 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
               <div className="rounded-md border p-3" style={{ borderColor: token.colorBorderSecondary }}>
                 <div style={{ color: token.colorTextSecondary, fontSize: 12 }}>有效记忆</div>
                 <div className="mt-1 flex items-center gap-2"><Database size={16} /><strong style={{ fontSize: 20 }}>{selectedProfile.itemCount}</strong></div>
@@ -252,14 +335,17 @@ export default function ProjectMemorySettings() {
               </div>
             </div>
 
-            <Table
-              rowKey="id"
-              columns={columns}
-              dataSource={items}
-              loading={loading}
-              pagination={{ pageSize: 12 }}
-              locale={{ emptyText: t('settings.memory.empty', '暂无记忆') }}
-            />
+            <div ref={tableWrapRef} className="min-h-0 flex-1">
+              <Table
+                rowKey="id"
+                columns={columns}
+                dataSource={items}
+                loading={loading}
+                pagination={{ pageSize: 12, showSizeChanger: false }}
+                scroll={{ y: tableScrollY, x: 760 }}
+                locale={{ emptyText: t('settings.memory.empty', '暂无记忆') }}
+              />
+            </div>
           </div>
         )}
       </main>

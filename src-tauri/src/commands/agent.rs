@@ -1,7 +1,10 @@
 use crate::AppState;
 use frogclaw_core::repo::{agent_session, conversation, message, provider};
-use frogclaw_core::types::{AgentEngineInfo, AgentSession, MessageRole, ProviderType};
-use frogclaw_providers::{resolve_base_url_for_type, ProviderAdapter};
+use frogclaw_core::token_counter;
+use frogclaw_core::types::{
+    AgentEngineInfo, AgentSession, MessageRole, ProviderConfig, ProviderProxyConfig, ProviderType,
+};
+use frogclaw_providers::{resolve_base_url_for_type, ProviderAdapter, ProviderRequestContext};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -12,7 +15,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
 use tauri::{Emitter, State};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::sync::RwLock;
+use tokio::sync::{oneshot, RwLock};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -398,7 +401,21 @@ fn write_codex_config(
 }
 
 fn codex_app_server_log_path() -> PathBuf {
-    crate::paths::frogclaw_home().join("codex-app-server.log")
+    crate::paths::frogclaw_home().join("ai-agent.log")
+}
+
+pub fn init_ai_agent_log_file() {
+    let path = codex_app_server_log_path();
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    if path.exists() {
+        let archive_stamp = chrono::Local::now().format("%Y%m%d-%H%M%S");
+        let archive_path = path.with_file_name(format!("ai-agent.{archive_stamp}.log"));
+        let _ = fs::rename(&path, archive_path);
+    }
+    let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f");
+    let _ = fs::write(path, format!("[{timestamp}] AI Agent log started\n"));
 }
 
 fn strip_ansi_control_sequences(value: &str) -> String {
@@ -455,6 +472,43 @@ fn append_codex_app_server_log(message: impl AsRef<str>) {
     if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
         use std::io::Write;
         let _ = writeln!(file, "[{timestamp}] {line}");
+    }
+}
+
+fn append_codex_app_server_event_log(method: &str, params: &Value) {
+    match method {
+        "thread/tokenUsage/updated" => {
+            if let Some(usage) = extract_codex_usage(params) {
+                append_codex_app_server_log(format!(
+                    "token usage input={} output={}",
+                    usage.input_tokens, usage.output_tokens
+                ));
+            }
+        }
+        "turn/completed" => append_codex_app_server_log("turn completed"),
+        "item/started" => {
+            if let Some((_id, tool_name, input)) = extract_app_server_tool_info(params) {
+                append_codex_app_server_log(format!(
+                    "tool started {tool_name}: {}",
+                    get_tool_input_summary(&tool_name, &input)
+                ));
+            }
+        }
+        "item/completed" => {
+            if let Some((_id, tool_name, input)) = extract_app_server_tool_info(params) {
+                append_codex_app_server_log(format!(
+                    "tool completed {tool_name}: {}",
+                    get_tool_input_summary(&tool_name, &input)
+                ));
+            }
+        }
+        method if method.contains("requestApproval") || method.ends_with("Approval") => {
+            append_codex_app_server_log(format!("approval request {method}"));
+        }
+        method if method.contains("error") || method.contains("failed") => {
+            append_codex_app_server_log(format!("event {method}: {params}"));
+        }
+        _ => {}
     }
 }
 
@@ -850,12 +904,23 @@ pub async fn agent_query(
 
     let db = state.sea_db.clone();
     let tokens = state.agent_cancel_tokens.clone();
+    let permission_senders = state.agent_permission_senders.clone();
+    let vector_store = state.vector_store.clone();
     let session_id = session.id.clone();
     let user_msg_id = user_message.id.clone();
     let cwd = session.cwd.clone();
     let permission_mode = session.permission_mode.clone();
     let conv_id = conversation_id.clone();
-    let prompt_for_task = prompt.clone();
+    let plan_mode = prompt.trim_start().starts_with("/plan");
+    let prompt_for_task = if plan_mode {
+        prompt.trim_start()
+            .strip_prefix("/plan")
+            .unwrap_or(&prompt)
+            .trim_start()
+            .to_string()
+    } else {
+        prompt.clone()
+    };
     let master_key = state.master_key;
 
     tokio::spawn(async move {
@@ -863,6 +928,8 @@ pub async fn agent_query(
             app,
             db,
             tokens,
+            permission_senders,
+            vector_store,
             conv_id,
             session_id,
             user_msg_id,
@@ -873,6 +940,7 @@ pub async fn agent_query(
             permission_mode,
             master_key,
             is_first_message,
+            plan_mode,
         )
         .await;
     });
@@ -1019,20 +1087,42 @@ fn extract_codex_texts(value: &Value) -> Vec<String> {
 }
 
 fn extract_codex_usage(value: &Value) -> Option<CodexUsage> {
-    if value.get("type").and_then(|v| v.as_str()) != Some("turn.completed") {
+    let usage = value.get("usage").or_else(|| {
+        value
+            .get("params")
+            .and_then(|params| params.get("usage"))
+    })?;
+    if value.get("type").and_then(|v| v.as_str()).is_some()
+        && value.get("type").and_then(|v| v.as_str()) != Some("turn.completed")
+    {
         return None;
     }
-    let usage = value.get("usage")?;
     Some(CodexUsage {
         input_tokens: usage
             .get("input_tokens")
+            .or_else(|| usage.get("inputTokens"))
             .and_then(|v| v.as_u64())
             .unwrap_or_default(),
         output_tokens: usage
             .get("output_tokens")
+            .or_else(|| usage.get("outputTokens"))
             .and_then(|v| v.as_u64())
             .unwrap_or_default(),
     })
+}
+
+fn estimate_agent_usage(prompt: &str, response: &str) -> CodexUsage {
+    CodexUsage {
+        input_tokens: token_counter::estimate_message_tokens("user", prompt) as u64,
+        output_tokens: token_counter::estimate_message_tokens("assistant", response) as u64,
+    }
+}
+
+fn effective_agent_usage(final_usage: Option<&CodexUsage>, prompt: &str, response: &str) -> CodexUsage {
+    match final_usage {
+        Some(usage) if usage.input_tokens > 0 || usage.output_tokens > 0 => usage.clone(),
+        _ => estimate_agent_usage(prompt, response),
+    }
 }
 
 async fn write_app_server_message(
@@ -1127,10 +1217,244 @@ fn extract_app_server_completed_text(params: &Value) -> Option<String> {
         .map(ToString::to_string)
 }
 
+fn extract_app_server_completed_plan_text(params: &Value) -> Option<String> {
+    let item = params.get("item")?;
+    let item_type = item.get("type").and_then(|v| v.as_str()).unwrap_or_default();
+    if !matches!(item_type, "plan" | "agentPlan" | "turnPlan") {
+        return None;
+    }
+    item.get("text")
+        .or_else(|| item.get("markdown"))
+        .and_then(|v| v.as_str())
+        .filter(|text| !text.trim().is_empty())
+        .map(ToString::to_string)
+}
+
+fn extract_app_server_plan_delta(params: &Value) -> Option<String> {
+    params
+        .get("delta")
+        .or_else(|| params.get("text"))
+        .and_then(|v| v.as_str())
+        .filter(|text| !text.is_empty())
+        .map(ToString::to_string)
+}
+
+fn extract_app_server_plan_update(params: &Value) -> Option<String> {
+    let plan = params.get("plan").unwrap_or(params);
+    let mut lines = Vec::new();
+    if let Some(explanation) = plan
+        .get("explanation")
+        .or_else(|| plan.get("summary"))
+        .and_then(|v| v.as_str())
+        .filter(|text| !text.trim().is_empty())
+    {
+        lines.push(explanation.trim().to_string());
+    }
+    if let Some(steps) = plan.get("steps").and_then(|v| v.as_array()) {
+        for step in steps {
+            let text = step
+                .get("step")
+                .or_else(|| step.get("text"))
+                .or_else(|| step.get("description"))
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .trim();
+            if text.is_empty() {
+                continue;
+            }
+            let status = step
+                .get("status")
+                .and_then(|v| v.as_str())
+                .unwrap_or("pending")
+                .trim();
+            lines.push(format!("- [{status}] {text}"));
+        }
+    }
+    if lines.is_empty() {
+        None
+    } else {
+        Some(lines.join("\n"))
+    }
+}
+
+fn json_pick_string<'a>(value: &'a Value, keys: &[&str]) -> Option<&'a str> {
+    for key in keys {
+        if let Some(text) = value.get(*key).and_then(|v| v.as_str()) {
+            if !text.trim().is_empty() {
+                return Some(text);
+            }
+        }
+    }
+    None
+}
+
+fn extract_app_server_item(params: &Value) -> Option<&Value> {
+    params.get("item").or_else(|| params.get("data"))
+}
+
+fn extract_app_server_tool_info(params: &Value) -> Option<(String, String, Value)> {
+    let item = extract_app_server_item(params)?;
+    let item_type = item.get("type").and_then(|v| v.as_str()).unwrap_or_default();
+    let type_lower = item_type.to_lowercase();
+    if !(type_lower.contains("command")
+        || type_lower.contains("tool")
+        || type_lower.contains("exec")
+        || type_lower.contains("filechange"))
+    {
+        return None;
+    }
+    let id = json_pick_string(item, &["id", "itemId", "toolUseId", "callId"])
+        .or_else(|| json_pick_string(params, &["id", "itemId", "toolUseId", "callId"]))?
+        .to_string();
+    let name = if type_lower.contains("filechange") {
+        "file_change".to_string()
+    } else if type_lower.contains("command") || type_lower.contains("exec") {
+        "command".to_string()
+    } else {
+        json_pick_string(item, &["name", "toolName", "type"])
+            .unwrap_or(item_type)
+            .to_string()
+    };
+    let input = item
+        .get("input")
+        .or_else(|| item.get("params"))
+        .or_else(|| item.get("arguments"))
+        .cloned()
+        .unwrap_or_else(|| item.clone());
+    Some((id, name, input))
+}
+
+fn extract_app_server_output_delta(params: &Value) -> Option<(String, String)> {
+    let id = json_pick_string(params, &["itemId", "id", "toolUseId", "callId"])?.to_string();
+    let delta = params
+        .get("delta")
+        .or_else(|| params.get("text"))
+        .or_else(|| params.get("output"))
+        .and_then(|v| v.as_str())?
+        .to_string();
+    Some((id, delta))
+}
+
+fn html_attr_escape(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('"', "&quot;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
+fn append_tool_call_tag(content: &mut String, tool_use_id: &str, tool_name: &str) {
+    if !content.trim().is_empty() {
+        content.push_str("\n\n");
+    }
+    content.push_str(&format!(
+        "<tool-call data-frogclaw=\"1\" id=\"{}\" name=\"{}\"></tool-call>",
+        html_attr_escape(tool_use_id),
+        html_attr_escape(tool_name)
+    ));
+}
+
+fn map_codex_permission_decision(method: &str, decision: &str) -> Value {
+    let method_lower = method.to_lowercase();
+    if matches!(method, "execCommandApproval" | "applyPatchApproval") {
+        let mapped = match decision {
+            "allow_always" => "approved_for_session",
+            "allow_once" => "approved",
+            _ => "denied",
+        };
+        return serde_json::json!({ "decision": mapped });
+    }
+    let mapped = match decision {
+        "allow_always" => "acceptForSession",
+        "allow_once" => "accept",
+        _ => "decline",
+    };
+    if method_lower.contains("requestapproval") {
+        serde_json::json!({ "decision": mapped })
+    } else {
+        serde_json::json!({ "decision": mapped })
+    }
+}
+
+async fn request_codex_permission(
+    app: &tauri::AppHandle,
+    permission_senders: &Arc<tokio::sync::Mutex<HashMap<String, oneshot::Sender<String>>>>,
+    db: &sea_orm::DatabaseConnection,
+    conversation_id: &str,
+    user_msg_id: &str,
+    current_assistant_msg_id: &mut Option<String>,
+    assistant_id_for_task: &Arc<RwLock<Option<String>>>,
+    method: &str,
+    request_id: i64,
+    request_params: &Value,
+) -> Result<Value, String> {
+    let tool_use_id = json_pick_string(request_params, &["itemId", "id", "toolUseId", "callId"])
+        .map(ToString::to_string)
+        .or_else(|| {
+            extract_app_server_item(request_params)
+                .and_then(|item| json_pick_string(item, &["id", "itemId", "toolUseId", "callId"]))
+                .map(ToString::to_string)
+        })
+        .unwrap_or_else(|| format!("codex-approval-{request_id}"));
+    let method_lower = method.to_lowercase();
+    let tool_name = if method_lower.contains("filechange") || method == "applyPatchApproval" {
+        "file_change"
+    } else {
+        "command"
+    };
+    let assistant_message_id = ensure_agent_assistant_message(
+        db,
+        app,
+        conversation_id,
+        user_msg_id,
+        "",
+        current_assistant_msg_id,
+        assistant_id_for_task,
+    )
+    .await
+    .unwrap_or_default();
+
+    let (tx, rx) = oneshot::channel();
+    permission_senders.lock().await.insert(tool_use_id.clone(), tx);
+    let _ = app.emit(
+        "agent-permission-request",
+        AgentPermissionRequestPayload {
+            conversation_id: conversation_id.to_string(),
+            assistant_message_id: assistant_message_id.clone(),
+            tool_use_id: tool_use_id.clone(),
+            tool_name: tool_name.to_string(),
+            input: request_params.clone(),
+            risk_level: if tool_name == "file_change" {
+                "write".to_string()
+            } else {
+                "execute".to_string()
+            },
+        },
+    );
+    let _ = app.emit(
+        "agent-tool-use",
+        AgentToolUsePayload {
+            conversation_id: conversation_id.to_string(),
+            assistant_message_id,
+            tool_use_id: tool_use_id.clone(),
+            tool_name: tool_name.to_string(),
+            input: request_params.clone(),
+            execution_id: None,
+        },
+    );
+
+    let decision = rx
+        .await
+        .map_err(|_| "Permission response channel closed".to_string())?;
+    Ok(map_codex_permission_decision(method, &decision))
+}
+
 async fn run_codex_app_server_query(
     app: tauri::AppHandle,
     db: sea_orm::DatabaseConnection,
     state_tokens: Arc<tokio::sync::Mutex<HashMap<String, AgentCancellationToken>>>,
+    permission_senders: Arc<tokio::sync::Mutex<HashMap<String, oneshot::Sender<String>>>>,
+    vector_store: Arc<frogclaw_core::vector_store::VectorStore>,
     conversation_id: String,
     session_id: String,
     user_msg_id: String,
@@ -1141,6 +1465,7 @@ async fn run_codex_app_server_query(
     permission_mode: String,
     master_key: [u8; 32],
     is_first_message: bool,
+    plan_mode: bool,
 ) {
     let prov = match provider::get_provider(&db, &provider_id).await {
         Ok(prov) => prov,
@@ -1189,6 +1514,22 @@ async fn run_codex_app_server_query(
     };
 
     let base_url = resolve_base_url_for_type(&prov.api_host, &prov.provider_type);
+    let settings = frogclaw_core::repo::settings::get_settings(&db)
+        .await
+        .unwrap_or_default();
+    let proxy_config = ProviderProxyConfig::resolve(&prov.proxy_config, &settings);
+    let ctx = ProviderRequestContext {
+        api_key: api_key.clone(),
+        key_id: key_row.id,
+        provider_id: prov.id.clone(),
+        base_url: Some(base_url.clone()),
+        api_path: prov.api_path.clone(),
+        proxy_config,
+        custom_headers: prov
+            .custom_headers
+            .as_ref()
+            .and_then(|s| serde_json::from_str(s).ok()),
+    };
     let codex_config = match write_codex_config(&model_id, &base_url, api_key, &permission_mode) {
         Ok(config) => config,
         Err(err) => {
@@ -1205,29 +1546,30 @@ async fn run_codex_app_server_query(
         }
     };
 
-    let _ = app.emit(
-        "agent-status",
-        AgentStatusPayload {
-            conversation_id: conversation_id.clone(),
-            message: format!(
-                "Codex runtime config generated at {}",
-                codex_config.codex_home.join("config.toml").display()
-            ),
-        },
-    );
+    append_codex_app_server_log(format!(
+        "runtime config generated path={}",
+        codex_config.codex_home.join("config.toml").display()
+    ));
 
     run_codex_app_server_stdio_query(
         app,
         db,
         state_tokens,
+        permission_senders,
+        vector_store,
         conversation_id,
         session_id,
         user_msg_id,
         prompt,
+        prov,
+        ctx,
         codex_config,
+        master_key,
+        model_id,
         cwd,
         permission_mode,
         is_first_message,
+        plan_mode,
     )
     .await;
 }
@@ -1236,14 +1578,21 @@ async fn run_codex_app_server_stdio_query(
     app: tauri::AppHandle,
     db: sea_orm::DatabaseConnection,
     state_tokens: Arc<tokio::sync::Mutex<HashMap<String, AgentCancellationToken>>>,
+    permission_senders: Arc<tokio::sync::Mutex<HashMap<String, oneshot::Sender<String>>>>,
+    vector_store: Arc<frogclaw_core::vector_store::VectorStore>,
     conversation_id: String,
     session_id: String,
     user_msg_id: String,
     prompt: String,
+    provider: ProviderConfig,
+    provider_ctx: ProviderRequestContext,
     codex_config: CodexRuntimeConfig,
+    master_key: [u8; 32],
+    model_id: String,
     cwd: Option<String>,
-    permission_mode: String,
+    _permission_mode: String,
     is_first_message: bool,
+    plan_mode: bool,
 ) {
     #[cfg(not(windows))]
     {
@@ -1302,6 +1651,10 @@ async fn run_codex_app_server_stdio_query(
     let assistant_id_for_task: Arc<RwLock<Option<String>>> = Arc::new(RwLock::new(None));
     let mut accumulated_text = String::new();
     let mut saw_agent_delta = false;
+    let mut plan_text = String::new();
+    let mut tool_names: HashMap<String, String> = HashMap::new();
+    let mut tool_outputs: HashMap<String, String> = HashMap::new();
+    let mut final_usage: Option<CodexUsage> = None;
 
     let mut cmd = tokio::process::Command::new(&app_server_path);
     cmd.arg("--listen")
@@ -1377,13 +1730,6 @@ async fn run_codex_app_server_stdio_query(
     let mut stderr_lines = stderr.map(|err| BufReader::new(err).lines());
     let mut next_request_id = 1_i64;
 
-    let _ = app.emit(
-        "agent-status",
-        AgentStatusPayload {
-            conversation_id: conversation_id.clone(),
-            message: "Codex app-server starting".to_string(),
-        },
-    );
     append_codex_app_server_log("request initialize");
 
     let init_id = match send_app_server_request(
@@ -1524,6 +1870,17 @@ async fn run_codex_app_server_stdio_query(
                 "text": prompt,
                 "textElements": [],
             }],
+            "collaborationMode": if plan_mode {
+                serde_json::json!({
+                    "mode": "plan",
+                    "settings": {
+                        "model": model_id,
+                        "developerInstructions": null
+                    }
+                })
+            } else {
+                Value::Null
+            },
             "cwd": cwd,
         }),
     )
@@ -1547,13 +1904,6 @@ async fn run_codex_app_server_stdio_query(
     };
     append_codex_app_server_log(format!("request turn/start thread_id={thread_id}"));
 
-    let _ = app.emit(
-        "agent-status",
-        AgentStatusPayload {
-            conversation_id: conversation_id.clone(),
-            message: "Codex app-server running".to_string(),
-        },
-    );
     append_codex_app_server_log(format!("response thread/start ok thread_id={thread_id}"));
 
     let mut turn_started_ack = false;
@@ -1637,52 +1987,33 @@ async fn run_codex_app_server_stdio_query(
                     value.get("method").and_then(|v| v.as_str()),
                 ) {
                     let result = match method {
-                        "item/commandExecution/requestApproval" => {
-                            let decision = if permission_mode == "full_access" {
-                                "acceptForSession"
-                            } else {
-                                "decline"
-                            };
-                            let _ = app.emit(
-                                "agent-status",
-                                AgentStatusPayload {
-                                    conversation_id: conversation_id.clone(),
-                                    message: format!("Codex command approval: {decision}"),
-                                },
-                            );
-                            Some(serde_json::json!({ "decision": decision }))
-                        }
-                        "item/fileChange/requestApproval" => {
-                            let decision = if matches!(permission_mode.as_str(), "full_access" | "accept_edits") {
-                                "acceptForSession"
-                            } else {
-                                "decline"
-                            };
-                            let _ = app.emit(
-                                "agent-status",
-                                AgentStatusPayload {
-                                    conversation_id: conversation_id.clone(),
-                                    message: format!("Codex file-change approval: {decision}"),
-                                },
-                            );
-                            Some(serde_json::json!({ "decision": decision }))
-                        }
-                        "execCommandApproval" => {
-                            let decision = if permission_mode == "full_access" {
-                                "approved_for_session"
-                            } else {
-                                "denied"
-                            };
-                            Some(serde_json::json!({ "decision": decision }))
-                        }
-                        "applyPatchApproval" => {
-                            let decision = if matches!(permission_mode.as_str(), "full_access" | "accept_edits") {
-                                "approved_for_session"
-                            } else {
-                                "denied"
-                            };
-                            Some(serde_json::json!({ "decision": decision }))
-                        }
+                        "item/commandExecution/requestApproval"
+                        | "item/fileChange/requestApproval"
+                        | "execCommandApproval"
+                        | "applyPatchApproval" => Some(
+                            match request_codex_permission(
+                                &app,
+                                &permission_senders,
+                                &db,
+                                &conversation_id,
+                                &user_msg_id,
+                                &mut current_assistant_msg_id,
+                                &assistant_id_for_task,
+                                method,
+                                request_id,
+                                value.get("params").unwrap_or(&Value::Null),
+                            )
+                            .await
+                            {
+                                Ok(result) => result,
+                                Err(err) => {
+                                    append_codex_app_server_log(format!(
+                                        "permission request failed: {err}"
+                                    ));
+                                    serde_json::json!({ "decision": "decline" })
+                                }
+                            },
+                        ),
                         _ => None,
                     };
 
@@ -1718,22 +2049,77 @@ async fn run_codex_app_server_stdio_query(
 
                 let method = value.get("method").and_then(|v| v.as_str()).unwrap_or_default();
                 let params = value.get("params").cloned().unwrap_or(Value::Null);
-                if !method.is_empty()
-                    && method != "item/agentMessage/delta"
-                    && method != "item/commandExecution/outputDelta"
-                {
-                    append_codex_app_server_log(format!("event {method}"));
+                if let Some(usage) = extract_codex_usage(&params).or_else(|| extract_codex_usage(&value)) {
+                    final_usage = Some(usage);
+                }
+                if !method.is_empty() {
+                    append_codex_app_server_event_log(method, &params);
                 }
                 match method {
                     "turn/started" => {
                         turn_started_ack = true;
-                        let _ = app.emit(
-                            "agent-status",
-                            AgentStatusPayload {
-                                conversation_id: conversation_id.clone(),
-                                message: "Codex app-server thinking".to_string(),
-                            },
-                        );
+                    }
+                    "item/started" => {
+                        if let Some((tool_use_id, tool_name, input)) =
+                            extract_app_server_tool_info(&params)
+                        {
+                            tool_names.insert(tool_use_id.clone(), tool_name.clone());
+                            let assistant_message_id = ensure_agent_assistant_message(
+                                &db,
+                                &app,
+                                &conversation_id,
+                                &user_msg_id,
+                                &accumulated_text,
+                                &mut current_assistant_msg_id,
+                                &assistant_id_for_task,
+                            )
+                            .await
+                            .unwrap_or_default();
+                            append_tool_call_tag(&mut accumulated_text, &tool_use_id, &tool_name);
+                            let _ = message::update_message_content(
+                                &db,
+                                &assistant_message_id,
+                                &accumulated_text,
+                            )
+                            .await;
+                            let _ = app.emit(
+                                "agent-stream-text",
+                                AgentTextPayload {
+                                    conversation_id: conversation_id.clone(),
+                                    assistant_message_id: assistant_message_id.clone(),
+                                    text: String::new(),
+                                },
+                            );
+                            let _ = app.emit(
+                                "agent-tool-start",
+                                AgentToolStartPayload {
+                                    conversation_id: conversation_id.clone(),
+                                    assistant_message_id,
+                                    tool_use_id,
+                                    tool_name,
+                                    input,
+                                },
+                            );
+                        }
+                    }
+                    "item/commandExecution/outputDelta" => {
+                        if let Some((tool_use_id, delta)) = extract_app_server_output_delta(&params)
+                        {
+                            tool_outputs
+                                .entry(tool_use_id)
+                                .and_modify(|output| output.push_str(&delta))
+                                .or_insert(delta);
+                        }
+                    }
+                    "turn/plan/updated" => {
+                        if let Some(next_plan) = extract_app_server_plan_update(&params) {
+                            plan_text = next_plan;
+                        }
+                    }
+                    "item/plan/delta" => {
+                        if let Some(delta) = extract_app_server_plan_delta(&params) {
+                            plan_text.push_str(&delta);
+                        }
                     }
                     "item/agentMessage/delta" => {
                         if let Some(delta) = params.get("delta").and_then(|v| v.as_str()) {
@@ -1764,6 +2150,39 @@ async fn run_codex_app_server_stdio_query(
                         }
                     }
                     "item/completed" => {
+                        if let Some((tool_use_id, tool_name, _input)) =
+                            extract_app_server_tool_info(&params)
+                        {
+                            let assistant_message_id =
+                                current_assistant_msg_id.clone().unwrap_or_default();
+                            let output = tool_outputs.remove(&tool_use_id).unwrap_or_else(|| {
+                                extract_app_server_item(&params)
+                                    .and_then(|item| {
+                                        item.get("output")
+                                            .or_else(|| item.get("result"))
+                                            .and_then(|v| v.as_str())
+                                    })
+                                    .unwrap_or_default()
+                                    .to_string()
+                            });
+                            let name = tool_names.remove(&tool_use_id).unwrap_or(tool_name);
+                            let _ = app.emit(
+                                "agent-tool-result",
+                                AgentToolResultPayload {
+                                    conversation_id: conversation_id.clone(),
+                                    assistant_message_id,
+                                    tool_use_id,
+                                    tool_name: name,
+                                    content: output,
+                                    is_error: false,
+                                },
+                            );
+                            continue;
+                        }
+                        if let Some(text) = extract_app_server_completed_plan_text(&params) {
+                            plan_text = text;
+                            continue;
+                        }
                         if !saw_agent_delta {
                             if let Some(text) = extract_app_server_completed_text(&params) {
                                 accumulated_text.push_str(&text);
@@ -1812,6 +2231,36 @@ async fn run_codex_app_server_stdio_query(
                         }
                     }
                     "turn/completed" => {
+                        if plan_mode && !plan_text.trim().is_empty() {
+                            let text = plan_text.trim().to_string();
+                            if accumulated_text.trim().is_empty()
+                                || accumulated_text.contains("<tool-call")
+                            {
+                                if !accumulated_text.trim().is_empty() {
+                                    accumulated_text.push_str("\n\n");
+                                }
+                                accumulated_text.push_str(&text);
+                                let assistant_message_id = persist_agent_partial_content(
+                                    &db,
+                                    &app,
+                                    &conversation_id,
+                                    &user_msg_id,
+                                    &accumulated_text,
+                                    &mut current_assistant_msg_id,
+                                    &assistant_id_for_task,
+                                )
+                                .await
+                                .unwrap_or_default();
+                                let _ = app.emit(
+                                    "agent-stream-text",
+                                    AgentTextPayload {
+                                        conversation_id: conversation_id.clone(),
+                                        assistant_message_id,
+                                        text,
+                                    },
+                                );
+                            }
+                        }
                         let assistant_message_id = if let Some(id) = current_assistant_msg_id.clone() {
                             id
                         } else {
@@ -1838,23 +2287,63 @@ async fn run_codex_app_server_stdio_query(
                                 Err(_) => String::new(),
                             }
                         };
+                        let effective_usage =
+                            effective_agent_usage(final_usage.as_ref(), &prompt, &accumulated_text);
                         let _ = app.emit(
                             "agent-done",
                             AgentDonePayload {
                                 conversation_id: conversation_id.clone(),
-                                assistant_message_id,
+                                assistant_message_id: assistant_message_id.clone(),
                                 text: accumulated_text.clone(),
-                                usage: None,
+                                usage: Some(AgentUsagePayload {
+                                    input_tokens: effective_usage.input_tokens,
+                                    output_tokens: effective_usage.output_tokens,
+                                }),
                                 num_turns: None,
                                 cost_usd: None,
                             },
                         );
+                        let _ = message::update_message_usage(
+                            &db,
+                            &assistant_message_id,
+                            Some(effective_usage.input_tokens as i64),
+                            Some(effective_usage.output_tokens as i64),
+                        )
+                        .await;
+                        if !plan_mode && !accumulated_text.trim().is_empty() {
+                            if let Ok(mut conversation) =
+                                conversation::get_conversation(&db, &conversation_id).await
+                            {
+                                if let Some(ref cwd) = cwd {
+                                    if !cwd.trim().is_empty() {
+                                        conversation.working_directory = Some(cwd.clone());
+                                        if conversation.project_name.as_deref().is_none_or(|v| v.trim().is_empty()) {
+                                            conversation.project_name = std::path::Path::new(cwd)
+                                                .file_name()
+                                                .and_then(|name| name.to_str())
+                                                .map(ToString::to_string);
+                                        }
+                                    }
+                                }
+                                crate::commands::conversations::auto_capture_project_memory(
+                                    &db,
+                                    &master_key,
+                                    vector_store.as_ref(),
+                                    &provider,
+                                    &provider_ctx,
+                                    &conversation,
+                                    &model_id,
+                                    &prompt,
+                                    &accumulated_text,
+                                )
+                                .await;
+                            }
+                        }
                         let _ = child.kill().await;
                         let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
                         if is_first_message {
                             tracing::info!("[agent:codex_app_server] first message completed; title fallback already set");
                         }
-                        append_codex_app_server_log("turn completed");
                         return;
                     }
                     _ => {}
@@ -1869,13 +2358,6 @@ async fn run_codex_app_server_stdio_query(
                 if let Ok(Some(line)) = line {
                     if !line.trim().is_empty() {
                         append_codex_app_server_log(format!("stderr: {line}"));
-                        let _ = app.emit(
-                            "agent-status",
-                            AgentStatusPayload {
-                                conversation_id: conversation_id.clone(),
-                                message: line.chars().take(160).collect(),
-                            },
-                        );
                     }
                 }
             }
@@ -2164,7 +2646,7 @@ async fn run_claude_code_cli_query(
                 "agent-done",
                 AgentDonePayload {
                     conversation_id: conversation_id.clone(),
-                    assistant_message_id,
+                    assistant_message_id: assistant_message_id.clone(),
                     text: accumulated_text,
                     usage: None,
                     num_turns: None,
@@ -2463,29 +2945,29 @@ async fn run_codex_cli_query(
                 }
             };
 
+            let effective_usage =
+                effective_agent_usage(final_usage.as_ref(), &prompt, &accumulated_text);
             let _ = app.emit(
                 "agent-done",
                 AgentDonePayload {
                     conversation_id: conversation_id.clone(),
-                    assistant_message_id,
+                    assistant_message_id: assistant_message_id.clone(),
                     text: accumulated_text,
-                    usage: final_usage.as_ref().map(|usage| AgentUsagePayload {
-                        input_tokens: usage.input_tokens,
-                        output_tokens: usage.output_tokens,
+                    usage: Some(AgentUsagePayload {
+                        input_tokens: effective_usage.input_tokens,
+                        output_tokens: effective_usage.output_tokens,
                     }),
                     num_turns: None,
                     cost_usd: None,
                 },
             );
-            if let (Some(ref mid), Some(ref usage)) = (&current_assistant_msg_id, &final_usage) {
-                let _ = message::update_message_usage(
-                    &db,
-                    mid,
-                    Some(usage.input_tokens as i64),
-                    Some(usage.output_tokens as i64),
-                )
-                .await;
-            }
+            let _ = message::update_message_usage(
+                &db,
+                &assistant_message_id,
+                Some(effective_usage.input_tokens as i64),
+                Some(effective_usage.output_tokens as i64),
+            )
+            .await;
             let _ = agent_session::update_agent_session_status(&db, &session_id, "idle").await;
             if is_first_message {
                 tracing::info!(
