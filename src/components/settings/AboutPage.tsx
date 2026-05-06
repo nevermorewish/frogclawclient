@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { isTauri, invoke } from '@/lib/invoke';
 import logoUrl from '@/assets/image/logo.png';
 import { useSettingsStore } from '@/stores';
-import { useUpdateChecker } from '@/hooks/useUpdateChecker';
+import { useUpdate } from '@/contexts/UpdateContext';
 import { SettingsGroup } from './SettingsGroup';
 
 const { Text } = Typography;
@@ -13,9 +13,8 @@ const { Text } = Typography;
 export function AboutPage() {
   const { t } = useTranslation();
   const appName = t('app.name');
-  const [checking, setChecking] = useState(false);
   const [appVersion, setAppVersion] = useState('...');
-  const { checkForUpdate } = useUpdateChecker();
+  const { checkUpdate, isChecking: checking } = useUpdate();
   const updateCheckInterval = useSettingsStore((s) => s.settings.update_check_interval ?? 60);
   const saveSettings = useSettingsStore((s) => s.saveSettings);
 
@@ -28,13 +27,8 @@ export function AboutPage() {
   }, []);
 
   const handleCheckUpdate = useCallback(async () => {
-    setChecking(true);
-    try {
-      await checkForUpdate();
-    } finally {
-      setChecking(false);
-    }
-  }, [checkForUpdate]);
+    await checkUpdate(true);
+  }, [checkUpdate]);
 
   const rowStyle = { padding: '4px 0' };
 

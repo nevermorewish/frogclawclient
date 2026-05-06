@@ -5,7 +5,7 @@ import { Sun, Moon, Monitor, Globe, Pin, PinOff, RotateCcw, ArrowDownCircle, Min
 import { useTranslation } from 'react-i18next';
 import { useSettingsStore } from '@/stores';
 import { isTauri, invoke } from '@/lib/invoke';
-import { useUpdateChecker } from '@/hooks/useUpdateChecker';
+import { useUpdate } from '@/contexts/UpdateContext';
 import { LANG_OPTIONS } from '@/lib/constants';
 import appLogo from '@/assets/image/logo.png';
 
@@ -38,8 +38,7 @@ export function TitleBar() {
   const alwaysOnTop = useSettingsStore((s) => s.settings.always_on_top);
   const saveSettings = useSettingsStore((s) => s.saveSettings);
   const [pinned, setPinned] = useState(alwaysOnTop ?? false);
-  const { checkForUpdate } = useUpdateChecker();
-  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const { checkUpdate, isChecking: checkingUpdate } = useUpdate();
   const [isMaximized, setIsMaximized] = useState(false);
   const tauriWindowRef = useRef<typeof import('@tauri-apps/api/window') | null>(null);
   const dragTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -84,13 +83,8 @@ export function TitleBar() {
   }, [pinned, saveSettings]);
 
   const handleCheckUpdate = useCallback(async () => {
-    setCheckingUpdate(true);
-    try {
-      await checkForUpdate();
-    } finally {
-      setCheckingUpdate(false);
-    }
-  }, [checkForUpdate]);
+    await checkUpdate(true);
+  }, [checkUpdate]);
 
   const themeMenuItems: MenuProps['items'] = THEME_OPTIONS.map((opt) => ({
     key: opt.key,
