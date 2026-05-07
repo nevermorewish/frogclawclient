@@ -128,7 +128,7 @@ fn claude_settings_path(home: &Path) -> PathBuf {
 }
 
 fn claude_config_path(home: &Path) -> PathBuf {
-    home.join(".claude").join("config.json")
+    home.join(".claude.json")
 }
 
 fn codex_auth_path(home: &Path) -> PathBuf {
@@ -290,10 +290,10 @@ fn claude_connect_writes_anthropic_env_settings_and_config() {
         assert_eq!(settings["env"]["ANTHROPIC_AUTH_TOKEN"], "test-api-key");
         assert!(
             config_path.exists(),
-            "expected Claude config.json at {config_path:?}"
+            "expected Claude ~/.claude.json at {config_path:?}"
         );
         let config = read_json(&config_path);
-        assert_eq!(config["primaryApiKey"], "any");
+        assert_eq!(config["hasCompletedOnboarding"], true);
     });
 }
 
@@ -316,7 +316,13 @@ fn claude_connect_overwrites_existing_anthropic_env_settings() {
                 }
             }),
         );
-        write_json(&config_path, &json!({ "primaryApiKey": "old-value" }));
+        write_json(
+            &config_path,
+            &json!({
+                "hasCompletedOnboarding": false,
+                "theme": "dark"
+            }),
+        );
 
         connect(
             CliTool::ClaudeCode,
@@ -335,7 +341,11 @@ fn claude_connect_overwrites_existing_anthropic_env_settings() {
         assert_eq!(settings["permissions"]["allow"][0], "mcp__pencil");
 
         let config = read_json(&config_path);
-        assert_eq!(config["primaryApiKey"], "any");
+        assert_eq!(
+            config["hasCompletedOnboarding"], true,
+            "existing non-true onboarding value should be corrected"
+        );
+        assert_eq!(config["theme"], "dark");
     });
 }
 
@@ -533,14 +543,14 @@ fn gemini_validation_drift_rejects_wrong_selected_type() {
 }
 
 #[test]
-fn claude_validation_requires_anthropic_env_and_primary_api_key() {
+fn claude_validation_requires_anthropic_env_and_onboarding() {
     use frogclaw_core::repo::cli_config::validate_connection;
 
     with_temp_home(|temp_home| {
         let settings_path = claude_settings_path(temp_home.home());
         let config_path = claude_config_path(temp_home.home());
 
-        // Write only settings.json, missing config.json
+        // Write only settings.json, missing ~/.claude.json
         write_json(
             &settings_path,
             &json!({
@@ -554,16 +564,16 @@ fn claude_validation_requires_anthropic_env_and_primary_api_key() {
         assert_eq!(
             validate_connection(CliTool::ClaudeCode, "http://localhost:1234/v1").unwrap(),
             false,
-            "should reject when config.json is missing"
+            "should reject when ~/.claude.json is missing"
         );
 
-        // Add config.json with primaryApiKey == "any"
-        write_json(&config_path, &json!({ "primaryApiKey": "any" }));
+        // Add ~/.claude.json with hasCompletedOnboarding == true
+        write_json(&config_path, &json!({ "hasCompletedOnboarding": true }));
 
         assert_eq!(
             validate_connection(CliTool::ClaudeCode, "http://localhost:1234/v1").unwrap(),
             true,
-            "should accept when Anthropic env settings and primaryApiKey are correct"
+            "should accept when Anthropic env settings and onboarding are correct"
         );
     });
 }
@@ -588,7 +598,7 @@ fn claude_validation_rejects_stale_anthropic_env_override() {
                 }
             }),
         );
-        write_json(&config_path, &json!({ "primaryApiKey": "any" }));
+        write_json(&config_path, &json!({ "hasCompletedOnboarding": true }));
 
         assert_eq!(
             validate_connection(CliTool::ClaudeCode, "http://localhost:1234/v1").unwrap(),
@@ -599,7 +609,7 @@ fn claude_validation_rejects_stale_anthropic_env_override() {
 }
 
 #[test]
-fn claude_validation_drift_rejects_wrong_primary_api_key() {
+fn claude_validation_rejects_non_true_onboarding() {
     use frogclaw_core::repo::cli_config::validate_connection;
 
     with_temp_home(|temp_home| {
@@ -616,18 +626,14 @@ fn claude_validation_drift_rejects_wrong_primary_api_key() {
             true
         );
 
-        // User manually changes primaryApiKey
+        // User has the onboarding field, but it must be true.
         let config_path = claude_config_path(temp_home.home());
-        write_json(
-            &config_path,
-            &json!({ "primaryApiKey": "some-other-value" }),
-        );
+        write_json(&config_path, &json!({ "hasCompletedOnboarding": false }));
 
-        // Should now be disconnected
         assert_eq!(
             validate_connection(CliTool::ClaudeCode, "http://localhost:1234/v1").unwrap(),
             false,
-            "should detect drift when primaryApiKey changes"
+            "should reject non-true onboarding field value"
         );
     });
 }
@@ -703,7 +709,13 @@ fn claude_disconnect_restore_backup_restores_both_files() {
                 "apiKey": "original-claude-key"
             }),
         );
-        write_json(&config_path, &json!({ "primaryApiKey": "user-key-123" }));
+        write_json(
+            &config_path,
+            &json!({
+                "hasCompletedOnboarding": false,
+                "theme": "light"
+            }),
+        );
 
         // Connect (this creates backups)
         connect(
@@ -717,7 +729,8 @@ fn claude_disconnect_restore_backup_restores_both_files() {
         let settings = read_json(&settings_path);
         assert_eq!(settings["apiBaseUrl"], "http://localhost:1234/v1");
         let config = read_json(&config_path);
-        assert_eq!(config["primaryApiKey"], "any");
+        assert_eq!(config["hasCompletedOnboarding"], true);
+        assert_eq!(config["theme"], "light");
 
         // Disconnect with restore
         disconnect(CliTool::ClaudeCode, true, "http://localhost:1234/v1")
@@ -729,7 +742,8 @@ fn claude_disconnect_restore_backup_restores_both_files() {
         assert_eq!(restored_settings["apiKey"], "original-claude-key");
 
         let restored_config = read_json(&config_path);
-        assert_eq!(restored_config["primaryApiKey"], "user-key-123");
+        assert_eq!(restored_config["hasCompletedOnboarding"], false);
+        assert_eq!(restored_config["theme"], "light");
     });
 }
 
@@ -808,7 +822,7 @@ fn claude_disconnect_minimal_cleanup_removes_only_frogclaw_fields() {
         write_json(
             &config_path,
             &json!({
-                "primaryApiKey": "any",
+                "hasCompletedOnboarding": true,
                 "otherConfig": "keep-this"
             }),
         );
@@ -823,9 +837,9 @@ fn claude_disconnect_minimal_cleanup_removes_only_frogclaw_fields() {
         assert!(!settings.as_object().unwrap().contains_key("apiKey"));
         assert_eq!(settings["userSetting"], "keep-this");
 
-        // Verify primaryApiKey removed from config.json
+        // Verify ~/.claude.json onboarding is preserved
         let config = read_json(&config_path);
-        assert!(!config.as_object().unwrap().contains_key("primaryApiKey"));
+        assert_eq!(config["hasCompletedOnboarding"], true);
         assert_eq!(config["otherConfig"], "keep-this");
     });
 }
@@ -856,7 +870,7 @@ fn claude_disconnect_minimal_cleanup_removes_only_frogclaw_anthropic_env_fields(
         write_json(
             &config_path,
             &json!({
-                "primaryApiKey": "any",
+                "hasCompletedOnboarding": true,
                 "otherConfig": "keep-this"
             }),
         );
@@ -873,7 +887,7 @@ fn claude_disconnect_minimal_cleanup_removes_only_frogclaw_anthropic_env_fields(
         assert_eq!(settings["permissions"]["allow"][0], "mcp__pencil");
 
         let config = read_json(&config_path);
-        assert!(config.get("primaryApiKey").is_none());
+        assert_eq!(config["hasCompletedOnboarding"], true);
         assert_eq!(config["otherConfig"], "keep-this");
     });
 }
@@ -918,14 +932,14 @@ fn gemini_disconnect_minimal_cleanup_preserves_non_frogclaw_selected_type() {
 }
 
 #[test]
-fn claude_disconnect_minimal_cleanup_preserves_non_any_primary_api_key() {
+fn claude_disconnect_minimal_cleanup_preserves_onboarding_config() {
     use frogclaw_core::repo::cli_config::disconnect;
 
     with_temp_home(|temp_home| {
         let settings_path = claude_settings_path(temp_home.home());
         let config_path = claude_config_path(temp_home.home());
 
-        // Create files where primaryApiKey is not "any"
+        // Create files with onboarding and user config
         write_json(
             &settings_path,
             &json!({
@@ -937,19 +951,21 @@ fn claude_disconnect_minimal_cleanup_preserves_non_any_primary_api_key() {
         write_json(
             &config_path,
             &json!({
-                "primaryApiKey": "user-custom-key"
+                "hasCompletedOnboarding": true,
+                "userConfig": "keep-this"
             }),
         );
 
-        // Disconnect should remove settings fields but preserve primaryApiKey
+        // Disconnect should remove settings fields but preserve ~/.claude.json
         disconnect(CliTool::ClaudeCode, false, "http://localhost:1234/v1")
             .expect("disconnect should succeed");
 
         let config = read_json(&config_path);
         assert_eq!(
-            config["primaryApiKey"], "user-custom-key",
-            "should preserve non-any primaryApiKey"
+            config["hasCompletedOnboarding"], true,
+            "should preserve onboarding"
         );
+        assert_eq!(config["userConfig"], "keep-this");
     });
 }
 
@@ -989,7 +1005,7 @@ fn claude_connect_rollback_on_post_write_validation_failure() {
         let settings_path = claude_settings_path(temp_home.home());
         let config_path = claude_config_path(temp_home.home());
 
-        // Seed original files, but make config.json invalid for connect_claude_code()
+        // Seed original files, but make ~/.claude.json invalid for connect_claude_code()
         write_json(&settings_path, &json!({ "original": "settings" }));
         std::fs::write(&config_path, "[]").unwrap();
 
@@ -998,7 +1014,7 @@ fn claude_connect_rollback_on_post_write_validation_failure() {
             "http://localhost:1234/v1",
             "test-api-key",
         )
-        .expect_err("connect should fail and roll back when config.json is not an object");
+        .expect_err("connect should fail and roll back when ~/.claude.json is not an object");
 
         let err_text = err.to_string();
         assert!(
@@ -1014,7 +1030,7 @@ fn claude_connect_rollback_on_post_write_validation_failure() {
         assert_eq!(
             std::fs::read_to_string(&config_path).unwrap(),
             "[]",
-            "config.json should be restored to its original invalid content"
+            "~/.claude.json should be restored to its original invalid content"
         );
     });
 }

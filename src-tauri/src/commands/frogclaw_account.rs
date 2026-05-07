@@ -1,6 +1,7 @@
 use crate::frogclaw_config::FROGCLAW_BASE_URL;
 use crate::AppState;
 use frogclaw_core::crypto::encrypt_key;
+use frogclaw_core::repo::{cli_config, gateway_key};
 use frogclaw_core::types::{
     CreateProviderInput, CreateSearchProviderInput, Model, ModelCapability, ModelType,
     ProviderType, UpdateProviderInput,
@@ -13,6 +14,8 @@ use std::time::Duration;
 use tauri::State;
 
 const FROGCLAW_PROVIDER_PREFIX: &str = "frogclaw-";
+const DEFAULT_GATEWAY_URL: &str = "http://127.0.0.1:8080/v1";
+const AUTO_CLI_GATEWAY_KEY_NAME: &str = "FrogClaw CLI Auto Config";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FrogclawUserData {
@@ -102,7 +105,16 @@ pub struct FrogclawConfigureResult {
     pub session: FrogclawLoginSession,
     pub configured_providers: Vec<FrogclawConfiguredProvider>,
     pub configured_search_provider: Option<FrogclawConfiguredSearchProvider>,
+    pub auto_cli_configs: Vec<FrogclawCliAutoConfigResult>,
     pub selected_token_id: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FrogclawCliAutoConfigResult {
+    pub tool: String,
+    pub name: String,
+    pub success: bool,
+    pub message: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -761,6 +773,110 @@ async fn configure_search_provider(
     }))
 }
 
+async fn resolve_auto_cli_gateway_key(state: &AppState) -> Result<String, String> {
+    let keys = gateway_key::list_gateway_keys(&state.sea_db)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    for key in keys
+        .into_iter()
+        .filter(|key| key.enabled && key.has_encrypted_key)
+    {
+        match gateway_key::get_plain_key(&state.sea_db, &state.master_key, &key.id).await {
+            Ok(plain_key) => return Ok(plain_key),
+            Err(err) => {
+                account_log(
+                    "auto-cli-config",
+                    &format!(
+                        "failed to decrypt existing gateway key id={} prefix={}: {}",
+                        key.id, key.key_prefix, err
+                    ),
+                );
+            }
+        }
+    }
+
+    let created = gateway_key::create_gateway_key(
+        &state.sea_db,
+        AUTO_CLI_GATEWAY_KEY_NAME,
+        Some(&state.master_key),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+
+    account_log(
+        "auto-cli-config",
+        &format!(
+            "created gateway key id={} prefix={} for CLI auto config",
+            created.gateway_key.id, created.gateway_key.key_prefix
+        ),
+    );
+    Ok(created.plain_key)
+}
+
+async fn configure_cli_tools_after_login(state: &AppState) -> Vec<FrogclawCliAutoConfigResult> {
+    let tools = [
+        cli_config::CliTool::ClaudeCode,
+        cli_config::CliTool::Codex,
+        cli_config::CliTool::Gemini,
+    ];
+
+    let api_key = match resolve_auto_cli_gateway_key(state).await {
+        Ok(api_key) => api_key,
+        Err(err) => {
+            account_log(
+                "auto-cli-config",
+                &format!("failed before writing CLI configs: {err}"),
+            );
+            return tools
+                .into_iter()
+                .map(|tool| FrogclawCliAutoConfigResult {
+                    tool: tool.id().to_string(),
+                    name: tool.display_name().to_string(),
+                    success: false,
+                    message: format!("Failed to prepare gateway key: {err}"),
+                })
+                .collect();
+        }
+    };
+
+    tools
+        .into_iter()
+        .map(
+            |tool| match cli_config::connect(tool, DEFAULT_GATEWAY_URL, &api_key) {
+                Ok(()) => {
+                    account_log(
+                        "auto-cli-config",
+                        &format!(
+                            "{} connected to {}",
+                            tool.display_name(),
+                            DEFAULT_GATEWAY_URL
+                        ),
+                    );
+                    FrogclawCliAutoConfigResult {
+                        tool: tool.id().to_string(),
+                        name: tool.display_name().to_string(),
+                        success: true,
+                        message: format!("Connected to {DEFAULT_GATEWAY_URL}"),
+                    }
+                }
+                Err(err) => {
+                    account_log(
+                        "auto-cli-config",
+                        &format!("{} config failed: {}", tool.display_name(), err),
+                    );
+                    FrogclawCliAutoConfigResult {
+                        tool: tool.id().to_string(),
+                        name: tool.display_name().to_string(),
+                        success: false,
+                        message: err.to_string(),
+                    }
+                }
+            },
+        )
+        .collect()
+}
+
 #[tauri::command]
 pub async fn fetch_and_configure_frogclaw(
     state: State<'_, AppState>,
@@ -794,10 +910,12 @@ pub async fn fetch_and_configure_frogclaw(
     let configured_providers = configure_system_providers(&state, &session, selected).await?;
     let configured_search_provider =
         configure_search_provider(&state, session.search_provider.as_ref()).await?;
+    let auto_cli_configs = configure_cli_tools_after_login(&state).await;
     Ok(FrogclawConfigureResult {
         session,
         configured_providers,
         configured_search_provider,
+        auto_cli_configs,
         selected_token_id: selected,
     })
 }

@@ -184,7 +184,7 @@ fn config_paths(tool: CliTool) -> Result<Vec<PathBuf>> {
     match tool {
         CliTool::ClaudeCode => Ok(vec![
             home.join(".claude").join("settings.json"),
-            home.join(".claude").join("config.json"),
+            home.join(".claude.json"),
         ]),
         CliTool::Codex => Ok(vec![
             home.join(".codex").join("auth.json"),
@@ -308,10 +308,10 @@ fn is_connected(tool: CliTool, gateway_url: &str) -> Result<bool> {
     }
 }
 
-/// ClaudeCode (~/.claude/settings.json + ~/.claude/config.json):
+/// ClaudeCode (~/.claude/settings.json + ~/.claude.json):
 /// connected = settings.json env.ANTHROPIC_BASE_URL == gateway_url AND
 ///             env.ANTHROPIC_AUTH_TOKEN is non-empty AND
-///             config.json has primaryApiKey == "any".
+///             ~/.claude.json has hasCompletedOnboarding == true.
 fn check_claude_code_connected(
     settings_path: &Path,
     config_path: &Path,
@@ -334,11 +334,14 @@ fn check_claude_code_connected(
         .map(|k| !k.is_empty())
         .unwrap_or(false);
 
-    // Check config.json
+    // Check ~/.claude.json
     let config = read_json_file(config_path)?;
-    let primary_key_ok = config.get("primaryApiKey").and_then(|v| v.as_str()) == Some("any");
+    let onboarding_ok = config
+        .get("hasCompletedOnboarding")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
 
-    Ok(url_ok && key_ok && primary_key_ok)
+    Ok(url_ok && key_ok && onboarding_ok)
 }
 
 /// Codex (~/.codex/auth.json + ~/.codex/config.toml):
@@ -581,14 +584,21 @@ fn connect_claude_code(
         .map_err(|e| FrogClawClientError::Gateway(format!("Failed to serialize JSON: {}", e)))?;
     atomic_write(settings_path, &content)?;
 
-    // Write config.json
+    // Write ~/.claude.json only when onboarding is not already true.
     let mut config = read_json_or_empty(config_path)?;
     let config_obj = config.as_object_mut().ok_or_else(|| {
         FrogClawClientError::Gateway("Claude Code config is not a JSON object".into())
     })?;
+    if config_obj
+        .get("hasCompletedOnboarding")
+        .and_then(|v| v.as_bool())
+        == Some(true)
+    {
+        return Ok(());
+    }
     config_obj.insert(
-        "primaryApiKey".into(),
-        serde_json::Value::String("any".into()),
+        "hasCompletedOnboarding".into(),
+        serde_json::Value::Bool(true),
     );
     let config_content = serde_json::to_string_pretty(&config).map_err(|e| {
         FrogClawClientError::Gateway(format!("Failed to serialize config JSON: {}", e))
@@ -835,8 +845,7 @@ fn disconnect_remove_fields(tool: CliTool, gateway_url: &str) -> Result<()> {
     let remove_result = match tool {
         CliTool::ClaudeCode => {
             let settings_result = remove_claude_settings_gateway_fields(&paths[0], gateway_url);
-            let config_result = remove_claude_config_primary_api_key(&paths[1]);
-            settings_result.and(config_result)
+            settings_result
         }
         CliTool::Codex => {
             // Two-file operation: remove auth.json then clean config.toml.
@@ -977,27 +986,6 @@ fn remove_json_provider(path: &Path, provider_name: &str) -> Result<()> {
             provider.remove(provider_name);
         }
     }
-    let output = serde_json::to_string_pretty(&json)
-        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to serialize JSON: {}", e)))?;
-    atomic_write(path, &output)
-}
-
-fn remove_claude_config_primary_api_key(path: &Path) -> Result<()> {
-    if !path.exists() {
-        return Ok(());
-    }
-    let content = std::fs::read_to_string(path)
-        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to read config.json: {}", e)))?;
-    let mut json: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| FrogClawClientError::Gateway(format!("Failed to parse JSON: {}", e)))?;
-
-    if let Some(obj) = json.as_object_mut() {
-        // Only remove primaryApiKey if it's "any"
-        if obj.get("primaryApiKey").and_then(|v| v.as_str()) == Some("any") {
-            obj.remove("primaryApiKey");
-        }
-    }
-
     let output = serde_json::to_string_pretty(&json)
         .map_err(|e| FrogClawClientError::Gateway(format!("Failed to serialize JSON: {}", e)))?;
     atomic_write(path, &output)

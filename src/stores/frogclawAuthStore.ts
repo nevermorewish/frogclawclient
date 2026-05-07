@@ -13,6 +13,9 @@ function parseStoredResult(): FrogclawConfigureResult | null {
       localStorage.removeItem(STORAGE_KEY);
       return null;
     }
+    if (!Array.isArray(parsed.auto_cli_configs)) {
+      parsed.auto_cli_configs = [];
+    }
     return parsed;
   } catch {
     localStorage.removeItem(STORAGE_KEY);

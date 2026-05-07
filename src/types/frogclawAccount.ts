@@ -117,9 +117,17 @@ export interface FrogclawConfiguredSearchProvider {
   created_provider: boolean;
 }
 
+export interface FrogclawCliAutoConfigResult {
+  tool: string;
+  name: string;
+  success: boolean;
+  message: string;
+}
+
 export interface FrogclawConfigureResult {
   session: FrogclawLoginSession;
   configured_providers: FrogclawConfiguredProvider[];
   configured_search_provider: FrogclawConfiguredSearchProvider | null;
+  auto_cli_configs: FrogclawCliAutoConfigResult[];
   selected_token_id: number | null;
 }
