@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Alert, Button, Modal, Progress, Typography } from 'antd';
-import { Download, ExternalLink, RefreshCw } from 'lucide-react';
+import { Download, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useUpdate } from '@/contexts/UpdateContext';
 import { relaunchApp } from '@/lib/updater';
@@ -16,17 +16,6 @@ export function UpdateDialog() {
   const [error, setError] = useState<string | null>(null);
 
   if (!updateInfo) return null;
-
-  const openReleasePage = async () => {
-    const url = `https://github.com/nevermorewish/frogclawclient/releases/tag/v${updateInfo.availableVersion}`;
-    try {
-      const { openUrl } = await import('@tauri-apps/plugin-opener');
-      await openUrl(url);
-      dismissUpdate();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err ?? 'Failed to open release page'));
-    }
-  };
 
   const installUpdate = async () => {
     if (!updateHandle) {
@@ -57,9 +46,9 @@ export function UpdateDialog() {
       const raw = err instanceof Error ? err.message : String(err ?? '');
       const lower = raw.toLowerCase();
       if (lower.includes('signature') || lower.includes('verify') || lower.includes('minisign')) {
-        setError(`Update signature verification failed. Please download manually.\n${raw}`);
+        setError(`Update signature verification failed.\n${raw}`);
       } else {
-        setError(`${t('settings.updateFailed')}. Please download manually.\n${raw}`);
+        setError(`${t('settings.updateFailed')}.\n${raw}`);
       }
     } finally {
       setIsInstalling(false);
@@ -86,11 +75,6 @@ export function UpdateDialog() {
         <Button key="later" disabled={isInstalling} onClick={dismissUpdate}>
           {t('settings.updateLater')}
         </Button>,
-        error && (
-          <Button key="manual" icon={<ExternalLink size={16} />} onClick={openReleasePage}>
-            Manual Download
-          </Button>
-        ),
         isInstalled ? (
           <Button key="restart" type="primary" icon={<RefreshCw size={16} />} onClick={restart}>
             Restart

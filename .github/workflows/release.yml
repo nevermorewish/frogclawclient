@@ -367,10 +367,77 @@ jobs:
           make_latest: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
+  # ── Upload release assets to frogclaw.com downloads ───
+  upload-server:
+    name: Upload Release Assets To Server
+    needs: [publish-release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Download release assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p release-assets
+          gh release download "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --dir release-assets \
+            --pattern '*'
+
+      - name: Rewrite updater manifest URLs
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          BASE_URL="https://frogclaw.com/downloads/frogclawclient/${VERSION}"
+
+          if [ ! -f release-assets/latest.json ]; then
+            echo "::error::latest.json was not found in release assets"
+            exit 1
+          fi
+
+          jq --arg base "$BASE_URL" --arg version "$VERSION" '
+            .notes = ("FrogClaw " + $version + " released.")
+            | .platforms |= with_entries(
+                .value.url = ($base + "/" + (.value.url | split("/") | last))
+              )
+          ' release-assets/latest.json > release-assets/latest.tmp.json
+          mv release-assets/latest.tmp.json release-assets/latest.json
+
+          echo "Updated latest.json:"
+          cat release-assets/latest.json
+
+      - name: Upload artifacts to Linux server
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PASSWORD: ${{ secrets.DEPLOY_PASSWORD }}
+          DEPLOY_REMOTE_DIR: ${{ secrets.DEPLOY_REMOTE_DIR }}
+        run: |
+          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_USER" ] || [ -z "$DEPLOY_PASSWORD" ] || [ -z "$DEPLOY_REMOTE_DIR" ]; then
+            echo "::warning::DEPLOY_HOST, DEPLOY_USER, DEPLOY_PASSWORD, or DEPLOY_REMOTE_DIR not set, skipping server upload"
+            exit 0
+          fi
+
+          sudo apt-get update -qq && sudo apt-get install -y -qq sshpass >/dev/null 2>&1
+
+          VERSION="${GITHUB_REF_NAME#v}"
+          REMOTE_ROOT="${DEPLOY_REMOTE_DIR%/}"
+          REMOTE_DIR="${REMOTE_ROOT}/${VERSION}"
+
+          export SSHPASS="$DEPLOY_PASSWORD"
+          SSH_OPTS="-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null"
+
+          sshpass -e ssh $SSH_OPTS "${DEPLOY_USER}@${DEPLOY_HOST}" "mkdir -p '${REMOTE_DIR}'"
+
+          find release-assets -maxdepth 1 -type f -exec sshpass -e scp $SSH_OPTS {} "${DEPLOY_USER}@${DEPLOY_HOST}:${REMOTE_DIR}/" \;
+          sshpass -e scp $SSH_OPTS release-assets/latest.json "${DEPLOY_USER}@${DEPLOY_HOST}:${REMOTE_ROOT}/latest.json"
+
+          echo "Uploaded release ${VERSION} to ${DEPLOY_HOST}:${REMOTE_DIR}"
+
   # ── Deploy website after release ────────────────────────
   deploy-website:
     name: Deploy Website
-    needs: [publish-release]
+    needs: [upload-server]
     runs-on: ubuntu-latest
     steps:
       - name: Trigger website deployment
