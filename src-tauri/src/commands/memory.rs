@@ -279,6 +279,20 @@ pub async fn search_memory(
 }
 
 #[tauri::command]
+pub async fn search_project_memory(
+    project_path: String,
+    project_name: Option<String>,
+    query: String,
+    top_k: Option<usize>,
+) -> Result<Vec<frogclaw_core::vector_store::VectorSearchResult>, String> {
+    let client = crate::claude_mem::ClaudeMemClient::new()?;
+    let project = project_name_from_path(&project_path, project_name.as_deref());
+    client
+        .search_memory(&query, Some(&project), top_k.unwrap_or(8))
+        .await
+}
+
+#[tauri::command]
 pub async fn rebuild_memory_index(_namespace_id: String) -> Result<(), String> {
     Err("claude-mem 自己维护索引，FrogClaw 不再重建内部记忆索引".to_string())
 }

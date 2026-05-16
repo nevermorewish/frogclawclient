@@ -933,6 +933,37 @@ export async function handleCommand<T>(cmd: string, args?: Record<string, unknow
         },
       });
     }
+    case 'summarize_project_memory': {
+      const profile = await handleCommand<any>('get_project_memory_profile', args);
+      return await handleCommand<T>('add_memory_item', {
+        input: {
+          namespaceId: profile.namespaceId,
+          title: `会话摘要：${profile.projectName}`,
+          content: `浏览器预览模式生成的 ${profile.projectName} 项目会话摘要。`,
+          source: 'auto_extract',
+        },
+      }).then(() => 1 as T);
+    }
+    case 'search_project_memory': {
+      const profile = await handleCommand<any>('get_project_memory_profile', args);
+      const query = String((args as any)?.query ?? '').trim().toLowerCase();
+      const limit = Number((args as any)?.topK ?? 8);
+      const items = await handleCommand<any[]>('list_project_memory_items', {
+        projectPath: profile.projectPath,
+        projectName: profile.projectName,
+      });
+      return items
+        .filter((item) => !query || `${item.title} ${item.content}`.toLowerCase().includes(query))
+        .slice(0, limit)
+        .map((item, index) => ({
+          id: `mock-search-${item.id}`,
+          document_id: item.id,
+          chunk_index: index,
+          content: `${item.title}\n${item.content}`,
+          score: index,
+          has_embedding: true,
+        })) as T;
+    }
     case 'list_memory_namespaces':
       return getStore('memory_namespaces', []) as T;
     case 'create_memory_namespace': {

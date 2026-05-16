@@ -224,6 +224,7 @@ pub fn run() {
             commands::memory::list_project_memory_items,
             commands::memory::add_project_memory_item,
             commands::memory::summarize_project_memory,
+            commands::memory::search_project_memory,
             commands::memory::create_memory_namespace,
             commands::memory::delete_memory_namespace,
             commands::memory::update_memory_namespace,

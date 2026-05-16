@@ -377,7 +377,7 @@ export function DefaultModelSettings() {
 
       <EmbeddingModelCard
         title={t('settings.defaultEmbeddingModel', '向量模型')}
-        description={t('settings.defaultEmbeddingModelDesc', '用于项目记忆、长期记忆和知识库索引的默认向量模型。项目记忆会默认使用此模型启用。')}
+        description={t('settings.defaultEmbeddingModelDesc', '用于知识库等 FrogClaw 内置向量索引。项目记忆现在由本机 claude-mem 负责保存、索引和召回。')}
         placeholder={t('settings.memory.embeddingModelPlaceholder', '选择向量模型')}
       />
 

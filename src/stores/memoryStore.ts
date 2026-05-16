@@ -203,7 +203,21 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
         projectPath,
         projectName: projectName ?? null,
       });
-      set({ items, loading: false, error: null });
+      set((s) => ({
+        items,
+        projectProfiles: s.projectProfiles.map((profile) => (
+          profile.projectPath === projectPath
+            ? {
+                ...profile,
+                itemCount: items.length,
+                pendingCount: items.filter((item) => item.indexStatus !== 'ready').length,
+                failedCount: items.filter((item) => item.indexStatus === 'failed').length,
+              }
+            : profile
+        )),
+        loading: false,
+        error: null,
+      }));
     } catch (e) {
       set({ error: String(e), loading: false });
     }
