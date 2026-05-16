@@ -6,7 +6,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::sync::OnceLock;
 use std::time::Duration;
 use tokio::sync::Mutex;
@@ -15,6 +15,9 @@ const DEFAULT_BASE_URL: &str = "http://127.0.0.1:37777";
 const DEFAULT_NAMESPACE_ID: &str = "claude-mem";
 const DEFAULT_NAMESPACE_NAME: &str = "Claude-Mem";
 static START_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+static WORKER_PROCESS: OnceLock<Mutex<Option<Child>>> = OnceLock::new();
+static RESOURCE_DIR: OnceLock<PathBuf> = OnceLock::new();
+static SHUTTING_DOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 #[derive(Debug, Clone)]
 pub struct ClaudeMemClient {
@@ -105,7 +108,8 @@ impl ClaudeMemClient {
         let base_url =
             std::env::var("FROGCLAW_CLAUDE_MEM_URL").unwrap_or_else(|_| DEFAULT_BASE_URL.into());
         let client = Client::builder()
-            .timeout(Duration::from_secs(15))
+            .connect_timeout(Duration::from_secs(5))
+            .timeout(Duration::from_secs(120))
             .build()
             .map_err(|e| format!("Failed to create claude-mem HTTP client: {e}"))?;
         Ok(Self { client, base_url })
@@ -146,6 +150,8 @@ impl ClaudeMemClient {
     }
 
     pub async fn ensure_ready(&self) -> Result<(), String> {
+        cleanup_leftover_worker_if_unmanaged().await;
+
         if self.health().await.is_ok() {
             return Ok(());
         }
@@ -158,7 +164,7 @@ impl ClaudeMemClient {
             return Ok(());
         }
 
-        start_local_worker().await?;
+        start_managed_worker().await?;
         let start = std::time::Instant::now();
         while start.elapsed() < Duration::from_secs(20) {
             if self.health().await.is_ok() {
@@ -186,19 +192,24 @@ impl ClaudeMemClient {
 
     pub async fn save_memory(&self, input: ClaudeMemSaveInput) -> Result<MemoryItem, String> {
         self.ensure_ready().await?;
-        let request = SaveMemoryRequest {
-            text: input.text.trim(),
-            title: input.title.as_deref().filter(|v| !v.trim().is_empty()),
-            project: input.project.as_deref().filter(|v| !v.trim().is_empty()),
-            metadata: input.metadata.as_ref(),
+        let response = match self.send_save_request(&input).await {
+            Ok(response) => response,
+            Err(first_error) => {
+                tracing::warn!(
+                    "claude-mem save failed, restarting local worker and retrying once: {}",
+                    first_error
+                );
+                restart_managed_worker().await?;
+                self.ensure_ready().await?;
+                self.send_save_request(&input)
+                    .await
+                    .map_err(|second_error| {
+                        format!(
+                            "claude-mem save failed after restart: {second_error}; first error: {first_error}"
+                        )
+                    })?
+            }
         };
-        let response = self
-            .client
-            .post(format!("{}/api/memory/save", self.base_url))
-            .json(&request)
-            .send()
-            .await
-            .map_err(|e| format!("claude-mem save failed: {e}"))?;
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
@@ -221,6 +232,24 @@ impl ClaudeMemClient {
             index_error: None,
             updated_at: chrono::Utc::now().to_rfc3339(),
         })
+    }
+
+    async fn send_save_request(
+        &self,
+        input: &ClaudeMemSaveInput,
+    ) -> Result<reqwest::Response, String> {
+        let request = SaveMemoryRequest {
+            text: input.text.trim(),
+            title: input.title.as_deref().filter(|v| !v.trim().is_empty()),
+            project: input.project.as_deref().filter(|v| !v.trim().is_empty()),
+            metadata: input.metadata.as_ref(),
+        };
+        self.client
+            .post(format!("{}/api/memory/save", self.base_url))
+            .json(&request)
+            .send()
+            .await
+            .map_err(|e| e.to_string())
     }
 
     pub async fn list_items(
@@ -358,6 +387,73 @@ impl ClaudeMemClient {
 
         let results = self.search_memory(query, project, limit).await?;
         Ok(vector_results_to_rag_result(results))
+    }
+}
+
+pub fn init_resource_dir(path: PathBuf) {
+    let _ = RESOURCE_DIR.set(path);
+}
+
+pub fn start_background_worker() {
+    tauri::async_runtime::spawn(async {
+        match ClaudeMemClient::new() {
+            Ok(client) => {
+                if let Err(err) = client.ensure_ready().await {
+                    tracing::warn!("claude-mem auto-start failed: {}", err);
+                } else {
+                    tracing::info!("claude-mem worker is ready");
+                }
+            }
+            Err(err) => tracing::warn!("claude-mem client init failed: {}", err),
+        }
+    });
+    tauri::async_runtime::spawn(async {
+        monitor_worker().await;
+    });
+}
+
+pub fn shutdown_managed_worker() {
+    SHUTTING_DOWN.store(true, std::sync::atomic::Ordering::SeqCst);
+    if let Some(process) = WORKER_PROCESS.get() {
+        if let Ok(mut guard) = process.try_lock() {
+            if let Some(mut child) = guard.take() {
+                let pid = child.id();
+                tracing::info!("Stopping managed claude-mem worker pid {}", pid);
+                kill_process_tree(pid, &mut child);
+                let _ = child.wait();
+            }
+        }
+    }
+}
+
+async fn monitor_worker() {
+    let mut interval = tokio::time::interval(Duration::from_secs(5));
+    loop {
+        interval.tick().await;
+        if SHUTTING_DOWN.load(std::sync::atomic::Ordering::SeqCst) {
+            return;
+        }
+        let client = match ClaudeMemClient::new() {
+            Ok(client) => client,
+            Err(err) => {
+                tracing::warn!("claude-mem monitor client init failed: {}", err);
+                continue;
+            }
+        };
+        if client.health().await.is_ok() {
+            reap_finished_worker().await;
+            continue;
+        }
+        let _guard = START_LOCK
+            .get_or_init(|| Mutex::new(()))
+            .lock()
+            .await;
+        if client.health().await.is_ok() {
+            continue;
+        }
+        if let Err(err) = restart_managed_worker().await {
+            tracing::warn!("claude-mem monitor restart failed: {}", err);
+        }
     }
 }
 
@@ -526,7 +622,19 @@ fn vector_results_to_rag_result(
     }
 }
 
-async fn start_local_worker() -> Result<(), String> {
+async fn start_managed_worker() -> Result<(), String> {
+    reap_finished_worker().await;
+
+    {
+        let process = WORKER_PROCESS
+            .get_or_init(|| Mutex::new(None))
+            .lock()
+            .await;
+        if process.is_some() {
+            return Ok(());
+        }
+    }
+
     let Some(start_command) = resolve_start_command() else {
         return Err("claude-mem executable/scripts not found. Set FROGCLAW_CLAUDE_MEM_HOME or put claude-mem under E:\\frogclaw\\claude-mem.".to_string());
     };
@@ -537,17 +645,12 @@ async fn start_local_worker() -> Result<(), String> {
         .current_dir(&start_command.cwd)
         .env("CLAUDE_MEM_WORKER_HOST", "127.0.0.1")
         .env("CLAUDE_MEM_WORKER_PORT", "37777")
-        .env(
-            "CLAUDE_MEM_DATA_DIR",
-            std::env::var("CLAUDE_MEM_DATA_DIR").unwrap_or_else(|_| {
-                dirs::home_dir()
-                    .unwrap_or_else(|| PathBuf::from("."))
-                    .join(".frogclaw")
-                    .join("claude-mem")
-                    .to_string_lossy()
-                    .to_string()
-            }),
-        )
+        .env("CLAUDE_MEM_DATA_DIR", claude_mem_data_dir());
+    if let Some(plugin_root) = start_command.plugin_root.as_ref() {
+        command.env("CLAUDE_PLUGIN_ROOT", plugin_root);
+        command.env("PLUGIN_ROOT", plugin_root);
+    }
+    command
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
@@ -556,31 +659,223 @@ async fn start_local_worker() -> Result<(), String> {
         use std::os::windows::process::CommandExt;
         command.creation_flags(0x08000000);
     }
-    command
+    let child = command
         .spawn()
         .map_err(|e| format!("Failed to start claude-mem worker: {e}"))?;
+    tracing::info!(
+        "Started managed claude-mem worker pid {} from {}",
+        child.id(),
+        start_command.program.display()
+    );
+    let mut process = WORKER_PROCESS
+        .get_or_init(|| Mutex::new(None))
+        .lock()
+        .await;
+    *process = Some(child);
     Ok(())
+}
+
+async fn restart_managed_worker() -> Result<(), String> {
+    stop_managed_worker().await;
+    start_managed_worker().await
+}
+
+async fn stop_managed_worker() {
+    let mut process = WORKER_PROCESS
+        .get_or_init(|| Mutex::new(None))
+        .lock()
+        .await;
+    if let Some(mut child) = process.take() {
+        let pid = child.id();
+        tracing::info!("Stopping managed claude-mem worker pid {}", pid);
+        kill_process_tree(pid, &mut child);
+        let _ = child.wait();
+    }
+}
+
+fn kill_process_tree(pid: u32, child: &mut Child) {
+    #[cfg(target_os = "windows")]
+    {
+        let status = Command::new("taskkill")
+            .args(["/PID", &pid.to_string(), "/T", "/F"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+        if status.map(|s| s.success()).unwrap_or(false) {
+            return;
+        }
+    }
+    let _ = child.kill();
+}
+
+async fn cleanup_leftover_worker_if_unmanaged() {
+    let process = WORKER_PROCESS
+        .get_or_init(|| Mutex::new(None))
+        .lock()
+        .await;
+    if process.is_some() {
+        return;
+    }
+    drop(process);
+
+    let Some(pid) = read_worker_pid_file() else {
+        return;
+    };
+    if pid == std::process::id() {
+        return;
+    }
+    if !is_pid_running(pid) {
+        let _ = std::fs::remove_file(worker_pid_file());
+        return;
+    }
+
+    tracing::info!(
+        "Stopping leftover unmanaged claude-mem worker from previous FrogClaw run pid {}",
+        pid
+    );
+    kill_pid_tree(pid);
+    let _ = std::fs::remove_file(worker_pid_file());
+    tokio::time::sleep(Duration::from_millis(500)).await;
+}
+
+fn claude_mem_data_dir() -> PathBuf {
+    std::env::var("CLAUDE_MEM_DATA_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            dirs::home_dir()
+                .unwrap_or_else(|| PathBuf::from("."))
+                .join(".frogclaw")
+                .join("claude-mem")
+        })
+}
+
+fn worker_pid_file() -> PathBuf {
+    claude_mem_data_dir().join("worker.pid")
+}
+
+fn read_worker_pid_file() -> Option<u32> {
+    let raw = std::fs::read_to_string(worker_pid_file()).ok()?;
+    let value: Value = serde_json::from_str(&raw).ok()?;
+    value
+        .get("pid")
+        .and_then(|pid| pid.as_u64())
+        .and_then(|pid| u32::try_from(pid).ok())
+}
+
+fn is_pid_running(pid: u32) -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("tasklist")
+            .args(["/FI", &format!("PID eq {pid}")])
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .output()
+            .map(|output| {
+                output.status.success()
+                    && String::from_utf8_lossy(&output.stdout).contains(&pid.to_string())
+            })
+            .unwrap_or(false)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Command::new("kill")
+            .args(["-0", &pid.to_string()])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map(|status| status.success())
+            .unwrap_or(false)
+    }
+}
+
+fn kill_pid_tree(pid: u32) {
+    #[cfg(target_os = "windows")]
+    {
+        let _ = Command::new("taskkill")
+            .args(["/PID", &pid.to_string(), "/T", "/F"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = Command::new("kill")
+            .args(["-TERM", &pid.to_string()])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+}
+
+async fn reap_finished_worker() {
+    let mut process = WORKER_PROCESS
+        .get_or_init(|| Mutex::new(None))
+        .lock()
+        .await;
+    if let Some(child) = process.as_mut() {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                tracing::warn!("Managed claude-mem worker exited with {}", status);
+                *process = None;
+            }
+            Ok(None) => {}
+            Err(err) => {
+                tracing::warn!("Failed to poll managed claude-mem worker: {}", err);
+                *process = None;
+            }
+        }
+    }
 }
 
 struct StartCommand {
     program: PathBuf,
     args: Vec<String>,
     cwd: PathBuf,
+    plugin_root: Option<PathBuf>,
 }
 
 fn resolve_start_command() -> Option<StartCommand> {
-    let home = claude_mem_home()?;
     if let Ok(path) = std::env::var("FROGCLAW_CLAUDE_MEM_EXE") {
         let path = PathBuf::from(path);
         if path.is_file() {
+            let cwd = path
+                .parent()
+                .map(Path::to_path_buf)
+                .or_else(claude_mem_home)
+                .unwrap_or_else(|| PathBuf::from("."));
             return Some(StartCommand {
                 program: path,
-                args: vec!["start".to_string()],
-                cwd: home,
+                args: vec!["--daemon".to_string()],
+                cwd,
+                plugin_root: claude_mem_home().map(|home| home.join("plugin")),
             });
         }
     }
 
+    if let Some(path) = packaged_claude_mem_exe() {
+        let packaged_root = packaged_claude_mem_root(&path);
+        let cwd = packaged_root
+            .clone()
+            .or_else(|| path.parent().map(Path::to_path_buf))
+            .unwrap_or_else(|| PathBuf::from("."));
+        let plugin_root = packaged_root
+            .as_ref()
+            .map(|root| root.join("plugin"))
+            .or_else(|| claude_mem_home().map(|home| home.join("plugin")));
+        return Some(StartCommand {
+            program: path,
+            args: vec!["--daemon".to_string()],
+            cwd,
+            plugin_root,
+        });
+    }
+
+    let home = claude_mem_home()?;
     let exe_names: &[&str] = if cfg!(target_os = "windows") {
         &["claude-mem.exe", "claude-mem"]
     } else {
@@ -596,8 +891,9 @@ fn resolve_start_command() -> Option<StartCommand> {
             if path.is_file() {
                 return Some(StartCommand {
                     program: path,
-                    args: vec!["start".to_string()],
-                    cwd: home,
+                    args: vec!["--daemon".to_string()],
+                    cwd: home.clone(),
+                    plugin_root: Some(home.join("plugin")),
                 });
             }
         }
@@ -605,8 +901,9 @@ fn resolve_start_command() -> Option<StartCommand> {
     if let Some(path) = find_worker_binary(&home) {
         return Some(StartCommand {
             program: path,
-            args: vec!["start".to_string()],
-            cwd: home,
+            args: vec!["--daemon".to_string()],
+            cwd: home.clone(),
+            plugin_root: Some(home.join("plugin")),
         });
     }
 
@@ -618,9 +915,53 @@ fn resolve_start_command() -> Option<StartCommand> {
         let bun = resolve_bun()?;
         return Some(StartCommand {
             program: bun,
-            args: vec![worker.to_string_lossy().to_string(), "start".to_string()],
-            cwd: home,
+            args: vec![worker.to_string_lossy().to_string(), "--daemon".to_string()],
+            cwd: home.clone(),
+            plugin_root: Some(home.join("plugin")),
         });
+    }
+    None
+}
+
+fn packaged_claude_mem_exe() -> Option<PathBuf> {
+    let names: &[&str] = if cfg!(target_os = "windows") {
+        &["claude-mem.exe"]
+    } else {
+        &["claude-mem"]
+    };
+    let mut dirs = Vec::new();
+    if let Some(resource_dir) = RESOURCE_DIR.get() {
+        dirs.push(resource_dir.clone());
+        dirs.push(resource_dir.join("binaries"));
+    }
+    if let Ok(current_exe) = std::env::current_exe() {
+        if let Some(exe_dir) = current_exe.parent() {
+            dirs.push(exe_dir.to_path_buf());
+            dirs.push(exe_dir.join("binaries"));
+        }
+    }
+    if let Ok(current_dir) = std::env::current_dir() {
+        dirs.push(current_dir.join("src-tauri").join("binaries"));
+        dirs.push(current_dir.join("binaries"));
+    }
+    dirs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("binaries"));
+    for dir in dirs {
+        for name in names {
+            let path = dir.join(name);
+            if path.is_file() {
+                return Some(path);
+            }
+        }
+    }
+    None
+}
+
+fn packaged_claude_mem_root(exe_path: &Path) -> Option<PathBuf> {
+    let exe_dir = exe_path.parent()?;
+    for root in [exe_dir, exe_dir.parent()?] {
+        if root.join("plugin").join("scripts").join("worker-service.cjs").is_file() {
+            return Some(root.to_path_buf());
+        }
     }
     None
 }

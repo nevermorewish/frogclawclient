@@ -32,7 +32,9 @@
     "createUpdaterArtifacts": true,
     "resources": [
       "binaries/frogclaw-platform-sidecar.cjs",
-      "binaries/codex-app-server.exe"
+      "binaries/codex-app-server.exe",
+      "binaries/claude-mem.exe",
+      "binaries/plugin"
     ],
     "icon": [
       "icons/32x32.png",

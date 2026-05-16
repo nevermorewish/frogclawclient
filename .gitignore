@@ -31,6 +31,8 @@ dist-ssr
 dist/
 target/
 src-tauri/binaries/codex-app-server.exe
+src-tauri/binaries/claude-mem.exe
+src-tauri/binaries/plugin/
 
 # Secrets
 *.key

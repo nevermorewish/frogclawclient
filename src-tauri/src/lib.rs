@@ -459,6 +459,10 @@ pub fn run() {
             frogclaw_core::storage_paths::ensure_documents_dirs()
                 .expect("failed to create documents storage dirs (custom root)");
 
+            if let Ok(resource_dir) = app.path().resource_dir() {
+                claude_mem::init_resource_dir(resource_dir);
+            }
+
             let tray_language = app_settings.language.clone();
 
             app.manage(AppState {
@@ -478,6 +482,7 @@ pub fn run() {
             });
             app.manage(commands::platform_bridge::PlatformBridgeState::default());
             commands::agent::init_ai_agent_log_file();
+            claude_mem::start_background_worker();
 
             {
                 let app_handle = app.handle().clone();
@@ -740,7 +745,11 @@ pub fn run() {
         }
     };
 
-    app.run(|app, event| {
+    app.run(|_app, event| {
+        if matches!(event, tauri::RunEvent::Exit) {
+            claude_mem::shutdown_managed_worker();
+        }
+
         #[cfg(target_os = "macos")]
         if let tauri::RunEvent::Reopen {
             has_visible_windows,
@@ -748,7 +757,7 @@ pub fn run() {
         } = event
         {
             if !has_visible_windows {
-                if let Some(w) = app.get_webview_window("main") {
+                if let Some(w) = _app.get_webview_window("main") {
                     let _ = w.show();
                     let _ = w.set_focus();
                 }
