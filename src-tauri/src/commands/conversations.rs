@@ -111,7 +111,7 @@ async fn resolve_auto_memory_summary_runtime(
 pub(crate) async fn auto_capture_project_memory(
     db: &DatabaseConnection,
     master_key: &[u8; 32],
-    vector_store: &frogclaw_core::vector_store::VectorStore,
+    _vector_store: &frogclaw_core::vector_store::VectorStore,
     fallback_provider: &ProviderConfig,
     fallback_ctx: &ProviderRequestContext,
     conversation: &Conversation,
@@ -127,26 +127,12 @@ pub(crate) async fn auto_capture_project_memory(
         tracing::info!("[project-memory] skip auto capture: content too short");
         return;
     }
-
-    let profile = match frogclaw_core::repo::memory::ensure_project_profile(
-        db,
-        project_path,
-        conversation.project_name.as_deref(),
-    )
-    .await
-    {
-        Ok(profile) => profile,
-        Err(err) => {
-            tracing::warn!("[project-memory] ensure profile failed: {}", err);
-            return;
-        }
-    };
-    let embedding_provider = profile.embedding_provider.clone();
     tracing::info!(
-        "[project-memory] auto capture start project={} namespace={} embedding_configured={}",
-        profile.project_name,
-        profile.namespace_id,
-        embedding_provider.is_some()
+        "[project-memory] claude-mem auto capture start project={}",
+        conversation
+            .project_name
+            .as_deref()
+            .unwrap_or(project_path)
     );
 
     let prompt = format!(
@@ -222,7 +208,10 @@ pub(crate) async fn auto_capture_project_memory(
     if candidates.is_empty() {
         tracing::info!(
             "[project-memory] auto capture produced 0 candidates project={} response={}",
-            profile.project_name,
+            conversation
+                .project_name
+                .as_deref()
+                .unwrap_or(project_path),
             response.content.chars().take(240).collect::<String>()
         );
         return;
@@ -230,67 +219,29 @@ pub(crate) async fn auto_capture_project_memory(
 
     let mut saved_count = 0usize;
     for candidate in candidates {
-        let item = match frogclaw_core::repo::memory::add_item(
-            db,
-            CreateMemoryItemInput {
-                namespace_id: profile.namespace_id.clone(),
-                title: candidate.title.trim().chars().take(120).collect(),
-                content: candidate.content.trim().chars().take(4000).collect(),
-                source: Some("auto_extract".to_string()),
-            },
+        match crate::claude_mem::save_auto_memory(
+            Some(project_path),
+            conversation.project_name.as_deref(),
+            &candidate.title.trim().chars().take(120).collect::<String>(),
+            &candidate.content.trim().chars().take(4000).collect::<String>(),
+            "auto_extract",
         )
         .await
         {
-            Ok(item) => item,
             Err(err) => {
-                tracing::warn!("[project-memory] add item failed: {}", err);
+                tracing::warn!("[project-memory] claude-mem save failed: {}", err);
                 continue;
             }
-        };
-        saved_count += 1;
-
-        if let Some(ref embedding_provider) = embedding_provider {
-            let _ = frogclaw_core::repo::memory::update_item_index_status(
-                db, &item.id, "indexing", None,
-            )
-            .await;
-            let result = crate::indexing::index_memory_item(
-                db,
-                master_key,
-                vector_store,
-                &profile.namespace_id,
-                &item.id,
-                &item.content,
-                embedding_provider,
-                profile.embedding_dimensions.map(|v| v as usize),
-            )
-            .await;
-            let (status, err_msg) = match result {
-                Ok(_) => ("ready", None),
-                Err(err) => ("failed", Some(err.to_string())),
-            };
-            let _ = frogclaw_core::repo::memory::update_item_index_status(
-                db,
-                &item.id,
-                status,
-                err_msg.as_deref(),
-            )
-            .await;
-        } else {
-            let _ = frogclaw_core::repo::memory::update_item_index_status(
-                db,
-                &item.id,
-                "skipped",
-                Some("embedding provider not configured"),
-            )
-            .await;
+            Ok(_) => saved_count += 1,
         }
     }
     tracing::info!(
-        "[project-memory] auto capture saved {} items project={} namespace={}",
+        "[project-memory] claude-mem auto capture saved {} items project={}",
         saved_count,
-        profile.project_name,
-        profile.namespace_id
+        conversation
+            .project_name
+            .as_deref()
+            .unwrap_or(project_path)
     );
 }
 
@@ -1687,6 +1638,47 @@ fn build_memory_retrieval_tag(sources: &[RagSourceResult]) -> String {
     result
 }
 
+async fn collect_reference_context(
+    state: &State<'_, AppState>,
+    conversation: &Conversation,
+    kb_ids: Vec<String>,
+    mem_ids: Vec<String>,
+    query: &str,
+    top_k: usize,
+) -> RagContextResult {
+    let mut rag_result = crate::indexing::collect_rag_context(
+        &state.sea_db,
+        &state.master_key,
+        &state.vector_store,
+        &kb_ids,
+        &[],
+        query,
+        top_k,
+    )
+    .await;
+
+    if !mem_ids.is_empty() {
+        match crate::claude_mem::collect_project_context(
+            query,
+            conversation.working_directory.as_deref(),
+            conversation.project_name.as_deref(),
+            top_k,
+        )
+        .await
+        {
+            Ok(mut mem_result) => {
+                rag_result.context_parts.append(&mut mem_result.context_parts);
+                rag_result.source_results.append(&mut mem_result.source_results);
+            }
+            Err(err) => {
+                tracing::warn!("[claude-mem] context retrieval failed: {}", err);
+            }
+        }
+    }
+
+    rag_result
+}
+
 /// Spawn the streaming background task shared by send_message and regenerate_message.
 /// Returns the assistant message_id that will be populated as chunks arrive.
 fn spawn_stream_task(
@@ -2338,16 +2330,8 @@ pub async fn send_message(
     // RAG retrieval: search enabled knowledge bases and memory namespaces
     let kb_ids = enabled_knowledge_base_ids.unwrap_or_default();
     let mem_ids = enabled_memory_namespace_ids.unwrap_or_default();
-    let rag_result = crate::indexing::collect_rag_context(
-        &state.sea_db,
-        &state.master_key,
-        &state.vector_store,
-        &kb_ids,
-        &mem_ids,
-        &content,
-        5,
-    )
-    .await;
+    let rag_result =
+        collect_reference_context(&state, &conversation, kb_ids, mem_ids, &content, 5).await;
 
     // Build memory retrieval tag for persistence before moving source_results
     let memory_tag = build_memory_retrieval_tag(&rag_result.source_results);
@@ -2716,12 +2700,11 @@ pub async fn regenerate_message(
     let memory_tag = {
         let kb_ids = enabled_knowledge_base_ids.unwrap_or_default();
         let mem_ids = enabled_memory_namespace_ids.unwrap_or_default();
-        let rag_result = crate::indexing::collect_rag_context(
-            &state.sea_db,
-            &state.master_key,
-            &state.vector_store,
-            &kb_ids,
-            &mem_ids,
+        let rag_result = collect_reference_context(
+            &state,
+            &conversation,
+            kb_ids,
+            mem_ids,
             &last_user_msg.content,
             5,
         )
@@ -3029,16 +3012,9 @@ pub async fn regenerate_with_model(
     let memory_tag = {
         let kb_ids = enabled_knowledge_base_ids.unwrap_or_default();
         let mem_ids = enabled_memory_namespace_ids.unwrap_or_default();
-        let rag_result = crate::indexing::collect_rag_context(
-            &state.sea_db,
-            &state.master_key,
-            &state.vector_store,
-            &kb_ids,
-            &mem_ids,
-            &user_msg.content,
-            5,
-        )
-        .await;
+        let rag_result =
+            collect_reference_context(&state, &conversation, kb_ids, mem_ids, &user_msg.content, 5)
+                .await;
 
         let tag = build_memory_retrieval_tag(&rag_result.source_results);
 

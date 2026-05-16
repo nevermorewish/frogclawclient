@@ -33,6 +33,7 @@ pub struct AppState {
 }
 
 mod commands;
+mod claude_mem;
 mod context_manager;
 mod frogclaw_config;
 mod indexing;

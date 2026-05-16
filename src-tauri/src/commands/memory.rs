@@ -1,198 +1,119 @@
 use crate::AppState;
 use frogclaw_core::types::*;
-use frogclaw_providers::{resolve_base_url_for_type, ProviderRequestContext};
-use tauri::{AppHandle, Emitter, State};
+use tauri::State;
 
-fn normalize_project_path(value: &str) -> String {
-    value
-        .trim()
-        .replace('\\', "/")
-        .trim_end_matches('/')
-        .to_lowercase()
+fn default_project_path() -> String {
+    crate::paths::default_workspace().to_string_lossy().to_string()
 }
 
-async fn index_memory_item_if_configured(
-    app: AppHandle,
-    state: &State<'_, AppState>,
-    item: MemoryItem,
-) -> Result<MemoryItem, String> {
-    let ns = frogclaw_core::repo::memory::get_namespace(&state.sea_db, &item.namespace_id)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    if let Some(ref embedding_provider) = ns.embedding_provider {
-        let _ = frogclaw_core::repo::memory::update_item_index_status(
-            &state.sea_db,
-            &item.id,
-            "indexing",
-            None,
-        )
-        .await;
-
-        let db = state.sea_db.clone();
-        let master_key = state.master_key;
-        let vector_store = state.vector_store.clone();
-        let item_id = item.id.clone();
-        let content = item.content.clone();
-        let ep = embedding_provider.clone();
-        let ns_id = item.namespace_id.clone();
-        let dims = ns.embedding_dimensions.map(|v| v as usize);
-
-        tokio::spawn(async move {
-            let result = crate::indexing::index_memory_item(
-                &db,
-                &master_key,
-                &vector_store,
-                &ns_id,
-                &item_id,
-                &content,
-                &ep,
-                dims,
-            )
-            .await;
-
-            let (status, err_msg) = match &result {
-                Ok(_) => ("ready", None),
-                Err(e) => {
-                    tracing::error!("Memory embedding failed for item {}: {}", item_id, e);
-                    ("failed", Some(e.to_string()))
-                }
-            };
-            let _ = frogclaw_core::repo::memory::update_item_index_status(
-                &db,
-                &item_id,
-                status,
-                err_msg.as_deref(),
-            )
-            .await;
-
-            let _ = app.emit(
-                "memory-item-indexed",
-                serde_json::json!({
-                    "itemId": item_id,
-                    "success": result.is_ok(),
-                    "status": status,
-                    "error": err_msg,
-                }),
-            );
-        });
-
-        Ok(MemoryItem {
-            index_status: "indexing".to_string(),
-            ..item
+fn project_name_from_path(project_path: &str, project_name: Option<&str>) -> String {
+    project_name
+        .filter(|v| !v.trim().is_empty())
+        .map(|v| v.trim().to_string())
+        .unwrap_or_else(|| {
+            std::path::Path::new(project_path)
+                .file_name()
+                .and_then(|v| v.to_str())
+                .unwrap_or("frogclaw")
+                .to_string()
         })
-    } else {
-        let _ = frogclaw_core::repo::memory::update_item_index_status(
-            &state.sea_db,
-            &item.id,
-            "skipped",
-            None,
-        )
-        .await;
-        Ok(MemoryItem {
-            index_status: "skipped".to_string(),
-            ..item
-        })
-    }
+}
+
+fn metadata_for_source(source: &str, project_path: Option<&str>) -> serde_json::Value {
+    serde_json::json!({
+        "app": "frogclaw",
+        "source": source,
+        "projectPath": project_path,
+    })
 }
 
 #[tauri::command]
-pub async fn list_memory_namespaces(
-    state: State<'_, AppState>,
-) -> Result<Vec<MemoryNamespace>, String> {
-    frogclaw_core::repo::memory::list_namespaces(&state.sea_db)
-        .await
-        .map_err(|e| e.to_string())
+pub async fn list_memory_namespaces() -> Result<Vec<MemoryNamespace>, String> {
+    Ok(vec![crate::claude_mem::ClaudeMemClient::namespace()])
 }
 
 #[tauri::command]
 pub async fn list_project_memory_profiles(
     state: State<'_, AppState>,
 ) -> Result<Vec<ProjectMemoryProfile>, String> {
-    let default_project_path = crate::paths::default_workspace()
-        .to_string_lossy()
-        .to_string();
-    frogclaw_core::repo::memory::list_project_profiles(&state.sea_db, &default_project_path)
+    let default_project_path = default_project_path();
+    let mut projects = vec![(
+        default_project_path.clone(),
+        project_name_from_path(&default_project_path, None),
+    )];
+
+    let conversations = frogclaw_core::repo::conversation::list_conversations(&state.sea_db)
         .await
-        .map_err(|e| e.to_string())
+        .unwrap_or_default();
+    for conversation in conversations {
+        let Some(path) = conversation.working_directory else {
+            continue;
+        };
+        if path.trim().is_empty() || projects.iter().any(|(p, _)| p == &path) {
+            continue;
+        }
+        let name = project_name_from_path(&path, conversation.project_name.as_deref());
+        projects.push((path, name));
+    }
+
+    Ok(projects
+        .into_iter()
+        .map(|(path, name)| {
+            crate::claude_mem::ClaudeMemClient::project_profile(&path, Some(&name))
+        })
+        .collect())
 }
 
 #[tauri::command]
 pub async fn get_project_memory_profile(
-    state: State<'_, AppState>,
     project_path: String,
     project_name: Option<String>,
 ) -> Result<ProjectMemoryProfile, String> {
-    frogclaw_core::repo::memory::get_project_profile(
-        &state.sea_db,
+    Ok(crate::claude_mem::ClaudeMemClient::project_profile(
         &project_path,
         project_name.as_deref(),
-    )
-    .await
-    .map_err(|e| e.to_string())
+    ))
 }
 
 #[tauri::command]
 pub async fn update_project_memory_profile(
-    state: State<'_, AppState>,
     project_path: String,
     project_name: Option<String>,
-    input: UpdateMemoryNamespaceInput,
+    _input: UpdateMemoryNamespaceInput,
 ) -> Result<ProjectMemoryProfile, String> {
-    frogclaw_core::repo::memory::update_project_profile(
-        &state.sea_db,
+    Ok(crate::claude_mem::ClaudeMemClient::project_profile(
         &project_path,
         project_name.as_deref(),
-        input,
-    )
-    .await
-    .map_err(|e| e.to_string())
+    ))
 }
 
 #[tauri::command]
 pub async fn list_project_memory_items(
-    state: State<'_, AppState>,
     project_path: String,
     project_name: Option<String>,
 ) -> Result<Vec<MemoryItem>, String> {
-    frogclaw_core::repo::memory::list_project_items(
-        &state.sea_db,
-        &project_path,
-        project_name.as_deref(),
-    )
-    .await
-    .map_err(|e| e.to_string())
+    let client = crate::claude_mem::ClaudeMemClient::new()?;
+    let project = project_name_from_path(&project_path, project_name.as_deref());
+    client.list_items(Some(&project), 200).await
 }
 
 #[tauri::command]
 pub async fn add_project_memory_item(
-    app: AppHandle,
-    state: State<'_, AppState>,
     project_path: String,
     project_name: Option<String>,
     title: String,
     content: String,
 ) -> Result<MemoryItem, String> {
-    let profile = frogclaw_core::repo::memory::ensure_project_profile(
-        &state.sea_db,
-        &project_path,
-        project_name.as_deref(),
-    )
-    .await
-    .map_err(|e| e.to_string())?;
-    let item = frogclaw_core::repo::memory::add_item(
-        &state.sea_db,
-        CreateMemoryItemInput {
-            namespace_id: profile.namespace_id,
-            title,
-            content,
-            source: Some("manual".to_string()),
-        },
-    )
-    .await
-    .map_err(|e| e.to_string())?;
-
-    index_memory_item_if_configured(app, &state, item).await
+    let client = crate::claude_mem::ClaudeMemClient::new()?;
+    let project = project_name_from_path(&project_path, project_name.as_deref());
+    client
+        .save_memory(crate::claude_mem::ClaudeMemSaveInput {
+            title: Some(title),
+            text: content,
+            project: Some(project),
+            metadata: Some(metadata_for_source("manual", Some(&project_path))),
+        })
+        .await
 }
 
 #[tauri::command]
@@ -201,20 +122,7 @@ pub async fn summarize_project_memory(
     project_path: String,
     project_name: Option<String>,
 ) -> Result<usize, String> {
-    let profile = frogclaw_core::repo::memory::ensure_project_profile(
-        &state.sea_db,
-        &project_path,
-        project_name.as_deref(),
-    )
-    .await
-    .map_err(|e| e.to_string())?;
-    let before_count =
-        frogclaw_core::repo::memory::list_items(&state.sea_db, &profile.namespace_id)
-            .await
-            .map_err(|e| e.to_string())?
-            .len();
-
-    let target_path = normalize_project_path(&project_path);
+    let target = project_path.trim().replace('\\', "/").trim_end_matches('/').to_lowercase();
     let mut conversations = frogclaw_core::repo::conversation::list_conversations(&state.sea_db)
         .await
         .map_err(|e| e.to_string())?
@@ -223,9 +131,9 @@ pub async fn summarize_project_memory(
             conversation
                 .working_directory
                 .as_deref()
-                .map(normalize_project_path)
+                .map(|p| p.trim().replace('\\', "/").trim_end_matches('/').to_lowercase())
                 .as_deref()
-                == Some(target_path.as_str())
+                == Some(target.as_str())
         })
         .collect::<Vec<_>>();
     conversations.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
@@ -233,488 +141,162 @@ pub async fn summarize_project_memory(
         return Err("当前项目没有可总结的会话".to_string());
     }
 
-    let mut user_parts = Vec::new();
-    let mut assistant_parts = Vec::new();
-    let mut runtime_conversation = None;
+    let mut saved = 0usize;
+    let project = project_name_from_path(&project_path, project_name.as_deref());
+    let client = crate::claude_mem::ClaudeMemClient::new()?;
     for conversation in conversations.iter().take(8) {
         let messages = frogclaw_core::repo::message::list_messages(&state.sea_db, &conversation.id)
             .await
             .map_err(|e| e.to_string())?;
-        if messages
+        let transcript = messages
             .iter()
-            .any(|msg| matches!(msg.role, MessageRole::Assistant))
-        {
-            runtime_conversation.get_or_insert_with(|| conversation.clone());
-        }
-        for msg in messages.iter().rev().take(16).rev() {
-            let content = msg.content.trim();
-            if content.is_empty() {
-                continue;
-            }
-            match msg.role {
-                MessageRole::User => {
-                    user_parts.push(format!("会话「{}」用户：{}", conversation.title, content))
+            .rev()
+            .take(20)
+            .rev()
+            .filter_map(|msg| {
+                let content = msg.content.trim();
+                if content.is_empty() {
+                    return None;
                 }
-                MessageRole::Assistant => {
-                    assistant_parts.push(format!("会话「{}」助手：{}", conversation.title, content))
-                }
-                _ => {}
-            }
+                let role = match msg.role {
+                    MessageRole::User => "User",
+                    MessageRole::Assistant => "Assistant",
+                    MessageRole::System => "System",
+                    MessageRole::Tool => "Tool",
+                };
+                Some(format!("{role}: {content}"))
+            })
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        if transcript.trim().is_empty() {
+            continue;
         }
+        let text = format!(
+            "FrogClaw project conversation summary source.\nProject: {}\nConversation: {}\n\n{}",
+            project, conversation.title, transcript
+        );
+        client
+            .save_memory(crate::claude_mem::ClaudeMemSaveInput {
+                title: Some(format!("FrogClaw 会话记忆：{}", conversation.title)),
+                text,
+                project: Some(project.clone()),
+                metadata: Some(metadata_for_source("manual_summarize", Some(&project_path))),
+            })
+            .await?;
+        saved += 1;
     }
-    if user_parts.is_empty() || assistant_parts.is_empty() {
-        return Err("当前项目没有可总结的用户/助手消息".to_string());
-    }
-    let mut conversation = runtime_conversation.unwrap_or_else(|| conversations[0].clone());
-    conversation.working_directory = Some(project_path.clone());
-    conversation.project_name = project_name.clone();
-
-    let provider =
-        frogclaw_core::repo::provider::get_provider(&state.sea_db, &conversation.provider_id)
-            .await
-            .map_err(|e| e.to_string())?;
-    let key_row =
-        frogclaw_core::repo::provider::get_active_key(&state.sea_db, &conversation.provider_id)
-            .await
-            .map_err(|e| e.to_string())?;
-    let api_key = frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, &state.master_key)
-        .map_err(|e| e.to_string())?;
-    let settings = frogclaw_core::repo::settings::get_settings(&state.sea_db)
-        .await
-        .unwrap_or_default();
-    let proxy_config = ProviderProxyConfig::resolve(&provider.proxy_config, &settings);
-    let ctx = ProviderRequestContext {
-        api_key,
-        key_id: key_row.id,
-        provider_id: provider.id.clone(),
-        base_url: Some(resolve_base_url_for_type(
-            &provider.api_host,
-            &provider.provider_type,
-        )),
-        api_path: provider.api_path.clone(),
-        proxy_config,
-        custom_headers: provider
-            .custom_headers
-            .as_ref()
-            .and_then(|s| serde_json::from_str(s).ok()),
-    };
-
-    crate::commands::conversations::auto_capture_project_memory(
-        &state.sea_db,
-        &state.master_key,
-        state.vector_store.as_ref(),
-        &provider,
-        &ctx,
-        &conversation,
-        &conversation.model_id,
-        &user_parts.join("\n\n"),
-        &assistant_parts.join("\n\n"),
-    )
-    .await;
-
-    let after_count = frogclaw_core::repo::memory::list_items(&state.sea_db, &profile.namespace_id)
-        .await
-        .map_err(|e| e.to_string())?
-        .len();
-    Ok(after_count.saturating_sub(before_count))
+    Ok(saved)
 }
 
 #[tauri::command]
 pub async fn create_memory_namespace(
-    state: State<'_, AppState>,
     input: CreateMemoryNamespaceInput,
 ) -> Result<MemoryNamespace, String> {
-    frogclaw_core::repo::memory::create_namespace(&state.sea_db, input)
-        .await
-        .map_err(|e| e.to_string())
+    let mut ns = crate::claude_mem::ClaudeMemClient::namespace();
+    if !input.name.trim().is_empty() {
+        ns.name = input.name;
+    }
+    ns.scope = input.scope;
+    Ok(ns)
 }
 
 #[tauri::command]
-pub async fn delete_memory_namespace(state: State<'_, AppState>, id: String) -> Result<(), String> {
-    frogclaw_core::repo::memory::delete_namespace(&state.sea_db, &id)
-        .await
-        .map_err(|e| e.to_string())
+pub async fn delete_memory_namespace(_id: String) -> Result<(), String> {
+    Err("claude-mem 当前只提供单一本地记忆库，不支持从 FrogClaw 删除命名空间".to_string())
 }
 
 #[tauri::command]
 pub async fn update_memory_namespace(
-    state: State<'_, AppState>,
-    id: String,
+    _id: String,
     input: UpdateMemoryNamespaceInput,
 ) -> Result<MemoryNamespace, String> {
-    frogclaw_core::repo::memory::update_namespace(&state.sea_db, &id, input)
-        .await
-        .map_err(|e| e.to_string())
+    let mut ns = crate::claude_mem::ClaudeMemClient::namespace();
+    if let Some(name) = input.name.filter(|v| !v.trim().is_empty()) {
+        ns.name = name;
+    }
+    if let Some(sort_order) = input.sort_order {
+        ns.sort_order = sort_order;
+    }
+    Ok(ns)
 }
 
 #[tauri::command]
-pub async fn list_memory_items(
-    state: State<'_, AppState>,
-    namespace_id: String,
-) -> Result<Vec<MemoryItem>, String> {
-    frogclaw_core::repo::memory::list_items(&state.sea_db, &namespace_id)
-        .await
-        .map_err(|e| e.to_string())
+pub async fn list_memory_items(_namespace_id: String) -> Result<Vec<MemoryItem>, String> {
+    let client = crate::claude_mem::ClaudeMemClient::new()?;
+    client.list_items(None, 200).await
 }
 
 #[tauri::command]
-pub async fn add_memory_item(
-    app: AppHandle,
-    state: State<'_, AppState>,
-    input: CreateMemoryItemInput,
-) -> Result<MemoryItem, String> {
-    let item = frogclaw_core::repo::memory::add_item(&state.sea_db, input)
+pub async fn add_memory_item(input: CreateMemoryItemInput) -> Result<MemoryItem, String> {
+    let client = crate::claude_mem::ClaudeMemClient::new()?;
+    client
+        .save_memory(crate::claude_mem::ClaudeMemSaveInput {
+            title: Some(input.title),
+            text: input.content,
+            project: None,
+            metadata: Some(metadata_for_source(input.source.as_deref().unwrap_or("manual"), None)),
+        })
         .await
-        .map_err(|e| e.to_string())?;
-
-    index_memory_item_if_configured(app, &state, item).await
 }
 
 #[tauri::command]
 pub async fn delete_memory_item(
-    state: State<'_, AppState>,
-    namespace_id: String,
-    id: String,
+    _namespace_id: String,
+    _id: String,
 ) -> Result<(), String> {
-    // Delete vector embedding for this item
-    let collection_id = format!("mem_{}", namespace_id);
-    let _ = state
-        .vector_store
-        .delete_document_embeddings(&collection_id, &id)
-        .await;
-
-    frogclaw_core::repo::memory::delete_item(&state.sea_db, &id)
-        .await
-        .map_err(|e| e.to_string())
+    Err("claude-mem 当前本地 worker 未提供删除单条记忆 API".to_string())
 }
 
 #[tauri::command]
 pub async fn update_memory_item(
-    app: AppHandle,
-    state: State<'_, AppState>,
-    namespace_id: String,
+    _namespace_id: String,
     id: String,
     input: UpdateMemoryItemInput,
 ) -> Result<MemoryItem, String> {
-    let content_changed = input.content.is_some();
-    let item = frogclaw_core::repo::memory::update_item(&state.sea_db, &id, input)
+    let title = input.title.unwrap_or_else(|| format!("Updated memory {id}"));
+    let content = input
+        .content
+        .ok_or_else(|| "claude-mem update requires content; saved as a new memory".to_string())?;
+    let client = crate::claude_mem::ClaudeMemClient::new()?;
+    client
+        .save_memory(crate::claude_mem::ClaudeMemSaveInput {
+            title: Some(title),
+            text: content,
+            project: None,
+            metadata: Some(metadata_for_source("manual_update", None)),
+        })
         .await
-        .map_err(|e| e.to_string())?;
-
-    // Re-index if content changed and namespace has embedding provider
-    if content_changed {
-        let ns = frogclaw_core::repo::memory::get_namespace(&state.sea_db, &namespace_id)
-            .await
-            .map_err(|e| e.to_string())?;
-
-        if let Some(ref embedding_provider) = ns.embedding_provider {
-            // Set status to indexing
-            let _ = frogclaw_core::repo::memory::update_item_index_status(
-                &state.sea_db,
-                &id,
-                "indexing",
-                None,
-            )
-            .await;
-
-            let db = state.sea_db.clone();
-            let master_key = state.master_key;
-            let vector_store = state.vector_store.clone();
-            let item_id = item.id.clone();
-            let content = item.content.clone();
-            let ep = embedding_provider.clone();
-            let ns_id = namespace_id.clone();
-            let dims = ns.embedding_dimensions.map(|v| v as usize);
-
-            tokio::spawn(async move {
-                // Delete old embedding first
-                let collection_id = format!("mem_{}", ns_id);
-                let _ = vector_store
-                    .delete_document_embeddings(&collection_id, &item_id)
-                    .await;
-
-                let result = crate::indexing::index_memory_item(
-                    &db,
-                    &master_key,
-                    &vector_store,
-                    &ns_id,
-                    &item_id,
-                    &content,
-                    &ep,
-                    dims,
-                )
-                .await;
-
-                let (status, err_msg) = match &result {
-                    Ok(_) => ("ready", None),
-                    Err(e) => {
-                        tracing::error!("Memory re-embedding failed for item {}: {}", item_id, e);
-                        ("failed", Some(e.to_string()))
-                    }
-                };
-                let _ = frogclaw_core::repo::memory::update_item_index_status(
-                    &db,
-                    &item_id,
-                    status,
-                    err_msg.as_deref(),
-                )
-                .await;
-
-                let _ = app.emit(
-                    "memory-item-indexed",
-                    serde_json::json!({
-                        "itemId": item_id,
-                        "success": result.is_ok(),
-                        "status": status,
-                        "error": err_msg,
-                    }),
-                );
-            });
-
-            return Ok(MemoryItem {
-                index_status: "indexing".to_string(),
-                ..item
-            });
-        }
-    }
-
-    Ok(item)
 }
 
 #[tauri::command]
 pub async fn search_memory(
-    state: State<'_, AppState>,
-    namespace_id: String,
+    _namespace_id: String,
     query: String,
     top_k: Option<usize>,
 ) -> Result<Vec<frogclaw_core::vector_store::VectorSearchResult>, String> {
-    crate::indexing::search_memory(
-        &state.sea_db,
-        &state.master_key,
-        &state.vector_store,
-        &namespace_id,
-        &query,
-        top_k.unwrap_or(5),
-    )
-    .await
-    .map_err(|e| e.to_string())
+    let client = crate::claude_mem::ClaudeMemClient::new()?;
+    client.search_memory(&query, None, top_k.unwrap_or(5)).await
 }
 
 #[tauri::command]
-pub async fn rebuild_memory_index(
-    app: AppHandle,
-    state: State<'_, AppState>,
-    namespace_id: String,
-) -> Result<(), String> {
-    let ns = frogclaw_core::repo::memory::get_namespace(&state.sea_db, &namespace_id)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let embedding_provider = ns
-        .embedding_provider
-        .ok_or("No embedding provider configured")?;
-
-    // Clear existing collection
-    let collection_id = format!("mem_{}", namespace_id);
-    let _ = state.vector_store.delete_collection(&collection_id).await;
-
-    // Get all items and re-index
-    let items = frogclaw_core::repo::memory::list_items(&state.sea_db, &namespace_id)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    // Set all items to indexing status
-    for item in &items {
-        let _ = frogclaw_core::repo::memory::update_item_index_status(
-            &state.sea_db,
-            &item.id,
-            "indexing",
-            None,
-        )
-        .await;
-    }
-
-    let db = state.sea_db.clone();
-    let master_key = state.master_key;
-    let vector_store = state.vector_store.clone();
-    let ep = embedding_provider.clone();
-    let dims = ns.embedding_dimensions.map(|v| v as usize);
-
-    tokio::spawn(async move {
-        for item in items {
-            let result = crate::indexing::index_memory_item(
-                &db,
-                &master_key,
-                &vector_store,
-                &namespace_id,
-                &item.id,
-                &item.content,
-                &ep,
-                dims,
-            )
-            .await;
-
-            let (status, err_msg) = match &result {
-                Ok(_) => ("ready", None),
-                Err(e) => {
-                    tracing::error!("Memory re-indexing failed for item {}: {}", item.id, e);
-                    ("failed", Some(e.to_string()))
-                }
-            };
-            let _ = frogclaw_core::repo::memory::update_item_index_status(
-                &db,
-                &item.id,
-                status,
-                err_msg.as_deref(),
-            )
-            .await;
-
-            // Emit per-item event for real-time progress
-            let _ = app.emit(
-                "memory-item-indexed",
-                serde_json::json!({
-                    "itemId": item.id,
-                    "success": result.is_ok(),
-                    "status": status,
-                    "error": err_msg,
-                    "isRebuild": true,
-                }),
-            );
-        }
-
-        let _ = app.emit(
-            "memory-rebuild-complete",
-            serde_json::json!({ "namespaceId": namespace_id }),
-        );
-    });
-
-    Ok(())
+pub async fn rebuild_memory_index(_namespace_id: String) -> Result<(), String> {
+    Err("claude-mem 自己维护索引，FrogClaw 不再重建内部记忆索引".to_string())
 }
 
 #[tauri::command]
-pub async fn clear_memory_index(
-    state: State<'_, AppState>,
-    namespace_id: String,
-) -> Result<(), String> {
-    let collection_id = format!("mem_{}", namespace_id);
-    state
-        .vector_store
-        .delete_collection(&collection_id)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    // Reset all items to "pending"
-    let items = frogclaw_core::repo::memory::list_items(&state.sea_db, &namespace_id)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    for item in items {
-        let _ = frogclaw_core::repo::memory::update_item_index_status(
-            &state.sea_db,
-            &item.id,
-            "pending",
-            None,
-        )
-        .await;
-    }
-
-    Ok(())
+pub async fn clear_memory_index(_namespace_id: String) -> Result<(), String> {
+    Err("claude-mem 自己维护索引，FrogClaw 不再清空内部记忆索引".to_string())
 }
 
 #[tauri::command]
 pub async fn reindex_memory_item(
-    app: AppHandle,
-    state: State<'_, AppState>,
-    namespace_id: String,
-    item_id: String,
+    _namespace_id: String,
+    _item_id: String,
 ) -> Result<(), String> {
-    let ns = frogclaw_core::repo::memory::get_namespace(&state.sea_db, &namespace_id)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let embedding_provider = ns
-        .embedding_provider
-        .ok_or("No embedding provider configured")?;
-
-    let items = frogclaw_core::repo::memory::list_items(&state.sea_db, &namespace_id)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let item = items
-        .into_iter()
-        .find(|i| i.id == item_id)
-        .ok_or("Item not found")?;
-
-    let _ = frogclaw_core::repo::memory::update_item_index_status(
-        &state.sea_db,
-        &item_id,
-        "indexing",
-        None,
-    )
-    .await;
-
-    let db = state.sea_db.clone();
-    let master_key = state.master_key;
-    let vector_store = state.vector_store.clone();
-    let ep = embedding_provider.clone();
-    let ns_id = namespace_id.clone();
-    let iid = item_id.clone();
-    let content = item.content.clone();
-    let dims = ns.embedding_dimensions.map(|v| v as usize);
-
-    tokio::spawn(async move {
-        let collection_id = format!("mem_{}", ns_id);
-        let _ = vector_store
-            .delete_document_embeddings(&collection_id, &iid)
-            .await;
-
-        let result = crate::indexing::index_memory_item(
-            &db,
-            &master_key,
-            &vector_store,
-            &ns_id,
-            &iid,
-            &content,
-            &ep,
-            dims,
-        )
-        .await;
-
-        let (status, err_msg) = match &result {
-            Ok(_) => ("ready", None),
-            Err(e) => {
-                tracing::error!("Memory reindex failed for item {}: {}", iid, e);
-                ("failed", Some(e.to_string()))
-            }
-        };
-        let _ = frogclaw_core::repo::memory::update_item_index_status(
-            &db,
-            &iid,
-            status,
-            err_msg.as_deref(),
-        )
-        .await;
-
-        let _ = app.emit(
-            "memory-item-indexed",
-            serde_json::json!({
-                "itemId": iid,
-                "success": result.is_ok(),
-                "status": status,
-                "error": err_msg,
-            }),
-        );
-    });
-
-    Ok(())
+    Err("claude-mem 自己维护索引，FrogClaw 不再重建单条记忆索引".to_string())
 }
 
 #[tauri::command]
-pub async fn reorder_memory_namespaces(
-    state: State<'_, AppState>,
-    namespace_ids: Vec<String>,
-) -> Result<(), String> {
-    frogclaw_core::repo::memory::reorder_namespaces(&state.sea_db, &namespace_ids)
-        .await
-        .map_err(|e| e.to_string())
+pub async fn reorder_memory_namespaces(_namespace_ids: Vec<String>) -> Result<(), String> {
+    Ok(())
 }
