@@ -121,19 +121,34 @@ pub(crate) async fn auto_capture_project_memory(
 ) {
     let Some(project_path) = conversation.working_directory.as_deref() else {
         tracing::info!("[project-memory] skip auto capture: conversation has no working directory");
+        crate::claude_mem::append_memory_log(format!(
+            "auto_capture skip conversation_id={} reason=no_working_directory",
+            conversation.id
+        ));
         return;
     };
     if user_content.trim().len() < 3 || assistant_content.trim().len() < 3 {
         tracing::info!("[project-memory] skip auto capture: content too short");
+        crate::claude_mem::append_memory_log(format!(
+            "auto_capture skip conversation_id={} project={} reason=content_too_short user_chars={} assistant_chars={}",
+            conversation.id,
+            conversation.project_name.as_deref().unwrap_or(project_path),
+            user_content.trim().chars().count(),
+            assistant_content.trim().chars().count()
+        ));
         return;
     }
     tracing::info!(
         "[project-memory] claude-mem auto capture start project={}",
-        conversation
-            .project_name
-            .as_deref()
-            .unwrap_or(project_path)
+        conversation.project_name.as_deref().unwrap_or(project_path)
     );
+    crate::claude_mem::append_memory_log(format!(
+        "auto_capture start conversation_id={} project={} user_chars={} assistant_chars={}",
+        conversation.id,
+        conversation.project_name.as_deref().unwrap_or(project_path),
+        user_content.trim().chars().count(),
+        assistant_content.trim().chars().count()
+    ));
 
     let prompt = format!(
         "从下面这一轮对话中抽取值得在该项目长期记住的信息。只返回 JSON 数组，不要 Markdown。\
@@ -155,8 +170,17 @@ pub(crate) async fn auto_capture_project_memory(
         )
         .await
     else {
+        crate::claude_mem::append_memory_log(format!(
+            "auto_capture skip conversation_id={} project={} reason=no_summary_runtime",
+            conversation.id,
+            conversation.project_name.as_deref().unwrap_or(project_path)
+        ));
         return;
     };
+    crate::claude_mem::append_memory_log(format!(
+        "auto_capture extractor_runtime provider_id={} model={}",
+        summary_provider.id, summary_model_id
+    ));
     let registry = ProviderRegistry::create_default();
     let registry_key =
         provider_type_to_registry_key_for_model(&summary_provider.provider_type, &summary_model_id);
@@ -165,6 +189,10 @@ pub(crate) async fn auto_capture_project_memory(
             "[project-memory] unsupported summary provider type: {}",
             registry_key
         );
+        crate::claude_mem::append_memory_log(format!(
+            "auto_capture failed conversation_id={} reason=unsupported_provider registry_key={}",
+            conversation.id, registry_key
+        ));
         return;
     };
 
@@ -200,6 +228,12 @@ pub(crate) async fn auto_capture_project_memory(
         Ok(response) => response,
         Err(err) => {
             tracing::warn!("[project-memory] extractor failed: {}", err);
+            crate::claude_mem::append_memory_log(format!(
+                "auto_capture extractor_failed conversation_id={} project={} error={}",
+                conversation.id,
+                conversation.project_name.as_deref().unwrap_or(project_path),
+                err.to_string().chars().take(240).collect::<String>()
+            ));
             return;
         }
     };
@@ -208,28 +242,49 @@ pub(crate) async fn auto_capture_project_memory(
     if candidates.is_empty() {
         tracing::info!(
             "[project-memory] auto capture produced 0 candidates project={} response={}",
-            conversation
-                .project_name
-                .as_deref()
-                .unwrap_or(project_path),
+            conversation.project_name.as_deref().unwrap_or(project_path),
             response.content.chars().take(240).collect::<String>()
         );
+        crate::claude_mem::append_memory_log(format!(
+            "auto_capture ok conversation_id={} project={} candidates=0",
+            conversation.id,
+            conversation.project_name.as_deref().unwrap_or(project_path)
+        ));
         return;
     }
 
     let mut saved_count = 0usize;
+    let candidate_count = candidates.len();
+    crate::claude_mem::append_memory_log(format!(
+        "auto_capture extracted conversation_id={} project={} candidates={}",
+        conversation.id,
+        conversation.project_name.as_deref().unwrap_or(project_path),
+        candidate_count
+    ));
     for candidate in candidates {
         match crate::claude_mem::save_auto_memory(
             Some(project_path),
             conversation.project_name.as_deref(),
             &candidate.title.trim().chars().take(120).collect::<String>(),
-            &candidate.content.trim().chars().take(4000).collect::<String>(),
+            &candidate
+                .content
+                .trim()
+                .chars()
+                .take(4000)
+                .collect::<String>(),
             "auto_extract",
         )
         .await
         {
             Err(err) => {
                 tracing::warn!("[project-memory] claude-mem save failed: {}", err);
+                crate::claude_mem::append_memory_log(format!(
+                    "auto_capture save_failed conversation_id={} project={} title_chars={} error={}",
+                    conversation.id,
+                    conversation.project_name.as_deref().unwrap_or(project_path),
+                    candidate.title.trim().chars().count(),
+                    err.chars().take(240).collect::<String>()
+                ));
                 continue;
             }
             Ok(_) => saved_count += 1,
@@ -238,11 +293,15 @@ pub(crate) async fn auto_capture_project_memory(
     tracing::info!(
         "[project-memory] claude-mem auto capture saved {} items project={}",
         saved_count,
-        conversation
-            .project_name
-            .as_deref()
-            .unwrap_or(project_path)
+        conversation.project_name.as_deref().unwrap_or(project_path)
     );
+    crate::claude_mem::append_memory_log(format!(
+        "auto_capture ok conversation_id={} project={} saved={} candidates={}",
+        conversation.id,
+        conversation.project_name.as_deref().unwrap_or(project_path),
+        saved_count,
+        candidate_count
+    ));
 }
 
 fn provider_type_to_registry_key(pt: &ProviderType) -> &'static str {
@@ -1658,6 +1717,18 @@ async fn collect_reference_context(
     .await;
 
     if !mem_ids.is_empty() {
+        crate::claude_mem::append_memory_log(format!(
+            "chat_memory_retrieval start conversation_id={} project={} enabled_memory_count={} query_chars={} top_k={}",
+            conversation.id,
+            conversation
+                .project_name
+                .as_deref()
+                .or(conversation.working_directory.as_deref())
+                .unwrap_or("-"),
+            mem_ids.len(),
+            query.chars().count(),
+            top_k
+        ));
         match crate::claude_mem::collect_project_context(
             query,
             conversation.working_directory.as_deref(),
@@ -1667,11 +1738,26 @@ async fn collect_reference_context(
         .await
         {
             Ok(mut mem_result) => {
-                rag_result.context_parts.append(&mut mem_result.context_parts);
-                rag_result.source_results.append(&mut mem_result.source_results);
+                let source_count = mem_result.source_results.len();
+                let context_count = mem_result.context_parts.len();
+                crate::claude_mem::append_memory_log(format!(
+                    "chat_memory_retrieval ok conversation_id={} sources={} context_parts={}",
+                    conversation.id, source_count, context_count
+                ));
+                rag_result
+                    .context_parts
+                    .append(&mut mem_result.context_parts);
+                rag_result
+                    .source_results
+                    .append(&mut mem_result.source_results);
             }
             Err(err) => {
                 tracing::warn!("[claude-mem] context retrieval failed: {}", err);
+                crate::claude_mem::append_memory_log(format!(
+                    "chat_memory_retrieval failed conversation_id={} error={}",
+                    conversation.id,
+                    err.chars().take(240).collect::<String>()
+                ));
             }
         }
     }

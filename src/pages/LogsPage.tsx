@@ -8,11 +8,17 @@ import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 type LogSource = {
   key: string;
   label: string;
-  command: 'platform_read_log' | 'install_read_log' | 'codex_app_server_read_log';
+  command: 'platform_read_log' | 'install_read_log' | 'codex_app_server_read_log' | 'memory_read_log';
   pathHint: string;
 };
 
 const SOURCES: LogSource[] = [
+  {
+    key: 'memory',
+    label: '记忆日志',
+    command: 'memory_read_log',
+    pathHint: '~/.frogclaw/memory.log',
+  },
   {
     key: 'ai_agent',
     label: 'AI Agent 日志',
@@ -39,6 +45,7 @@ const CATEGORY_FILTERS = [
   { key: 'qq', label: 'QQ', pattern: /qqbot|QQ|qq/i },
   { key: 'install', label: 'Install', pattern: /install|安装|node|git|claude|codex|gemini/i },
   { key: 'ai_agent', label: 'AI Agent', pattern: /ai agent|codex|app-server|thread\/start|turn\/start|JSON-RPC/i },
+  { key: 'memory', label: 'Memory', pattern: /memory|claude-mem|auto_capture|chat_memory_retrieval|project-memory|记忆/i },
   { key: 'warn', label: 'Warn', pattern: /\bwarn\b|warning|警告/i },
   { key: 'error', label: 'Error', pattern: /\berror\b|failed|失败|\[err\]/i },
 ];
@@ -49,6 +56,7 @@ function lineColor(line: string, token: ReturnType<typeof theme.useToken>['token
   if (/ready|connected|success|完成|成功/i.test(line)) return token.colorSuccess;
   if (/feishu|飞书/i.test(line)) return token.colorInfo;
   if (/qqbot|QQ|qq/i.test(line)) return token.colorPrimary;
+  if (/memory|claude-mem|auto_capture|chat_memory_retrieval|project-memory|记忆/i.test(line)) return '#b37feb';
   return '#9aa4b2';
 }
 
@@ -147,7 +155,7 @@ export function LogsPage() {
             </span>
             <div>
               <Typography.Title level={4} style={{ margin: 0 }}>系统日志</Typography.Title>
-              <Typography.Text type="secondary">查看 AI Agent 日志、Sidecar 日志、安装日志和 IM 通道运行信息。</Typography.Text>
+              <Typography.Text type="secondary">查看记忆日志、AI Agent 日志、Sidecar 日志、安装日志和 IM 通道运行信息。</Typography.Text>
             </div>
           </Space>
           <Space wrap>

@@ -731,11 +731,17 @@ pub async fn codex_app_server_read_log(max_bytes: Option<u64>) -> Result<String,
 }
 
 #[tauri::command]
+pub async fn memory_read_log(max_bytes: Option<u64>) -> Result<String, String> {
+    read_log_file(crate::claude_mem::memory_log_path(), max_bytes)
+}
+
+#[tauri::command]
 pub async fn get_log_file_path(source: String) -> Result<String, String> {
     let file_name = match source.as_str() {
         "install" => "install.log",
         "sidecar" | "platform" => "platform-sidecar.log",
         "ai_agent" | "codex_app_server" | "codex" => "ai-agent.log",
+        "memory" | "claude_mem" => "memory.log",
         other => return Err(format!("Unknown log source: {other}")),
     };
     Ok(config_dir()?.join(file_name).display().to_string())

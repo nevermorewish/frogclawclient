@@ -5,10 +5,11 @@ use frogclaw_core::types::{
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::OnceLock;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 
 const DEFAULT_BASE_URL: &str = "http://127.0.0.1:37777";
@@ -150,29 +151,45 @@ impl ClaudeMemClient {
     }
 
     pub async fn ensure_ready(&self) -> Result<(), String> {
+        append_memory_log("ensure_ready start");
         cleanup_leftover_worker_if_unmanaged().await;
 
         if self.health().await.is_ok() {
+            append_memory_log("ensure_ready ready existing_worker=true");
             return Ok(());
         }
 
-        let _guard = START_LOCK
-            .get_or_init(|| Mutex::new(()))
-            .lock()
-            .await;
+        let _guard = START_LOCK.get_or_init(|| Mutex::new(())).lock().await;
         if self.health().await.is_ok() {
+            append_memory_log("ensure_ready ready existing_worker=true after_lock=true");
             return Ok(());
         }
 
-        start_managed_worker().await?;
-        let start = std::time::Instant::now();
+        append_memory_log("ensure_ready worker_start required");
+        start_managed_worker().await.map_err(|err| {
+            append_memory_log(format!(
+                "ensure_ready worker_start failed error={}",
+                compact_log_value(&err, 240)
+            ));
+            err
+        })?;
+        let start = Instant::now();
         while start.elapsed() < Duration::from_secs(20) {
             if self.health().await.is_ok() {
+                append_memory_log(format!(
+                    "ensure_ready ready existing_worker=false elapsed_ms={}",
+                    start.elapsed().as_millis()
+                ));
                 return Ok(());
             }
             tokio::time::sleep(Duration::from_millis(400)).await;
         }
-        Err("claude-mem worker did not become ready on http://127.0.0.1:37777".to_string())
+        let err = "claude-mem worker did not become ready on http://127.0.0.1:37777".to_string();
+        append_memory_log(format!(
+            "ensure_ready failed error={}",
+            compact_log_value(&err, 240)
+        ));
+        Err(err)
     }
 
     async fn health(&self) -> Result<(), String> {
@@ -191,6 +208,22 @@ impl ClaudeMemClient {
     }
 
     pub async fn save_memory(&self, input: ClaudeMemSaveInput) -> Result<MemoryItem, String> {
+        let started = Instant::now();
+        let project = input
+            .project
+            .as_deref()
+            .map(|value| compact_log_value(value, 180))
+            .unwrap_or_else(|| "-".to_string());
+        append_memory_log(format!(
+            "save_memory start title_chars={} project={} text_chars={}",
+            input
+                .title
+                .as_deref()
+                .map(|value| value.chars().count())
+                .unwrap_or(0),
+            project,
+            input.text.chars().count()
+        ));
         self.ensure_ready().await?;
         let response = match self.send_save_request(&input).await {
             Ok(response) => response,
@@ -199,28 +232,56 @@ impl ClaudeMemClient {
                     "claude-mem save failed, restarting local worker and retrying once: {}",
                     first_error
                 );
+                append_memory_log(format!(
+                    "save_memory request_failed retrying=true error={}",
+                    compact_log_value(&first_error, 240)
+                ));
                 restart_managed_worker().await?;
                 self.ensure_ready().await?;
                 self.send_save_request(&input)
                     .await
                     .map_err(|second_error| {
-                        format!(
+                        let err = format!(
                             "claude-mem save failed after restart: {second_error}; first error: {first_error}"
-                        )
+                        );
+                        append_memory_log(format!(
+                            "save_memory failed elapsed_ms={} error={}",
+                            started.elapsed().as_millis(),
+                            compact_log_value(&err, 320)
+                        ));
+                        err
                     })?
             }
         };
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            return Err(format!("claude-mem save returned {status}: {body}"));
+            let err = format!("claude-mem save returned {status}: {body}");
+            append_memory_log(format!(
+                "save_memory failed elapsed_ms={} status={} error={}",
+                started.elapsed().as_millis(),
+                status,
+                compact_log_value(&err, 320)
+            ));
+            return Err(err);
         }
-        let saved: SaveMemoryResponse = response
-            .json()
-            .await
-            .map_err(|e| format!("claude-mem save response parse failed: {e}"))?;
+        let saved: SaveMemoryResponse = response.json().await.map_err(|e| {
+            let err = format!("claude-mem save response parse failed: {e}");
+            append_memory_log(format!(
+                "save_memory failed elapsed_ms={} error={}",
+                started.elapsed().as_millis(),
+                compact_log_value(&err, 240)
+            ));
+            err
+        })?;
+        let saved_id = value_to_id(&saved.id);
+        append_memory_log(format!(
+            "save_memory ok id={} elapsed_ms={}",
+            compact_log_value(&saved_id, 120),
+            started.elapsed().as_millis()
+        ));
         Ok(MemoryItem {
-            id: value_to_id(&saved.id),
+            id: saved_id,
             namespace_id: DEFAULT_NAMESPACE_ID.to_string(),
             title: saved
                 .title
@@ -257,6 +318,14 @@ impl ClaudeMemClient {
         project: Option<&str>,
         limit: usize,
     ) -> Result<Vec<MemoryItem>, String> {
+        let started = Instant::now();
+        append_memory_log(format!(
+            "list_items start project={} limit={}",
+            project
+                .map(|value| compact_log_value(value, 180))
+                .unwrap_or_else(|| "-".to_string()),
+            limit
+        ));
         self.ensure_ready().await?;
         let mut request = self
             .client
@@ -265,23 +334,46 @@ impl ClaudeMemClient {
         if let Some(project) = project.filter(|v| !v.trim().is_empty()) {
             request = request.query(&[("project", project)]);
         }
-        let response = request
-            .send()
-            .await
-            .map_err(|e| format!("claude-mem list failed: {e}"))?;
+        let response = request.send().await.map_err(|e| {
+            let err = format!("claude-mem list failed: {e}");
+            append_memory_log(format!(
+                "list_items failed elapsed_ms={} error={}",
+                started.elapsed().as_millis(),
+                compact_log_value(&err, 240)
+            ));
+            err
+        })?;
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            return Err(format!("claude-mem list returned {status}: {body}"));
+            let err = format!("claude-mem list returned {status}: {body}");
+            append_memory_log(format!(
+                "list_items failed elapsed_ms={} status={} error={}",
+                started.elapsed().as_millis(),
+                status,
+                compact_log_value(&err, 320)
+            ));
+            return Err(err);
         }
-        let body: Value = response
-            .json()
-            .await
-            .map_err(|e| format!("claude-mem list response parse failed: {e}"))?;
-        Ok(parse_observation_list(body)
+        let body: Value = response.json().await.map_err(|e| {
+            let err = format!("claude-mem list response parse failed: {e}");
+            append_memory_log(format!(
+                "list_items failed elapsed_ms={} error={}",
+                started.elapsed().as_millis(),
+                compact_log_value(&err, 240)
+            ));
+            err
+        })?;
+        let items = parse_observation_list(body)
             .into_iter()
             .map(observation_to_item)
-            .collect())
+            .collect::<Vec<_>>();
+        append_memory_log(format!(
+            "list_items ok count={} elapsed_ms={}",
+            items.len(),
+            started.elapsed().as_millis()
+        ));
+        Ok(items)
     }
 
     pub async fn search_memory(
@@ -290,36 +382,71 @@ impl ClaudeMemClient {
         project: Option<&str>,
         limit: usize,
     ) -> Result<Vec<frogclaw_core::vector_store::VectorSearchResult>, String> {
+        let started = Instant::now();
+        append_memory_log(format!(
+            "search_memory start query_chars={} project={} limit={}",
+            query.chars().count(),
+            project
+                .map(|value| compact_log_value(value, 180))
+                .unwrap_or_else(|| "-".to_string()),
+            limit
+        ));
         self.ensure_ready().await?;
-        let mut request = self.client.get(format!("{}/api/search", self.base_url)).query(&[
-            ("query", query),
-            ("searchType", "observations"),
-            ("format", "json"),
-            ("limit", &limit.to_string()),
-        ]);
+        let mut request = self
+            .client
+            .get(format!("{}/api/search", self.base_url))
+            .query(&[
+                ("query", query),
+                ("searchType", "observations"),
+                ("format", "json"),
+                ("limit", &limit.to_string()),
+            ]);
         if let Some(project) = project.filter(|v| !v.trim().is_empty()) {
             request = request.query(&[("project", project)]);
         }
-        let response = request
-            .send()
-            .await
-            .map_err(|e| format!("claude-mem search failed: {e}"))?;
+        let response = request.send().await.map_err(|e| {
+            let err = format!("claude-mem search failed: {e}");
+            append_memory_log(format!(
+                "search_memory failed elapsed_ms={} error={}",
+                started.elapsed().as_millis(),
+                compact_log_value(&err, 240)
+            ));
+            err
+        })?;
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            return Err(format!("claude-mem search returned {status}: {body}"));
+            let err = format!("claude-mem search returned {status}: {body}");
+            append_memory_log(format!(
+                "search_memory failed elapsed_ms={} status={} error={}",
+                started.elapsed().as_millis(),
+                status,
+                compact_log_value(&err, 320)
+            ));
+            return Err(err);
         }
-        let body: Value = response
-            .json()
-            .await
-            .map_err(|e| format!("claude-mem search response parse failed: {e}"))?;
+        let body: Value = response.json().await.map_err(|e| {
+            let err = format!("claude-mem search response parse failed: {e}");
+            append_memory_log(format!(
+                "search_memory failed elapsed_ms={} error={}",
+                started.elapsed().as_millis(),
+                compact_log_value(&err, 240)
+            ));
+            err
+        })?;
         let observations = parse_search_observations(body);
-        Ok(observations
+        let results = observations
             .into_iter()
             .take(limit)
             .enumerate()
             .map(|(idx, obs)| observation_to_vector_result(obs, idx))
-            .collect())
+            .collect::<Vec<_>>();
+        append_memory_log(format!(
+            "search_memory ok count={} elapsed_ms={}",
+            results.len(),
+            started.elapsed().as_millis()
+        ));
+        Ok(results)
     }
 
     pub async fn collect_context(
@@ -328,6 +455,15 @@ impl ClaudeMemClient {
         project: Option<&str>,
         limit: usize,
     ) -> Result<RagContextResult, String> {
+        let started = Instant::now();
+        append_memory_log(format!(
+            "collect_context start query_chars={} project={} limit={}",
+            query.chars().count(),
+            project
+                .map(|value| compact_log_value(value, 180))
+                .unwrap_or_else(|| "-".to_string()),
+            limit
+        ));
         self.ensure_ready().await?;
         let semantic_response = self
             .client
@@ -339,24 +475,48 @@ impl ClaudeMemClient {
             })
             .send()
             .await
-            .map_err(|e| format!("claude-mem semantic context failed: {e}"))?;
+            .map_err(|e| {
+                let err = format!("claude-mem semantic context failed: {e}");
+                append_memory_log(format!(
+                    "collect_context semantic_failed elapsed_ms={} error={}",
+                    started.elapsed().as_millis(),
+                    compact_log_value(&err, 240)
+                ));
+                err
+            })?;
         if semantic_response.status().is_success() {
-            let body: ContextResponse = semantic_response
-                .json()
-                .await
-                .map_err(|e| format!("claude-mem semantic context response parse failed: {e}"))?;
+            let body: ContextResponse = semantic_response.json().await.map_err(|e| {
+                let err = format!("claude-mem semantic context response parse failed: {e}");
+                append_memory_log(format!(
+                    "collect_context semantic_failed elapsed_ms={} error={}",
+                    started.elapsed().as_millis(),
+                    compact_log_value(&err, 240)
+                ));
+                err
+            })?;
             let context = body.context.unwrap_or_default();
             if !context.trim().is_empty() {
-                return Ok(context_to_rag_result(
-                    context,
-                    body.count.unwrap_or(1).max(1),
+                let count = body.count.unwrap_or(1).max(1);
+                append_memory_log(format!(
+                    "collect_context ok source=semantic count={} elapsed_ms={}",
+                    count,
+                    started.elapsed().as_millis()
                 ));
+                return Ok(context_to_rag_result(context, count));
             }
+            append_memory_log(format!(
+                "collect_context semantic_empty elapsed_ms={}",
+                started.elapsed().as_millis()
+            ));
         } else {
             tracing::warn!(
                 "claude-mem semantic context returned {}. Falling back to inject/search.",
                 semantic_response.status()
             );
+            append_memory_log(format!(
+                "collect_context semantic_status status={} fallback=inject",
+                semantic_response.status()
+            ));
         }
 
         let mut request = self
@@ -366,26 +526,53 @@ impl ClaudeMemClient {
         if let Some(project) = project.filter(|v| !v.trim().is_empty()) {
             request = request.query(&[("projects", project)]);
         }
-        let response = request
-            .send()
-            .await
-            .map_err(|e| format!("claude-mem context failed: {e}"))?;
+        let response = request.send().await.map_err(|e| {
+            let err = format!("claude-mem context failed: {e}");
+            append_memory_log(format!(
+                "collect_context inject_failed elapsed_ms={} error={}",
+                started.elapsed().as_millis(),
+                compact_log_value(&err, 240)
+            ));
+            err
+        })?;
         if response.status().is_success() {
-            let context = response
-                .text()
-                .await
-                .map_err(|e| format!("claude-mem context response read failed: {e}"))?;
+            let context = response.text().await.map_err(|e| {
+                let err = format!("claude-mem context response read failed: {e}");
+                append_memory_log(format!(
+                    "collect_context inject_failed elapsed_ms={} error={}",
+                    started.elapsed().as_millis(),
+                    compact_log_value(&err, 240)
+                ));
+                err
+            })?;
             if !context.trim().is_empty() {
+                append_memory_log(format!(
+                    "collect_context ok source=inject count=1 elapsed_ms={}",
+                    started.elapsed().as_millis()
+                ));
                 return Ok(context_to_rag_result(context, 1));
             }
+            append_memory_log(format!(
+                "collect_context inject_empty elapsed_ms={}",
+                started.elapsed().as_millis()
+            ));
         } else {
             tracing::warn!(
                 "claude-mem context returned {}. Falling back to search.",
                 response.status()
             );
+            append_memory_log(format!(
+                "collect_context inject_status status={} fallback=search",
+                response.status()
+            ));
         }
 
         let results = self.search_memory(query, project, limit).await?;
+        append_memory_log(format!(
+            "collect_context ok source=search count={} elapsed_ms={}",
+            results.len(),
+            started.elapsed().as_millis()
+        ));
         Ok(vector_results_to_rag_result(results))
     }
 }
@@ -395,16 +582,28 @@ pub fn init_resource_dir(path: PathBuf) {
 }
 
 pub fn start_background_worker() {
+    append_memory_log("background_worker start requested");
     tauri::async_runtime::spawn(async {
         match ClaudeMemClient::new() {
             Ok(client) => {
                 if let Err(err) = client.ensure_ready().await {
                     tracing::warn!("claude-mem auto-start failed: {}", err);
+                    append_memory_log(format!(
+                        "background_worker auto_start failed error={}",
+                        compact_log_value(&err, 240)
+                    ));
                 } else {
                     tracing::info!("claude-mem worker is ready");
+                    append_memory_log("background_worker auto_start ready");
                 }
             }
-            Err(err) => tracing::warn!("claude-mem client init failed: {}", err),
+            Err(err) => {
+                tracing::warn!("claude-mem client init failed: {}", err);
+                append_memory_log(format!(
+                    "background_worker client_init failed error={}",
+                    compact_log_value(&err, 240)
+                ));
+            }
         }
     });
     tauri::async_runtime::spawn(async {
@@ -414,13 +613,16 @@ pub fn start_background_worker() {
 
 pub fn shutdown_managed_worker() {
     SHUTTING_DOWN.store(true, std::sync::atomic::Ordering::SeqCst);
+    append_memory_log("shutdown managed_worker requested");
     if let Some(process) = WORKER_PROCESS.get() {
         if let Ok(mut guard) = process.try_lock() {
             if let Some(mut child) = guard.take() {
                 let pid = child.id();
                 tracing::info!("Stopping managed claude-mem worker pid {}", pid);
+                append_memory_log(format!("shutdown stopping_worker pid={}", pid));
                 kill_process_tree(pid, &mut child);
                 let _ = child.wait();
+                append_memory_log(format!("shutdown stopped_worker pid={}", pid));
             }
         }
     }
@@ -437,6 +639,10 @@ async fn monitor_worker() {
             Ok(client) => client,
             Err(err) => {
                 tracing::warn!("claude-mem monitor client init failed: {}", err);
+                append_memory_log(format!(
+                    "monitor client_init failed error={}",
+                    compact_log_value(&err, 240)
+                ));
                 continue;
             }
         };
@@ -444,15 +650,19 @@ async fn monitor_worker() {
             reap_finished_worker().await;
             continue;
         }
-        let _guard = START_LOCK
-            .get_or_init(|| Mutex::new(()))
-            .lock()
-            .await;
+        let _guard = START_LOCK.get_or_init(|| Mutex::new(())).lock().await;
         if client.health().await.is_ok() {
             continue;
         }
+        append_memory_log("monitor worker_unhealthy restarting=true");
         if let Err(err) = restart_managed_worker().await {
             tracing::warn!("claude-mem monitor restart failed: {}", err);
+            append_memory_log(format!(
+                "monitor restart failed error={}",
+                compact_log_value(&err, 240)
+            ));
+        } else {
+            append_memory_log("monitor restart ok");
         }
     }
 }
@@ -464,6 +674,17 @@ pub async fn save_auto_memory(
     text: &str,
     source: &str,
 ) -> Result<MemoryItem, String> {
+    append_memory_log(format!(
+        "save_auto_memory start source={} project_path={} project_name={} title_chars={}",
+        compact_log_value(source, 80),
+        project_path
+            .map(|value| compact_log_value(value, 180))
+            .unwrap_or_else(|| "-".to_string()),
+        project_name
+            .map(|value| compact_log_value(value, 120))
+            .unwrap_or_else(|| "-".to_string()),
+        title.chars().count()
+    ));
     let client = ClaudeMemClient::new()?;
     let project = project_name
         .filter(|v| !v.trim().is_empty())
@@ -491,11 +712,51 @@ pub async fn collect_project_context(
     project_name: Option<&str>,
     limit: usize,
 ) -> Result<RagContextResult, String> {
+    append_memory_log(format!(
+        "collect_project_context start query_chars={} project_path={} project_name={} limit={}",
+        query.chars().count(),
+        project_path
+            .map(|value| compact_log_value(value, 180))
+            .unwrap_or_else(|| "-".to_string()),
+        project_name
+            .map(|value| compact_log_value(value, 120))
+            .unwrap_or_else(|| "-".to_string()),
+        limit
+    ));
     let client = ClaudeMemClient::new()?;
     let project = project_name
         .filter(|v| !v.trim().is_empty())
         .or_else(|| project_path.and_then(|p| Path::new(p).file_name().and_then(|v| v.to_str())));
     client.collect_context(query, project, limit).await
+}
+
+pub fn memory_log_path() -> PathBuf {
+    crate::paths::frogclaw_home().join("memory.log")
+}
+
+pub fn append_memory_log(message: impl AsRef<str>) {
+    let path = memory_log_path();
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    const MAX_LOG_BYTES: u64 = 1024 * 1024;
+    if std::fs::metadata(&path)
+        .map(|metadata| metadata.len() > MAX_LOG_BYTES)
+        .unwrap_or(false)
+    {
+        let rotated = path.with_extension("log.1");
+        let _ = std::fs::remove_file(&rotated);
+        let _ = std::fs::rename(&path, rotated);
+    }
+    let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f");
+    let line = compact_log_value(message.as_ref(), 900);
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+    {
+        let _ = writeln!(file, "[{timestamp}] {line}");
+    }
 }
 
 fn parse_observation_list(body: Value) -> Vec<ClaudeMemObservation> {
@@ -524,7 +785,11 @@ fn parse_search_observations(body: Value) -> Vec<ClaudeMemObservation> {
     }
     body.get("observations")
         .cloned()
-        .or_else(|| body.get("results").and_then(|v| v.get("observations")).cloned())
+        .or_else(|| {
+            body.get("results")
+                .and_then(|v| v.get("observations"))
+                .cloned()
+        })
         .and_then(|v| serde_json::from_value(v).ok())
         .unwrap_or_default()
 }
@@ -534,7 +799,10 @@ fn observation_to_item(obs: ClaudeMemObservation) -> MemoryItem {
     MemoryItem {
         id: value_to_id(&obs.id),
         namespace_id: DEFAULT_NAMESPACE_ID.to_string(),
-        title: obs.title.clone().unwrap_or_else(|| title_from_text(&content)),
+        title: obs
+            .title
+            .clone()
+            .unwrap_or_else(|| title_from_text(&content)),
         content,
         source: "manual".to_string(),
         index_status: "ready".to_string(),
@@ -564,10 +832,7 @@ fn observation_to_vector_result(
 
 fn context_to_rag_result(context: String, count: usize) -> RagContextResult {
     RagContextResult {
-        context_parts: vec![format!(
-            "[Claude-Mem Project Memory]\n{}",
-            context.trim()
-        )],
+        context_parts: vec![format!("[Claude-Mem Project Memory]\n{}", context.trim())],
         source_results: vec![RagSourceResult {
             source_type: "memory".to_string(),
             container_id: DEFAULT_NAMESPACE_ID.to_string(),
@@ -623,22 +888,32 @@ fn vector_results_to_rag_result(
 }
 
 async fn start_managed_worker() -> Result<(), String> {
+    append_memory_log("worker start_managed requested");
     reap_finished_worker().await;
 
     {
-        let process = WORKER_PROCESS
-            .get_or_init(|| Mutex::new(None))
-            .lock()
-            .await;
+        let process = WORKER_PROCESS.get_or_init(|| Mutex::new(None)).lock().await;
         if process.is_some() {
+            append_memory_log("worker start_managed skipped existing_child=true");
             return Ok(());
         }
     }
 
     let Some(start_command) = resolve_start_command() else {
-        return Err("claude-mem executable/scripts not found. Set FROGCLAW_CLAUDE_MEM_HOME or put claude-mem under E:\\frogclaw\\claude-mem.".to_string());
+        let err = "claude-mem executable/scripts not found. Set FROGCLAW_CLAUDE_MEM_HOME or put claude-mem under E:\\frogclaw\\claude-mem.".to_string();
+        append_memory_log(format!(
+            "worker start_managed failed error={}",
+            compact_log_value(&err, 240)
+        ));
+        return Err(err);
     };
 
+    append_memory_log(format!(
+        "worker spawn program={} cwd={} args={}",
+        compact_log_value(&start_command.program.display().to_string(), 220),
+        compact_log_value(&start_command.cwd.display().to_string(), 220),
+        compact_log_value(&start_command.args.join(" "), 160)
+    ));
     let mut command = Command::new(&start_command.program);
     command
         .args(&start_command.args)
@@ -659,37 +934,56 @@ async fn start_managed_worker() -> Result<(), String> {
         use std::os::windows::process::CommandExt;
         command.creation_flags(0x08000000);
     }
-    let child = command
-        .spawn()
-        .map_err(|e| format!("Failed to start claude-mem worker: {e}"))?;
+    let child = command.spawn().map_err(|e| {
+        let err = format!("Failed to start claude-mem worker: {e}");
+        append_memory_log(format!(
+            "worker spawn failed error={}",
+            compact_log_value(&err, 240)
+        ));
+        err
+    })?;
     tracing::info!(
         "Started managed claude-mem worker pid {} from {}",
         child.id(),
         start_command.program.display()
     );
-    let mut process = WORKER_PROCESS
-        .get_or_init(|| Mutex::new(None))
-        .lock()
-        .await;
+    append_memory_log(format!(
+        "worker spawn ok pid={} program={}",
+        child.id(),
+        compact_log_value(&start_command.program.display().to_string(), 220)
+    ));
+    let mut process = WORKER_PROCESS.get_or_init(|| Mutex::new(None)).lock().await;
     *process = Some(child);
     Ok(())
 }
 
 async fn restart_managed_worker() -> Result<(), String> {
+    append_memory_log("worker restart requested");
     stop_managed_worker().await;
-    start_managed_worker().await
+    let result = start_managed_worker().await;
+    if let Err(err) = &result {
+        append_memory_log(format!(
+            "worker restart failed error={}",
+            compact_log_value(err, 240)
+        ));
+    } else {
+        append_memory_log("worker restart ok");
+    }
+    result
 }
 
 async fn stop_managed_worker() {
-    let mut process = WORKER_PROCESS
-        .get_or_init(|| Mutex::new(None))
-        .lock()
-        .await;
+    append_memory_log("worker stop requested");
+    let mut process = WORKER_PROCESS.get_or_init(|| Mutex::new(None)).lock().await;
     if let Some(mut child) = process.take() {
         let pid = child.id();
         tracing::info!("Stopping managed claude-mem worker pid {}", pid);
+        append_memory_log(format!("worker stop killing pid={}", pid));
         kill_process_tree(pid, &mut child);
         let _ = child.wait();
+        append_memory_log(format!("worker stop done pid={}", pid));
+    } else {
+        append_memory_log("worker stop skipped no_child=true");
     }
 }
 
@@ -710,10 +1004,7 @@ fn kill_process_tree(pid: u32, child: &mut Child) {
 }
 
 async fn cleanup_leftover_worker_if_unmanaged() {
-    let process = WORKER_PROCESS
-        .get_or_init(|| Mutex::new(None))
-        .lock()
-        .await;
+    let process = WORKER_PROCESS.get_or_init(|| Mutex::new(None)).lock().await;
     if process.is_some() {
         return;
     }
@@ -734,20 +1025,17 @@ async fn cleanup_leftover_worker_if_unmanaged() {
         "Stopping leftover unmanaged claude-mem worker from previous FrogClaw run pid {}",
         pid
     );
+    append_memory_log(format!("worker cleanup_leftover killing pid={}", pid));
     kill_pid_tree(pid);
     let _ = std::fs::remove_file(worker_pid_file());
     tokio::time::sleep(Duration::from_millis(500)).await;
+    append_memory_log(format!("worker cleanup_leftover done pid={}", pid));
 }
 
 fn claude_mem_data_dir() -> PathBuf {
     std::env::var("CLAUDE_MEM_DATA_DIR")
         .map(PathBuf::from)
-        .unwrap_or_else(|_| {
-            dirs::home_dir()
-                .unwrap_or_else(|| PathBuf::from("."))
-                .join(".frogclaw")
-                .join("claude-mem")
-        })
+        .unwrap_or_else(|_| crate::paths::frogclaw_home().join("claude-mem"))
 }
 
 fn worker_pid_file() -> PathBuf {
@@ -813,19 +1101,21 @@ fn kill_pid_tree(pid: u32) {
 }
 
 async fn reap_finished_worker() {
-    let mut process = WORKER_PROCESS
-        .get_or_init(|| Mutex::new(None))
-        .lock()
-        .await;
+    let mut process = WORKER_PROCESS.get_or_init(|| Mutex::new(None)).lock().await;
     if let Some(child) = process.as_mut() {
         match child.try_wait() {
             Ok(Some(status)) => {
                 tracing::warn!("Managed claude-mem worker exited with {}", status);
+                append_memory_log(format!("worker exited status={}", status));
                 *process = None;
             }
             Ok(None) => {}
             Err(err) => {
                 tracing::warn!("Failed to poll managed claude-mem worker: {}", err);
+                append_memory_log(format!(
+                    "worker poll failed error={}",
+                    compact_log_value(&err.to_string(), 240)
+                ));
                 *process = None;
             }
         }
@@ -959,7 +1249,12 @@ fn packaged_claude_mem_exe() -> Option<PathBuf> {
 fn packaged_claude_mem_root(exe_path: &Path) -> Option<PathBuf> {
     let exe_dir = exe_path.parent()?;
     for root in [exe_dir, exe_dir.parent()?] {
-        if root.join("plugin").join("scripts").join("worker-service.cjs").is_file() {
+        if root
+            .join("plugin")
+            .join("scripts")
+            .join("worker-service.cjs")
+            .is_file()
+        {
             return Some(root.to_path_buf());
         }
     }
@@ -1042,7 +1337,10 @@ fn obs_content(obs: &ClaudeMemObservation) -> String {
 }
 
 fn format_observation_content(obs: &ClaudeMemObservation) -> String {
-    let title = obs.title.clone().unwrap_or_else(|| title_from_text(&obs_content(obs)));
+    let title = obs
+        .title
+        .clone()
+        .unwrap_or_else(|| title_from_text(&obs_content(obs)));
     let kind = obs.r#type.clone().unwrap_or_else(|| "memory".to_string());
     let content = obs_content(obs);
     if content.trim().is_empty() {
@@ -1077,8 +1375,27 @@ fn title_from_text(text: &str) -> String {
     }
 }
 
+fn compact_log_value(value: &str, max_chars: usize) -> String {
+    let cleaned = value
+        .replace('\r', "\\r")
+        .replace('\n', "\\n")
+        .replace('\t', "\\t");
+    if cleaned.chars().count() <= max_chars {
+        cleaned
+    } else {
+        format!(
+            "{}... <truncated>",
+            cleaned.chars().take(max_chars).collect::<String>()
+        )
+    }
+}
+
 fn normalize_project_path(value: &str) -> String {
-    value.trim().replace('\\', "/").trim_end_matches('/').to_string()
+    value
+        .trim()
+        .replace('\\', "/")
+        .trim_end_matches('/')
+        .to_string()
 }
 
 fn fallback_project_name(project_path: &str) -> String {

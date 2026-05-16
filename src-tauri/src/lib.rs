@@ -32,8 +32,8 @@ pub struct AppState {
         Arc<Mutex<std::collections::HashMap<String, std::collections::HashSet<String>>>>,
 }
 
-mod commands;
 mod claude_mem;
+mod commands;
 mod context_manager;
 mod frogclaw_config;
 mod indexing;
@@ -117,6 +117,7 @@ pub fn run() {
             commands::platform_bridge::platform_read_log,
             commands::platform_bridge::install_read_log,
             commands::platform_bridge::codex_app_server_read_log,
+            commands::platform_bridge::memory_read_log,
             commands::platform_bridge::get_log_file_path,
             // drawing
             commands::drawing::list_drawing_generations,

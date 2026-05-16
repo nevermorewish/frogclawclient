@@ -1394,6 +1394,15 @@ export async function handleCommand<T>(cmd: string, args?: Record<string, unknow
         message: '浏览器预览模式不能安装本机工具，请在 Tauri 应用中使用。',
         log_file: null,
       } as T;
+    case 'platform_read_log':
+    case 'install_read_log':
+    case 'codex_app_server_read_log':
+    case 'memory_read_log':
+      return '[browser preview] 日志文件只在 Tauri 应用中可用。' as T;
+    case 'get_log_file_path': {
+      const source = (args as any)?.source || 'memory';
+      return `~/.frogclaw/${source}.log` as T;
+    }
 
     case 'fetch_and_configure_frogclaw':
       throw new Error('浏览器预览模式不能登录 frogclaw.com，请在 Tauri 应用中使用。');
