@@ -215,21 +215,21 @@ async fn parse_response(response: reqwest::Response) -> Result<ImageApiOutput> {
 mod tests {
     use super::*;
 
-    fn context_with_chat_path() -> ProviderRequestContext {
+    fn context_with_responses_path() -> ProviderRequestContext {
         ProviderRequestContext {
             api_key: "sk-test".to_string(),
             key_id: "key".to_string(),
             provider_id: "provider".to_string(),
             base_url: Some("https://api.openai.com/v1".to_string()),
-            api_path: Some("/v1/chat/completions".to_string()),
+            api_path: Some("/v1/responses".to_string()),
             proxy_config: None,
             custom_headers: None,
         }
     }
 
     #[test]
-    fn image_urls_ignore_chat_api_path() {
-        let ctx = context_with_chat_path();
+    fn image_urls_ignore_non_image_api_path() {
+        let ctx = context_with_responses_path();
 
         assert_eq!(
             OpenAIImagesClient::generate_url(&ctx),

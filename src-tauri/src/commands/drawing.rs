@@ -9,7 +9,7 @@ use frogclaw_core::types::{ProviderConfig, ProviderProxyConfig, ProviderType};
 use frogclaw_providers::openai_images::{
     ImageEditRequest, ImageGenerateRequest, ImageUpload, OpenAIImagesClient,
 };
-use frogclaw_providers::{resolve_base_url_for_type, ProviderRequestContext};
+use frogclaw_providers::{resolve_base_url, ProviderRequestContext};
 use image::GenericImageView;
 use serde::{Deserialize, Serialize};
 use tauri::State;
@@ -370,7 +370,7 @@ async fn build_image_context(
     }
     if !matches!(
         provider.provider_type,
-        ProviderType::OpenAI | ProviderType::Custom
+        ProviderType::OpenAI | ProviderType::OpenAIResponses | ProviderType::Custom
     ) {
         return Err("Drawing only supports OpenAI-compatible providers".to_string());
     }
@@ -387,10 +387,7 @@ async fn build_image_context(
         api_key: decrypted,
         key_id: key.id.clone(),
         provider_id: real_provider_id,
-        base_url: Some(resolve_base_url_for_type(
-            &provider.api_host,
-            &provider.provider_type,
-        )),
+        base_url: Some(resolve_base_url(&provider.api_host)),
         api_path: provider.api_path.clone(),
         proxy_config: proxy,
         custom_headers: provider

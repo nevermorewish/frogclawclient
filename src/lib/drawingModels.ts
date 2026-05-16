@@ -21,7 +21,9 @@ export interface DrawingModelOption {
 type DrawingTranslate = (key: string, fallback: string) => string;
 
 function isOpenAIImagesCompatible(provider: ProviderConfig): boolean {
-  return provider.provider_type === 'openai' || provider.provider_type === 'custom';
+  return provider.provider_type === 'openai'
+    || provider.provider_type === 'openai_responses'
+    || provider.provider_type === 'custom';
 }
 
 function hasEnabledImageModel(provider: ProviderConfig, modelId: DrawingModelId): boolean {

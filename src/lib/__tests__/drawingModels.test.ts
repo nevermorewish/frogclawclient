@@ -95,6 +95,24 @@ describe('drawing model/provider filtering', () => {
           },
         ],
       }),
+      providerFixture({
+        id: 'synced-openai-responses',
+        name: 'Synced OpenAI Responses',
+        provider_type: 'openai_responses',
+        models: [
+          {
+            provider_id: 'synced-openai-responses',
+            model_id: 'gpt-image-2',
+            name: 'gpt-image-2',
+            group_name: 'FrogClaw',
+            model_type: 'Image',
+            capabilities: [],
+            max_tokens: null,
+            enabled: true,
+            param_overrides: null,
+          },
+        ],
+      }),
     ];
 
     expect(getDrawingModelOptions(providers).map((item) => item.value)).toEqual([
@@ -103,7 +121,10 @@ describe('drawing model/provider filtering', () => {
       'gpt-image-1',
       'gpt-image-1-mini',
     ]);
-    expect(getDrawingProvidersForModel(providers, 'gpt-image-2').map((item) => item.id)).toEqual(['openai-1']);
+    expect(getDrawingProvidersForModel(providers, 'gpt-image-2').map((item) => item.id)).toEqual([
+      'openai-1',
+      'synced-openai-responses',
+    ]);
   });
 
   it('returns localized drawing parameter options', () => {
