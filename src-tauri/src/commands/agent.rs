@@ -2,10 +2,10 @@ use crate::AppState;
 use frogclaw_core::repo::{agent_session, conversation, message, provider};
 use frogclaw_core::token_counter;
 use frogclaw_core::types::{
-    AgentEngineInfo, AgentSession, MessageRole, ProviderConfig, ProviderProxyConfig, ProviderType,
+    AgentEngineInfo, AgentSession, MessageRole, ProviderConfig, ProviderProxyConfig,
     RagContextResult,
 };
-use frogclaw_providers::{resolve_base_url_for_type, ProviderAdapter, ProviderRequestContext};
+use frogclaw_providers::{resolve_base_url_for_type, ProviderRequestContext};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -249,39 +249,11 @@ pub struct AgentPermissionRequestPayload {
     pub risk_level: String,
 }
 
-#[derive(Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct AgentAskUserPayload {
-    conversation_id: String,
-    assistant_message_id: String,
-    ask_id: String,
-    question: String,
-    options: Option<Vec<String>>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentStatusPayload {
     #[serde(rename = "conversationId")]
     pub conversation_id: String,
     pub message: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentRateLimitPayload {
-    #[serde(rename = "conversationId")]
-    pub conversation_id: String,
-    #[serde(rename = "retryAfterMs")]
-    pub retry_after_ms: u64,
-    pub message: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentThinkingPayload {
-    #[serde(rename = "conversationId")]
-    pub conversation_id: String,
-    #[serde(rename = "assistantMessageId")]
-    pub assistant_message_id: String,
-    pub thinking: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -296,30 +268,6 @@ pub struct AgentTextPayload {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-fn provider_type_to_registry_key(pt: &ProviderType) -> &'static str {
-    match pt {
-        ProviderType::OpenAI => "openai",
-        ProviderType::OpenAIResponses => "openai_responses",
-        ProviderType::Anthropic => "anthropic",
-        ProviderType::Gemini => "gemini",
-        ProviderType::Jina => "jina",
-        ProviderType::Cohere => "cohere",
-        ProviderType::Voyage => "voyage",
-        ProviderType::Custom => "openai",
-    }
-}
-
-fn is_deepseek_v4_model(model_id: &str) -> bool {
-    model_id.to_lowercase().starts_with("deepseek-v4-")
-}
-
-fn provider_type_to_registry_key_for_model(pt: &ProviderType, model_id: &str) -> &'static str {
-    if matches!(pt, ProviderType::OpenAIResponses) && is_deepseek_v4_model(model_id) {
-        return "openai";
-    }
-    provider_type_to_registry_key(pt)
-}
 
 fn is_supported_engine_kind(kind: &str) -> bool {
     matches!(
@@ -683,42 +631,6 @@ fn cli_engine_info(
             Some(format!("{display_name} CLI not found"))
         },
         experimental,
-    }
-}
-
-/// Create an `Arc<dyn ProviderAdapter>` directly (avoids borrow-lifetime issues
-/// with the registry returning `&dyn ProviderAdapter`).
-fn create_adapter_arc(
-    pt: &ProviderType,
-    model_id: &str,
-) -> Result<Arc<dyn ProviderAdapter>, String> {
-    if matches!(pt, ProviderType::OpenAIResponses) && is_deepseek_v4_model(model_id) {
-        return Ok(Arc::new(frogclaw_providers::openai::OpenAIAdapter::new()));
-    }
-
-    match pt {
-        ProviderType::OpenAI | ProviderType::Custom => {
-            Ok(Arc::new(frogclaw_providers::openai::OpenAIAdapter::new()))
-        }
-        ProviderType::Anthropic => Ok(Arc::new(
-            frogclaw_providers::anthropic::AnthropicAdapter::new(),
-        )),
-        ProviderType::Gemini => Ok(Arc::new(frogclaw_providers::gemini::GeminiAdapter::new())),
-        ProviderType::OpenAIResponses => Ok(Arc::new(
-            frogclaw_providers::openai_responses::OpenAIResponsesAdapter::new(),
-        )),
-        ProviderType::Jina | ProviderType::Cohere | ProviderType::Voyage => {
-            Err("Rerank-only providers cannot be used as agent chat providers".to_string())
-        }
-    }
-}
-
-/// Truncate a string to a maximum byte length for DB preview fields.
-fn truncate_preview(s: &str, max_len: usize) -> String {
-    if s.len() <= max_len {
-        s.to_string()
-    } else {
-        format!("{}…", &s[..max_len.min(s.len())])
     }
 }
 

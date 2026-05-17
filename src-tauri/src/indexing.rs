@@ -1,17 +1,17 @@
-//! Indexing pipeline for knowledge base documents and memory items.
+//! Indexing pipeline for knowledge base documents.
 //!
 //! Provides functions to:
 //! - Parse an `embedding_provider` string ("providerId::modelId")
 //! - Build a `ProviderRequestContext` for embedding API calls
 //! - Generate embeddings via provider adapters
-//! - Index knowledge base documents and memory items via the unified RAG layer
-//! - Search knowledge base / memory vectors via the unified RAG layer
+//! - Index knowledge base documents via the unified RAG layer
+//! - Search knowledge base vectors via the unified RAG layer
 //! - Collect RAG context for conversation injection
 
 use sea_orm::DatabaseConnection;
 
 use frogclaw_core::error::{FrogClawClientError, Result};
-use frogclaw_core::rag::{self, ChunkStrategy, KnowledgeRAG, MemoryRAG};
+use frogclaw_core::rag::{self, ChunkStrategy, KnowledgeRAG};
 use frogclaw_core::types::*;
 use frogclaw_core::vector_store::{VectorSearchResult, VectorStore};
 
@@ -288,39 +288,6 @@ pub async fn index_knowledge_document(
     Ok(())
 }
 
-/// Index a single memory item: embed content → store in vector DB.
-pub async fn index_memory_item(
-    db: &DatabaseConnection,
-    master_key: &[u8; 32],
-    vector_store: &VectorStore,
-    namespace_id: &str,
-    item_id: &str,
-    content: &str,
-    embedding_provider: &str,
-    dimensions: Option<usize>,
-) -> Result<()> {
-    let chunks = rag::prepare_direct_chunk(item_id, content);
-
-    if chunks.is_empty() {
-        return Ok(());
-    }
-
-    let chunk_texts: Vec<String> = chunks.iter().map(|(_, text, _)| text.clone()).collect();
-    let embed_response =
-        generate_embeddings(db, master_key, embedding_provider, chunk_texts, dimensions).await?;
-
-    rag::index(
-        vector_store,
-        "mem",
-        namespace_id,
-        item_id,
-        content,
-        embed_response.embeddings,
-        chunks,
-    )
-    .await
-}
-
 // ── Search (delegates to rag::search) ────────────────────────────────────────
 
 /// Search knowledge base vectors for relevant content.
@@ -386,34 +353,6 @@ pub async fn search_knowledge(
     }
     results.truncate(final_top_k);
     Ok(results)
-}
-
-/// Search memory namespace vectors for relevant content.
-pub async fn search_memory(
-    db: &DatabaseConnection,
-    master_key: &[u8; 32],
-    vector_store: &VectorStore,
-    namespace_id: &str,
-    query: &str,
-    top_k: usize,
-) -> Result<Vec<VectorSearchResult>> {
-    // Look up namespace settings for dimensions
-    let dims = frogclaw_core::repo::memory::get_namespace(db, namespace_id)
-        .await
-        .ok()
-        .and_then(|ns| ns.embedding_dimensions.map(|v| v as usize));
-    rag::search(
-        &MemoryRAG,
-        db,
-        master_key,
-        vector_store,
-        namespace_id,
-        query,
-        top_k,
-        dims,
-        ProviderEmbedFn,
-    )
-    .await
 }
 
 // ── Context collection (delegates to rag::collect_rag_context) ───────────────

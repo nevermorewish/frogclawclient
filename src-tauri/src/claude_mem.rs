@@ -127,8 +127,6 @@ struct ContextResponse {
 struct ClaudeMemObservation {
     id: Value,
     #[serde(default)]
-    project: Option<String>,
-    #[serde(default)]
     title: Option<String>,
     #[serde(default)]
     subtitle: Option<String>,

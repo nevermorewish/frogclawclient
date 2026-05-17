@@ -5,7 +5,6 @@ use sea_orm::{
 use tracing::info;
 
 use crate::error::Result;
-use crate::repo::provider;
 use crate::types::*;
 
 pub struct DbHandle {
@@ -296,64 +295,6 @@ pub fn get_builtin_providers() -> Vec<BuiltinProvider> {
             ],
         },
     ]
-}
-
-async fn seed_builtin_providers(db: &DatabaseConnection) -> Result<()> {
-    let existing = provider::list_providers(db).await?;
-    if !existing.is_empty() {
-        return Ok(());
-    }
-
-    info!("Seeding built-in providers...");
-
-    let builtins = get_builtin_providers();
-
-    for (idx, bp) in builtins.into_iter().enumerate() {
-        let prov = provider::create_provider(
-            db,
-            CreateProviderInput {
-                name: bp.name.to_string(),
-                provider_type: bp.provider_type,
-                api_host: bp.api_host.to_string(),
-                api_path: None,
-                enabled: true,
-                builtin_id: None,
-            },
-        )
-        .await?;
-
-        let models: Vec<Model> = bp
-            .models
-            .into_iter()
-            .map(|(model_id, name, caps, max_tokens)| Model {
-                provider_id: prov.id.clone(),
-                model_id: model_id.to_string(),
-                name: name.to_string(),
-                group_name: None,
-                model_type: ModelType::detect(model_id),
-                capabilities: caps,
-                max_tokens,
-                enabled: true,
-                param_overrides: None,
-            })
-            .collect();
-
-        provider::save_models(db, &prov.id, &models).await?;
-
-        // Set sort order based on insertion index
-        provider::update_provider(
-            db,
-            &prov.id,
-            UpdateProviderInput {
-                sort_order: Some(idx as i32),
-                ..Default::default()
-            },
-        )
-        .await?;
-    }
-
-    info!("Seeded built-in providers");
-    Ok(())
 }
 
 #[cfg(test)]

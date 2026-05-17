@@ -1,6 +1,6 @@
 use crate::AppState;
 use std::sync::atomic::Ordering;
-use tauri::{Emitter, Manager};
+use tauri::Manager;
 
 #[tauri::command]
 pub async fn minimize_window(window: tauri::Window) -> Result<(), String> {

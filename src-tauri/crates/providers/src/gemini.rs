@@ -145,7 +145,6 @@ struct GeminiModelsResponse {
 struct GeminiModel {
     name: String,
     display_name: Option<String>,
-    supported_generation_methods: Option<Vec<String>>,
 }
 
 #[derive(Serialize)]
