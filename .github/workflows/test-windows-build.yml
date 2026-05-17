@@ -39,11 +39,9 @@ jobs:
         run: |
           if ($env:SUBMODULE_TOKEN) {
             Write-Host "::add-mask::$env:SUBMODULE_TOKEN"
-            git config submodule.src-tauri/crates/open-agent-sdk.url "https://x-access-token:$env:SUBMODULE_TOKEN@github.com/AQBot-Desktop/open-agent-sdk-rust.git"
             git config submodule.libs/markstream-vue.url "https://x-access-token:$env:SUBMODULE_TOKEN@github.com/AQBot-Desktop/markstream-vue.git"
             git config submodule.libs/stream-monaco.url "https://x-access-token:$env:SUBMODULE_TOKEN@github.com/AQBot-Desktop/stream-monaco.git"
           } else {
-            git config submodule.src-tauri/crates/open-agent-sdk.url "https://github.com/AQBot-Desktop/open-agent-sdk-rust.git"
             git config submodule.libs/markstream-vue.url "https://github.com/AQBot-Desktop/markstream-vue.git"
             git config submodule.libs/stream-monaco.url "https://github.com/AQBot-Desktop/stream-monaco.git"
           }

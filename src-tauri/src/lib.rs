@@ -350,6 +350,10 @@ pub fn run() {
             std::fs::create_dir_all(paths::default_workspace())
                 .expect("failed to create default workspace dir");
 
+            // Archive prior-session logs to ~/.frogclaw/backlogs/ before any
+            // logger or child process opens the current-session files.
+            paths::rotate_startup_logs();
+
             // Ensure ~/Documents/frogclaw/{images,files,backups}/ exist
             frogclaw_core::storage_paths::ensure_documents_dirs()
                 .expect("failed to create documents storage dirs");
