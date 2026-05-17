@@ -13,7 +13,7 @@ env:
   CODEX_APP_SERVER_REPO: nevermorewish/codex
   CODEX_APP_SERVER_RELEASE_TAG: codex-app-server-v0.1.0
   CLAUDE_MEM_REPO: nevermorewish/claude-mem
-  CLAUDE_MEM_RELEASE_TAG: v13.2.0
+  CLAUDE_MEM_RELEASE_TAG: v13.2.3
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.ref }}'
@@ -186,26 +186,24 @@ jobs:
         run: node scripts/prepare-claude-mem.mjs ${{ matrix.target }}
 
       - name: Verify claude-mem source resource
-        if: contains(matrix.target, 'windows')
-        shell: pwsh
+        shell: bash
         run: |
-          $exe = "src-tauri/binaries/claude-mem.exe"
-          $worker = "src-tauri/binaries/plugin/scripts/worker-service.cjs"
-          if (!(Test-Path -LiteralPath $exe)) {
-            throw "Missing prepared claude-mem executable: $exe"
-          }
-          if ((Get-Item -LiteralPath $exe).Length -le 0) {
-            throw "Prepared claude-mem executable is empty: $exe"
-          }
-          if (!(Test-Path -LiteralPath $worker)) {
-            throw "Missing prepared claude-mem plugin worker: $worker"
-          }
+          set -euo pipefail
+          exe="src-tauri/binaries/claude-mem"
+          if [[ "${{ matrix.target }}" == *windows* ]]; then
+            exe="src-tauri/binaries/claude-mem.exe"
+          fi
+          worker="src-tauri/binaries/plugin/scripts/worker-service.cjs"
+          test -s "$exe"
+          test -f "$worker"
+          test -f "src-tauri/binaries/plugin/node_modules/zod/package.json"
 
       - name: Build with Tauri
         uses: tauri-apps/tauri-action@v0
         env:
           NODE_OPTIONS: '--max_old_space_size=4096'
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_BUILD_TARGET: ${{ matrix.target }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ matrix.os == 'macos-latest' && '-' || '' }}
@@ -220,22 +218,18 @@ jobs:
           includeUpdaterJson: true
 
       - name: Verify claude-mem bundled resource
-        if: contains(matrix.target, 'windows')
-        shell: pwsh
+        shell: bash
         run: |
-          $releaseDir = "src-tauri/target/${{ matrix.target }}/release"
-          $exe = Join-Path $releaseDir "binaries/claude-mem.exe"
-          $worker = Join-Path $releaseDir "binaries/plugin/scripts/worker-service.cjs"
-          if (!(Test-Path -LiteralPath $exe)) {
-            Get-ChildItem -LiteralPath $releaseDir -Recurse -Filter "claude-mem.exe" -ErrorAction SilentlyContinue | Select-Object FullName,Length | Format-Table -AutoSize
-            throw "Missing bundled claude-mem executable: $exe"
-          }
-          if ((Get-Item -LiteralPath $exe).Length -le 0) {
-            throw "Bundled claude-mem executable is empty: $exe"
-          }
-          if (!(Test-Path -LiteralPath $worker)) {
-            throw "Missing bundled claude-mem plugin worker: $worker"
-          }
+          set -euo pipefail
+          release_dir="src-tauri/target/${{ matrix.target }}/release"
+          exe="$release_dir/binaries/claude-mem"
+          if [[ "${{ matrix.target }}" == *windows* ]]; then
+            exe="$release_dir/binaries/claude-mem.exe"
+          fi
+          worker="$release_dir/binaries/plugin/scripts/worker-service.cjs"
+          test -s "$exe"
+          test -f "$worker"
+          test -f "$release_dir/binaries/plugin/node_modules/zod/package.json"
 
       - name: Verify claude-mem NSIS installer payload
         if: contains(matrix.target, 'windows')
@@ -401,6 +395,13 @@ jobs:
       - name: Prepare claude-mem resource
         run: node scripts/prepare-claude-mem.mjs aarch64-unknown-linux-gnu
 
+      - name: Verify claude-mem source resource
+        run: |
+          set -euo pipefail
+          test -s "src-tauri/binaries/claude-mem"
+          test -f "src-tauri/binaries/plugin/scripts/worker-service.cjs"
+          test -f "src-tauri/binaries/plugin/node_modules/zod/package.json"
+
       - name: Build for Linux ARM64
         run: |
           export PKG_CONFIG_ALLOW_CROSS=1
@@ -409,12 +410,21 @@ jobs:
           pnpm tauri build --target aarch64-unknown-linux-gnu --bundles deb,rpm
         env:
           NODE_OPTIONS: '--max_old_space_size=4096'
+          TAURI_BUILD_TARGET: aarch64-unknown-linux-gnu
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
           CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
           CXX_aarch64_unknown_linux_gnu: aarch64-linux-gnu-g++
           AR_aarch64_unknown_linux_gnu: aarch64-linux-gnu-ar
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: Verify claude-mem bundled resource
+        run: |
+          set -euo pipefail
+          release_dir="src-tauri/target/aarch64-unknown-linux-gnu/release"
+          test -s "$release_dir/binaries/claude-mem"
+          test -f "$release_dir/binaries/plugin/scripts/worker-service.cjs"
+          test -f "$release_dir/binaries/plugin/node_modules/zod/package.json"
 
       - name: Upload Linux ARM64 artifacts
         uses: softprops/action-gh-release@v2

@@ -15,22 +15,42 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
-const target = process.argv[2] || '';
+const target = process.argv[2] || process.env.TAURI_BUILD_TARGET || '';
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const binDir = join(root, 'src-tauri', 'binaries');
-const destExe = join(binDir, 'claude-mem.exe');
+const binaryName = binaryNameForTarget(target);
+const destExe = join(binDir, binaryName);
+const staleExe = join(binDir, binaryName === 'claude-mem.exe' ? 'claude-mem' : 'claude-mem.exe');
 const destPlugin = join(binDir, 'plugin');
 const claudeMemRepo = process.env.CLAUDE_MEM_REPO || 'nevermorewish/claude-mem';
 const claudeMemReleaseTag = process.env.CLAUDE_MEM_RELEASE_TAG || '';
-const claudeMemReleaseAsset = process.env.CLAUDE_MEM_RELEASE_ASSET || 'claude-mem-windows-x64.zip';
+const claudeMemReleaseAsset = process.env.CLAUDE_MEM_RELEASE_ASSET || releaseAssetForTarget(target);
 const claudeMemUrl = process.env.CLAUDE_MEM_URL || (
   claudeMemReleaseTag
     ? `https://github.com/${claudeMemRepo}/releases/download/${claudeMemReleaseTag}/${claudeMemReleaseAsset}`
     : ''
 );
 
-function isWindowsTarget() {
-  return target.includes('windows') || (target === '' && process.platform === 'win32');
+function targetPlatform(value) {
+  if (value.includes('windows')) return 'windows';
+  if (value.includes('apple-darwin')) return 'macos';
+  if (value.includes('linux')) return 'linux';
+  if (process.platform === 'win32') return 'windows';
+  if (process.platform === 'darwin') return 'macos';
+  return 'linux';
+}
+
+function targetArch(value) {
+  if (value.includes('aarch64') || value.includes('arm64')) return 'arm64';
+  return 'x64';
+}
+
+function binaryNameForTarget(value) {
+  return targetPlatform(value) === 'windows' ? 'claude-mem.exe' : 'claude-mem';
+}
+
+function releaseAssetForTarget(value) {
+  return `claude-mem-${targetPlatform(value)}-${targetArch(value)}.zip`;
 }
 
 function normalize(value) {
@@ -45,6 +65,10 @@ function existingFile(path) {
   return path && existsSync(path) && statSync(path).isFile() ? path : null;
 }
 
+function existingNonEmptyFile(path) {
+  return path && existsSync(path) && statSync(path).isFile() && statSync(path).size > 0 ? path : null;
+}
+
 function hasPlugin(path) {
   return Boolean(path && existingFile(join(path, 'scripts', 'worker-service.cjs')));
 }
@@ -54,7 +78,7 @@ function hasRuntimeDeps(path) {
 }
 
 function hasPreparedCoreResources() {
-  return Boolean(existingFile(destExe) && existingDir(destPlugin) && hasPlugin(destPlugin));
+  return Boolean(existingNonEmptyFile(destExe) && existingDir(destPlugin) && hasPlugin(destPlugin));
 }
 
 function hasPreparedResources() {
@@ -95,17 +119,17 @@ function resolveSourceInDir(home) {
   if (!hasPlugin(plugin)) return null;
 
   const candidates = [
-    join(home, 'claude-mem.exe'),
-    join(home, 'dist', 'binaries', 'claude-mem.exe'),
+    join(home, binaryName),
+    join(home, 'dist', 'binaries', binaryName),
   ];
   const binariesDir = join(home, 'dist', 'binaries');
   if (existingDir(binariesDir)) {
-    const names = ['worker-service'].flatMap((prefix) => {
+    const names = ['claude-mem', 'worker-service'].flatMap((prefix) => {
       try {
         return Array.from(
           new Set(
             readdirSync(binariesDir)
-            .filter((name) => name.startsWith(prefix) && name.endsWith('.exe'))
+            .filter((name) => name.startsWith(prefix))
             .sort()
             .reverse()
           )
@@ -183,6 +207,28 @@ function extractZip(zipPath, outputDir) {
   run('unzip', ['-q', zipPath, '-d', outputDir]);
 }
 
+function delay(ms) {
+  return new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
+}
+
+async function downloadWithRetry(url, output, attempts = 3) {
+  let lastError = null;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await download(url, output);
+      return;
+    } catch (error) {
+      lastError = error;
+      rmSync(output, { force: true });
+      if (attempt >= attempts) break;
+      const waitMs = 2000 * attempt;
+      console.warn(`Download failed (${error.message}); retrying in ${waitMs}ms (${attempt}/${attempts})`);
+      await delay(waitMs);
+    }
+  }
+  throw lastError;
+}
+
 function download(url, output, redirectCount = 0) {
   if (redirectCount > 5) {
     throw new Error(`Too many redirects while downloading ${url}`);
@@ -218,8 +264,12 @@ function download(url, output, redirectCount = 0) {
         file.close(resolveDownload);
       });
       file.on('error', rejectDownload);
+      response.on('error', rejectDownload);
     });
     request.on('error', rejectDownload);
+    request.setTimeout(300000, () => {
+      request.destroy(new Error(`Download timed out: ${url}`));
+    });
   });
 }
 
@@ -229,11 +279,17 @@ function bundleSource(source) {
   }
 
   cpSync(source.exe, destExe, { force: true });
+  ensureStalePlaceholder();
   rmSync(destPlugin, { recursive: true, force: true });
   cpSync(source.plugin, destPlugin, { recursive: true, force: true });
   ensureRuntimeDeps(destPlugin, source.plugin);
   console.log(`Bundled claude-mem executable: ${source.exe} -> ${destExe}`);
   console.log(`Bundled claude-mem plugin: ${source.plugin} -> ${destPlugin}`);
+}
+
+function ensureStalePlaceholder() {
+  rmSync(staleExe, { force: true });
+  writeFileSync(staleExe, '');
 }
 
 function copyRuntimeDepFromSource(pluginDir, sourcePlugin, depName) {
@@ -293,14 +349,14 @@ async function bundleReleasePackage() {
 
   try {
     console.log(`Downloading claude-mem package: ${claudeMemUrl}`);
-    await download(claudeMemUrl, zipPath);
+    await downloadWithRetry(claudeMemUrl, zipPath);
     if (statSync(zipPath).size <= 0) {
       throw new Error(`Downloaded claude-mem package is empty: ${zipPath}`);
     }
     extractZip(zipPath, extractDir);
     const source = findPackageSource(extractDir);
     if (!source) {
-      throw new Error(`claude-mem.exe and plugin/ were not found in ${zipPath}`);
+      throw new Error(`${binaryName} and plugin/ were not found in ${zipPath}`);
     }
     bundleSource(source);
     return true;
@@ -311,15 +367,8 @@ async function bundleReleasePackage() {
 
 mkdirSync(binDir, { recursive: true });
 
-if (!isWindowsTarget()) {
-  if (!existsSync(destExe)) writeFileSync(destExe, '');
-  mkdirSync(destPlugin, { recursive: true });
-  if (!hasPlugin(destPlugin)) writeFileSync(join(destPlugin, '.placeholder'), '');
-  console.log(`Prepared non-Windows claude-mem placeholders in ${binDir}`);
-  process.exit(0);
-}
-
 if (!target && hasPreparedResources()) {
+  ensureStalePlaceholder();
   console.log(`Using already prepared claude-mem resources in ${binDir}`);
   process.exit(0);
 }
@@ -329,6 +378,7 @@ if (target && await bundleReleasePackage()) {
 }
 
 if (hasPreparedCoreResources()) {
+  ensureStalePlaceholder();
   ensureRuntimeDeps(destPlugin, destPlugin);
   console.log(`Using already prepared claude-mem resources in ${binDir}`);
   process.exit(0);
@@ -345,6 +395,7 @@ if (await bundleReleasePackage()) {
 }
 
 if (hasPreparedCoreResources()) {
+  ensureStalePlaceholder();
   ensureRuntimeDeps(destPlugin, destPlugin);
   console.log(`Using already prepared claude-mem resources in ${binDir}`);
   process.exit(0);

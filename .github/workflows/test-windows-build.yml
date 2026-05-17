@@ -17,7 +17,7 @@ env:
   CODEX_APP_SERVER_REPO: nevermorewish/codex
   CODEX_APP_SERVER_RELEASE_TAG: codex-app-server-v0.1.0
   CLAUDE_MEM_REPO: nevermorewish/claude-mem
-  CLAUDE_MEM_RELEASE_TAG: v13.2.0
+  CLAUDE_MEM_RELEASE_TAG: v13.2.3
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.ref }}'
@@ -130,6 +130,9 @@ jobs:
           if (!(Test-Path -LiteralPath $worker)) {
             throw "Missing prepared claude-mem plugin worker: $worker"
           }
+          if (!(Test-Path -LiteralPath "src-tauri/binaries/plugin/node_modules/zod/package.json")) {
+            throw "Missing prepared claude-mem runtime dependency: zod"
+          }
 
       - name: Disable updater artifacts when signing key is unavailable
         shell: pwsh
@@ -167,6 +170,9 @@ jobs:
           }
           if (!(Test-Path -LiteralPath $worker)) {
             throw "Missing bundled claude-mem plugin worker: $worker"
+          }
+          if (!(Test-Path -LiteralPath (Join-Path $releaseDir "binaries/plugin/node_modules/zod/package.json"))) {
+            throw "Missing bundled claude-mem runtime dependency: zod"
           }
 
       - name: Verify claude-mem NSIS installer payload
