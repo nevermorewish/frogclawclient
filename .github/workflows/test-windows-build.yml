@@ -118,6 +118,21 @@ jobs:
       - name: Prepare claude-mem resource
         run: node scripts/prepare-claude-mem.mjs x86_64-pc-windows-msvc
 
+      - name: Verify claude-mem source resource
+        shell: pwsh
+        run: |
+          $exe = "src-tauri/binaries/claude-mem.exe"
+          $worker = "src-tauri/binaries/plugin/scripts/worker-service.cjs"
+          if (!(Test-Path -LiteralPath $exe)) {
+            throw "Missing prepared claude-mem executable: $exe"
+          }
+          if ((Get-Item -LiteralPath $exe).Length -le 0) {
+            throw "Prepared claude-mem executable is empty: $exe"
+          }
+          if (!(Test-Path -LiteralPath $worker)) {
+            throw "Missing prepared claude-mem plugin worker: $worker"
+          }
+
       - name: Disable updater artifacts when signing key is unavailable
         shell: pwsh
         env:
@@ -138,6 +153,58 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: pnpm tauri build --target x86_64-pc-windows-msvc
+
+      - name: Verify claude-mem bundled resource
+        shell: pwsh
+        run: |
+          $releaseDir = "src-tauri/target/x86_64-pc-windows-msvc/release"
+          $exe = Join-Path $releaseDir "binaries/claude-mem.exe"
+          $worker = Join-Path $releaseDir "binaries/plugin/scripts/worker-service.cjs"
+          if (!(Test-Path -LiteralPath $exe)) {
+            Get-ChildItem -LiteralPath $releaseDir -Recurse -Filter "claude-mem.exe" -ErrorAction SilentlyContinue | Select-Object FullName,Length | Format-Table -AutoSize
+            throw "Missing bundled claude-mem executable: $exe"
+          }
+          if ((Get-Item -LiteralPath $exe).Length -le 0) {
+            throw "Bundled claude-mem executable is empty: $exe"
+          }
+          if (!(Test-Path -LiteralPath $worker)) {
+            throw "Missing bundled claude-mem plugin worker: $worker"
+          }
+
+      - name: Verify claude-mem NSIS installer payload
+        shell: pwsh
+        run: |
+          $releaseDir = "src-tauri/target/x86_64-pc-windows-msvc/release"
+          $installers = Get-ChildItem -LiteralPath (Join-Path $releaseDir "bundle/nsis") -Filter "*setup.exe" -ErrorAction SilentlyContinue
+          if (!$installers) {
+            throw "No NSIS setup.exe found under $releaseDir"
+          }
+          foreach ($installer in $installers) {
+            $stage = Join-Path $env:RUNNER_TEMP ("frogclaw-nsis-check-" + $installer.BaseName)
+            Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
+            New-Item -ItemType Directory -Path $stage | Out-Null
+            & 7z x "-o$stage" $installer.FullName -y | Out-Host
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to extract NSIS installer for verification: $($installer.FullName)"
+            }
+            $nestedArchives = Get-ChildItem -LiteralPath $stage -Recurse -Include *.7z,*.zip -ErrorAction SilentlyContinue
+            foreach ($archive in $nestedArchives) {
+              $nestedStage = Join-Path $archive.DirectoryName $archive.BaseName
+              New-Item -ItemType Directory -Path $nestedStage -Force | Out-Null
+              & 7z x "-o$nestedStage" $archive.FullName -y | Out-Host
+              if ($LASTEXITCODE -ne 0) {
+                throw "Failed to extract nested installer payload: $($archive.FullName)"
+              }
+            }
+            $exe = Get-ChildItem -LiteralPath $stage -Recurse -Filter "claude-mem.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+            $worker = Get-ChildItem -LiteralPath $stage -Recurse -Filter "worker-service.cjs" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if (!$exe) {
+              throw "NSIS installer is missing claude-mem.exe: $($installer.FullName)"
+            }
+            if (!$worker) {
+              throw "NSIS installer is missing claude-mem plugin worker: $($installer.FullName)"
+            }
+          }
 
       - name: Upload Windows build artifacts
         uses: actions/upload-artifact@v4

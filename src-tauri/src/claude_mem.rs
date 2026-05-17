@@ -2459,10 +2459,14 @@ fn packaged_claude_mem_exe() -> Option<PathBuf> {
     if let Some(resource_dir) = RESOURCE_DIR.get() {
         dirs.push(resource_dir.clone());
         dirs.push(resource_dir.join("binaries"));
+        dirs.push(resource_dir.join("resources"));
+        dirs.push(resource_dir.join("resources").join("binaries"));
     }
     if let Ok(current_exe) = std::env::current_exe() {
         if let Some(exe_dir) = current_exe.parent() {
             dirs.push(exe_dir.to_path_buf());
+            dirs.push(exe_dir.join("resources"));
+            dirs.push(exe_dir.join("resources").join("binaries"));
             dirs.push(exe_dir.join("binaries"));
         }
     }
@@ -2475,10 +2479,15 @@ fn packaged_claude_mem_exe() -> Option<PathBuf> {
         for name in names {
             let path = dir.join(name);
             if path.is_file() {
+                append_memory_log(format!(
+                    "打包 claude-mem：找到 路径={}",
+                    compact_log_value(&path.display().to_string(), 240)
+                ));
                 return Some(path);
             }
         }
     }
+    append_memory_log("打包 claude-mem：未找到");
     None
 }
 
