@@ -1984,6 +1984,32 @@ async fn start_managed_worker() -> Result<(), String> {
         compact_log_value(&start_command.cwd.display().to_string(), 220),
         compact_log_value(&start_command.args.join(" "), 160)
     ));
+
+    if let Some(plugin_root) = start_command.plugin_root.as_ref() {
+        stage_claude_mem_hardcoded_assets(plugin_root);
+        if uses_worker_service_script(&start_command)
+            && !plugin_root
+                .join("node_modules")
+                .join("zod")
+                .join("package.json")
+                .is_file()
+        {
+            let err = format!(
+                "claude-mem runtime dependency missing: {}. Run pnpm build:sidecar to prepare bundled runtime dependencies.",
+                plugin_root
+                    .join("node_modules")
+                    .join("zod")
+                    .join("package.json")
+                    .display()
+            );
+            append_memory_log(format!(
+                "worker start_managed failed error={}",
+                compact_log_value(&err, 240)
+            ));
+            return Err(err);
+        }
+    }
+
     let mut command = Command::new(&start_command.program);
     command
         .args(&start_command.args)
@@ -1994,11 +2020,48 @@ async fn start_managed_worker() -> Result<(), String> {
     if let Some(plugin_root) = start_command.plugin_root.as_ref() {
         command.env("CLAUDE_PLUGIN_ROOT", plugin_root);
         command.env("PLUGIN_ROOT", plugin_root);
+        command.env("NODE_PATH", plugin_root.join("node_modules"));
     }
-    command
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
+    command.stdin(Stdio::null());
+    // Capture daemon stdout/stderr so silent crashes / startup errors are
+    // visible. Without this they were redirected to /dev/null and the only
+    // diagnostic was the internal claude-mem log, which doesn't include
+    // process-level panics or pre-logger output.
+    let daemon_console_log = claude_mem_data_dir()
+        .join("logs")
+        .join("daemon-console.log");
+    if let Some(parent) = daemon_console_log.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    match std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&daemon_console_log)
+    {
+        Ok(file) => {
+            let stderr_file = file.try_clone().unwrap_or_else(|_| {
+                std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(&daemon_console_log)
+                    .expect("failed to reopen daemon-console.log for stderr")
+            });
+            command
+                .stdout(Stdio::from(file))
+                .stderr(Stdio::from(stderr_file));
+            append_memory_log(format!(
+                "worker console_log path={}",
+                compact_log_value(&daemon_console_log.display().to_string(), 220)
+            ));
+        }
+        Err(err) => {
+            append_memory_log(format!(
+                "worker console_log open_failed error={} fallback=null",
+                compact_log_value(&err.to_string(), 240)
+            ));
+            command.stdout(Stdio::null()).stderr(Stdio::null());
+        }
+    }
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
@@ -2057,14 +2120,80 @@ async fn stop_managed_worker() {
     }
 }
 
+/// Workaround for upstream claude-mem (<=v0.0.77): the bundled binary's
+/// viewer.html lookup is baked at build time to the CI runner's source paths
+/// (`D:\a\claude-mem\claude-mem\src\{ui,plugin\ui}\viewer.html`) and does not
+/// consult CLAUDE_PLUGIN_ROOT at runtime. When viewer.html isn't found the
+/// daemon exits before binding its HTTP port, which sends the monitor into an
+/// infinite restart loop.
+///
+/// Until upstream resolves the asset path from the executable directory, we
+/// mirror viewer.html / viewer-bundle.js from the bundled plugin/ui into the
+/// two hardcoded locations on each launch. Best effort: silent skip on any
+/// error (missing source, non-writable target volume, etc.).
+fn stage_claude_mem_hardcoded_assets(plugin_root: &Path) {
+    #[cfg(target_os = "windows")]
+    {
+        let ui_src = plugin_root.join("ui");
+        if !ui_src.is_dir() {
+            append_memory_log(format!(
+                "viewer stage skipped reason=ui_dir_missing path={}",
+                compact_log_value(&ui_src.display().to_string(), 220)
+            ));
+            return;
+        }
+        const HARDCODED_TARGETS: &[&str] = &[
+            r"D:\a\claude-mem\claude-mem\src\ui",
+            r"D:\a\claude-mem\claude-mem\src\plugin\ui",
+        ];
+        const ASSET_NAMES: &[&str] = &["viewer.html", "viewer-bundle.js"];
+        for target in HARDCODED_TARGETS {
+            let target_dir = PathBuf::from(target);
+            if let Err(err) = std::fs::create_dir_all(&target_dir) {
+                append_memory_log(format!(
+                    "viewer stage create_dir failed target={} error={}",
+                    compact_log_value(&target_dir.display().to_string(), 220),
+                    compact_log_value(&err.to_string(), 240)
+                ));
+                continue;
+            }
+            for name in ASSET_NAMES {
+                let src = ui_src.join(name);
+                let dst = target_dir.join(name);
+                if !src.is_file() {
+                    continue;
+                }
+                if let Err(err) = std::fs::copy(&src, &dst) {
+                    append_memory_log(format!(
+                        "viewer stage copy failed name={} target={} error={}",
+                        name,
+                        compact_log_value(&target_dir.display().to_string(), 220),
+                        compact_log_value(&err.to_string(), 240)
+                    ));
+                }
+            }
+        }
+        append_memory_log(format!(
+            "viewer stage done plugin_ui={}",
+            compact_log_value(&ui_src.display().to_string(), 220)
+        ));
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = plugin_root;
+    }
+}
+
 fn kill_process_tree(pid: u32, child: &mut Child) {
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
         let status = Command::new("taskkill")
             .args(["/PID", &pid.to_string(), "/T", "/F"])
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
+            .creation_flags(0x08000000)
             .status();
         if status.map(|s| s.success()).unwrap_or(false) {
             return;
@@ -2290,11 +2419,13 @@ fn read_worker_pid_file() -> Option<u32> {
 fn is_pid_running(pid: u32) -> bool {
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
         Command::new("tasklist")
             .args(["/FI", &format!("PID eq {pid}")])
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
+            .creation_flags(0x08000000)
             .output()
             .map(|output| {
                 output.status.success()
@@ -2318,11 +2449,13 @@ fn is_pid_running(pid: u32) -> bool {
 fn kill_pid_tree(pid: u32) {
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
         let _ = Command::new("taskkill")
             .args(["/PID", &pid.to_string(), "/T", "/F"])
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
+            .creation_flags(0x08000000)
             .status();
     }
     #[cfg(not(target_os = "windows"))]
@@ -2365,6 +2498,15 @@ struct StartCommand {
     plugin_root: Option<PathBuf>,
 }
 
+fn uses_worker_service_script(command: &StartCommand) -> bool {
+    command.args.iter().any(|arg| {
+        Path::new(arg)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.eq_ignore_ascii_case("worker-service.cjs"))
+    })
+}
+
 fn resolve_start_command() -> Option<StartCommand> {
     if let Ok(path) = std::env::var("FROGCLAW_CLAUDE_MEM_EXE") {
         let path = PathBuf::from(path);
@@ -2393,6 +2535,38 @@ fn resolve_start_command() -> Option<StartCommand> {
             .as_ref()
             .map(|root| root.join("plugin"))
             .or_else(|| claude_mem_home().map(|home| home.join("plugin")));
+
+        // Prefer bun + worker-service.cjs over `claude-mem.exe --daemon` when
+        // both are available. The current bundled claude-mem.exe (<=v0.0.77)
+        // does not accept `--daemon` as a subcommand (its subcommands are
+        // cursor/gemini/hook/hooks/install/missing/section/skill/start/status/
+        // worker), so the daemon path exits silently after caching viewer.html
+        // and never binds the HTTP port. Running the worker-service.cjs entry
+        // point directly under bun bypasses that and binds 127.0.0.1:37777
+        // normally.
+        let worker_script = plugin_root
+            .as_ref()
+            .map(|root| root.join("scripts").join("worker-service.cjs"));
+        if let (Some(worker), Some(bun)) = (
+            worker_script.as_ref().filter(|p| p.is_file()).cloned(),
+            resolve_bun(),
+        ) {
+            append_memory_log(format!(
+                "worker resolve_command using=bun+worker-service.cjs bun={} script={}",
+                compact_log_value(&bun.display().to_string(), 220),
+                compact_log_value(&worker.display().to_string(), 220)
+            ));
+            return Some(StartCommand {
+                program: bun,
+                args: vec![worker.to_string_lossy().to_string(), "--daemon".to_string()],
+                cwd,
+                plugin_root,
+            });
+        }
+        append_memory_log(format!(
+            "worker resolve_command using=claude-mem.exe fallback program={}",
+            compact_log_value(&path.display().to_string(), 220)
+        ));
         return Some(StartCommand {
             program: path,
             args: vec!["--daemon".to_string()],

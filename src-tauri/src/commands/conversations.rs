@@ -30,6 +30,90 @@ fn parse_auto_memory_candidates(text: &str) -> Vec<AutoMemoryCandidate> {
         .collect()
 }
 
+fn auto_memory_fallback_title(conversation: &Conversation, user_content: &str) -> String {
+    let title = conversation.title.trim();
+    if !title.is_empty() && title != "新建对话" {
+        return format!("FrogClaw 会话记忆：{title}");
+    }
+
+    let fallback = user_content.trim().chars().take(40).collect::<String>();
+    if fallback.is_empty() {
+        "FrogClaw 会话记忆".to_string()
+    } else {
+        format!("FrogClaw 会话记忆：{fallback}")
+    }
+}
+
+fn auto_memory_fallback_content(
+    project: &str,
+    conversation: &Conversation,
+    user_content: &str,
+    assistant_content: &str,
+) -> String {
+    let title = conversation.title.trim();
+    let conversation_title = if title.is_empty() {
+        "未命名会话"
+    } else {
+        title
+    };
+    format!(
+        "FrogClaw project conversation summary source.\nProject: {}\nConversation: {}\n\nUser: {}\n\nAssistant: {}",
+        project,
+        conversation_title,
+        user_content.trim().chars().take(4000).collect::<String>(),
+        assistant_content
+            .trim()
+            .chars()
+            .take(6000)
+            .collect::<String>(),
+    )
+}
+
+async fn save_auto_memory_fallback_summary(
+    project_path: &str,
+    conversation: &Conversation,
+    user_content: &str,
+    assistant_content: &str,
+    reason: &str,
+) -> bool {
+    let project = conversation.project_name.as_deref().unwrap_or(project_path);
+    let title = auto_memory_fallback_title(conversation, user_content);
+    let content =
+        auto_memory_fallback_content(project, conversation, user_content, assistant_content);
+    match crate::claude_mem::save_auto_memory(
+        Some(project_path),
+        conversation.project_name.as_deref(),
+        &title,
+        &content,
+        "auto_summary",
+    )
+    .await
+    {
+        Ok(_) => {
+            crate::claude_mem::append_memory_log(format!(
+                "auto_capture fallback_summary_saved conversation_id={} project={} reason={} title_chars={} content_chars={}",
+                conversation.id,
+                project,
+                reason,
+                title.chars().count(),
+                content.chars().count()
+            ));
+            true
+        }
+        Err(err) => {
+            tracing::warn!("[project-memory] fallback summary save failed: {}", err);
+            crate::claude_mem::append_memory_log(format!(
+                "auto_capture fallback_summary_failed conversation_id={} project={} reason={} error={}",
+                conversation.id,
+                project,
+                reason,
+                err.chars().take(240).collect::<String>()
+            ));
+            false
+        }
+    }
+}
+
 async fn resolve_auto_memory_summary_runtime(
     db: &DatabaseConnection,
     master_key: &[u8; 32],
@@ -170,10 +254,19 @@ pub(crate) async fn auto_capture_project_memory(
         )
         .await
     else {
+        let saved = save_auto_memory_fallback_summary(
+            project_path,
+            conversation,
+            user_content,
+            assistant_content,
+            "no_summary_runtime",
+        )
+        .await;
         crate::claude_mem::append_memory_log(format!(
-            "auto_capture skip conversation_id={} project={} reason=no_summary_runtime",
+            "auto_capture ok conversation_id={} project={} reason=no_summary_runtime fallback_summary={}",
             conversation.id,
-            conversation.project_name.as_deref().unwrap_or(project_path)
+            conversation.project_name.as_deref().unwrap_or(project_path),
+            saved
         ));
         return;
     };
@@ -192,6 +285,20 @@ pub(crate) async fn auto_capture_project_memory(
         crate::claude_mem::append_memory_log(format!(
             "auto_capture failed conversation_id={} reason=unsupported_provider registry_key={}",
             conversation.id, registry_key
+        ));
+        let saved = save_auto_memory_fallback_summary(
+            project_path,
+            conversation,
+            user_content,
+            assistant_content,
+            "unsupported_provider",
+        )
+        .await;
+        crate::claude_mem::append_memory_log(format!(
+            "auto_capture ok conversation_id={} project={} reason=unsupported_provider fallback_summary={}",
+            conversation.id,
+            conversation.project_name.as_deref().unwrap_or(project_path),
+            saved
         ));
         return;
     };
@@ -234,6 +341,20 @@ pub(crate) async fn auto_capture_project_memory(
                 conversation.project_name.as_deref().unwrap_or(project_path),
                 err.to_string().chars().take(240).collect::<String>()
             ));
+            let saved = save_auto_memory_fallback_summary(
+                project_path,
+                conversation,
+                user_content,
+                assistant_content,
+                "extractor_failed",
+            )
+            .await;
+            crate::claude_mem::append_memory_log(format!(
+                "auto_capture ok conversation_id={} project={} reason=extractor_failed fallback_summary={}",
+                conversation.id,
+                conversation.project_name.as_deref().unwrap_or(project_path),
+                saved
+            ));
             return;
         }
     };
@@ -245,10 +366,19 @@ pub(crate) async fn auto_capture_project_memory(
             conversation.project_name.as_deref().unwrap_or(project_path),
             response.content.chars().take(240).collect::<String>()
         );
+        let saved = save_auto_memory_fallback_summary(
+            project_path,
+            conversation,
+            user_content,
+            assistant_content,
+            "empty_candidates",
+        )
+        .await;
         crate::claude_mem::append_memory_log(format!(
-            "auto_capture ok conversation_id={} project={} candidates=0",
+            "auto_capture ok conversation_id={} project={} candidates=0 fallback_summary={}",
             conversation.id,
-            conversation.project_name.as_deref().unwrap_or(project_path)
+            conversation.project_name.as_deref().unwrap_or(project_path),
+            saved
         ));
         return;
     }

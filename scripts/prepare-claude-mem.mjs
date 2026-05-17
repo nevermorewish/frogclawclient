@@ -49,8 +49,16 @@ function hasPlugin(path) {
   return Boolean(path && existingFile(join(path, 'scripts', 'worker-service.cjs')));
 }
 
-function hasPreparedResources() {
+function hasRuntimeDeps(path) {
+  return Boolean(path && existingFile(join(path, 'node_modules', 'zod', 'package.json')));
+}
+
+function hasPreparedCoreResources() {
   return Boolean(existingFile(destExe) && existingDir(destPlugin) && hasPlugin(destPlugin));
+}
+
+function hasPreparedResources() {
+  return Boolean(hasPreparedCoreResources() && hasRuntimeDeps(destPlugin));
 }
 
 function run(cmd, args, options = {}) {
@@ -223,8 +231,55 @@ function bundleSource(source) {
   cpSync(source.exe, destExe, { force: true });
   rmSync(destPlugin, { recursive: true, force: true });
   cpSync(source.plugin, destPlugin, { recursive: true, force: true });
+  ensureRuntimeDeps(destPlugin, source.plugin);
   console.log(`Bundled claude-mem executable: ${source.exe} -> ${destExe}`);
   console.log(`Bundled claude-mem plugin: ${source.plugin} -> ${destPlugin}`);
+}
+
+function copyRuntimeDepFromSource(pluginDir, sourcePlugin, depName) {
+  const source = join(sourcePlugin, 'node_modules', depName);
+  if (!existingDir(source)) return false;
+  const dest = join(pluginDir, 'node_modules', depName);
+  rmSync(dest, { recursive: true, force: true });
+  mkdirSync(dirname(dest), { recursive: true });
+  cpSync(source, dest, { recursive: true, force: true });
+  return true;
+}
+
+function ensureRuntimeDeps(pluginDir, sourcePlugin) {
+  if (hasRuntimeDeps(pluginDir)) return;
+
+  if (sourcePlugin && copyRuntimeDepFromSource(pluginDir, sourcePlugin, 'zod') && hasRuntimeDeps(pluginDir)) {
+    console.log('Bundled claude-mem runtime dependency: zod');
+    return;
+  }
+
+  const workDir = join(tmpdir(), `frogclaw-claude-mem-runtime-${process.pid}`);
+  rmSync(workDir, { recursive: true, force: true });
+  mkdirSync(workDir, { recursive: true });
+  try {
+    run('npm', [
+      'install',
+      '--prefix',
+      workDir,
+      '--no-save',
+      '--omit=dev',
+      '--ignore-scripts',
+      '--package-lock=false',
+      'zod@^4.3.6',
+    ]);
+    const source = join(workDir, 'node_modules', 'zod');
+    if (!existingDir(source)) {
+      throw new Error(`npm install completed but zod was not found in ${source}`);
+    }
+    const dest = join(pluginDir, 'node_modules', 'zod');
+    rmSync(dest, { recursive: true, force: true });
+    mkdirSync(dirname(dest), { recursive: true });
+    cpSync(source, dest, { recursive: true, force: true });
+    console.log(`Bundled claude-mem runtime dependency: ${source} -> ${dest}`);
+  } finally {
+    rmSync(workDir, { recursive: true, force: true });
+  }
 }
 
 async function bundleReleasePackage() {
@@ -273,6 +328,12 @@ if (target && await bundleReleasePackage()) {
   process.exit(0);
 }
 
+if (hasPreparedCoreResources()) {
+  ensureRuntimeDeps(destPlugin, destPlugin);
+  console.log(`Using already prepared claude-mem resources in ${binDir}`);
+  process.exit(0);
+}
+
 const source = resolveSource();
 if (source) {
   bundleSource(source);
@@ -283,7 +344,8 @@ if (await bundleReleasePackage()) {
   process.exit(0);
 }
 
-if (hasPreparedResources()) {
+if (hasPreparedCoreResources()) {
+  ensureRuntimeDeps(destPlugin, destPlugin);
   console.log(`Using already prepared claude-mem resources in ${binDir}`);
   process.exit(0);
 }
