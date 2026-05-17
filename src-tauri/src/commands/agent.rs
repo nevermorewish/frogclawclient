@@ -3,6 +3,7 @@ use frogclaw_core::repo::{agent_session, conversation, message, provider};
 use frogclaw_core::token_counter;
 use frogclaw_core::types::{
     AgentEngineInfo, AgentSession, MessageRole, ProviderConfig, ProviderProxyConfig, ProviderType,
+    RagContextResult,
 };
 use frogclaw_providers::{resolve_base_url_for_type, ProviderAdapter, ProviderRequestContext};
 use serde::{Deserialize, Serialize};
@@ -838,6 +839,40 @@ pub async fn agent_query(
         }
     }
 
+    if !matches!(
+        session.engine_kind.as_str(),
+        ENGINE_CLAUDE_CODE | ENGINE_CODEX_CLI | ENGINE_CODEX_APP_SERVER | ENGINE_FROG_AGENT
+    ) {
+        let _ =
+            agent_session::update_agent_session_status(&state.sea_db, &session.id, "idle").await;
+        return Err(format!(
+            "Agent engine '{}' is registered but not implemented yet",
+            session.engine_kind
+        ));
+    }
+
+    let plan_mode = matches!(
+        session.engine_kind.as_str(),
+        ENGINE_CODEX_APP_SERVER | ENGINE_FROG_AGENT
+    ) && prompt.trim_start().starts_with("/plan");
+    let task_prompt = if plan_mode {
+        prompt
+            .trim_start()
+            .strip_prefix("/plan")
+            .unwrap_or(&prompt)
+            .trim_start()
+            .to_string()
+    } else {
+        prompt.clone()
+    };
+    let prompt_for_task = prepare_agent_prompt_with_memory(
+        &state.sea_db,
+        &conversation_id,
+        session.cwd.as_deref(),
+        &task_prompt,
+    )
+    .await;
+
     if matches!(
         session.engine_kind.as_str(),
         ENGINE_CLAUDE_CODE | ENGINE_CODEX_CLI
@@ -849,7 +884,6 @@ pub async fn agent_query(
         let cwd = session.cwd.clone();
         let permission_mode = session.permission_mode.clone();
         let conv_id = conversation_id.clone();
-        let prompt_for_task = prompt.clone();
         if session.engine_kind == ENGINE_CLAUDE_CODE {
             tokio::spawn(async move {
                 run_claude_code_cli_query(
@@ -887,18 +921,6 @@ pub async fn agent_query(
         return Ok(());
     }
 
-    if !matches!(
-        session.engine_kind.as_str(),
-        ENGINE_CODEX_APP_SERVER | ENGINE_FROG_AGENT
-    ) {
-        let _ =
-            agent_session::update_agent_session_status(&state.sea_db, &session.id, "idle").await;
-        return Err(format!(
-            "Agent engine '{}' is registered but not implemented yet",
-            session.engine_kind
-        ));
-    }
-
     let db = state.sea_db.clone();
     let tokens = state.agent_cancel_tokens.clone();
     let permission_senders = state.agent_permission_senders.clone();
@@ -908,17 +930,6 @@ pub async fn agent_query(
     let cwd = session.cwd.clone();
     let permission_mode = session.permission_mode.clone();
     let conv_id = conversation_id.clone();
-    let plan_mode = prompt.trim_start().starts_with("/plan");
-    let prompt_for_task = if plan_mode {
-        prompt
-            .trim_start()
-            .strip_prefix("/plan")
-            .unwrap_or(&prompt)
-            .trim_start()
-            .to_string()
-    } else {
-        prompt.clone()
-    };
     let master_key = state.master_key;
 
     tokio::spawn(async move {
@@ -932,6 +943,7 @@ pub async fn agent_query(
             session_id,
             user_msg_id,
             prompt_for_task,
+            task_prompt,
             provider_id,
             model_id,
             cwd,
@@ -1122,6 +1134,103 @@ fn effective_agent_usage(
     match final_usage {
         Some(usage) if usage.input_tokens > 0 || usage.output_tokens > 0 => usage.clone(),
         _ => estimate_agent_usage(prompt, response),
+    }
+}
+
+fn project_name_from_path(project_path: &str) -> Option<String> {
+    std::path::Path::new(project_path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.trim().is_empty())
+        .map(ToString::to_string)
+}
+
+fn merge_agent_prompt_with_memory(prompt: &str, rag_result: &RagContextResult) -> String {
+    if rag_result.context_parts.is_empty() {
+        return prompt.to_string();
+    }
+
+    format!(
+        "以下是 FrogClaw 为当前项目召回的长期记忆。请只在相关时使用，不要向用户暴露这段包装文本；如果记忆与用户请求冲突，以用户最新指令和仓库实际状态为准。\n\n{}\n\n用户请求：\n{}",
+        rag_result.context_parts.join("\n\n"),
+        prompt
+    )
+}
+
+async fn prepare_agent_prompt_with_memory(
+    db: &sea_orm::DatabaseConnection,
+    conversation_id: &str,
+    session_cwd: Option<&str>,
+    prompt: &str,
+) -> String {
+    let conversation = match conversation::get_conversation(db, conversation_id).await {
+        Ok(conversation) => conversation,
+        Err(err) => {
+            crate::claude_mem::append_memory_log(format!(
+                "Agent 记忆召回：跳过 会话={} 原因=读取会话失败 错误={}",
+                conversation_id,
+                err.to_string().chars().take(240).collect::<String>()
+            ));
+            return prompt.to_string();
+        }
+    };
+
+    let project_path = conversation
+        .working_directory
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .or_else(|| session_cwd.filter(|value| !value.trim().is_empty()));
+    let project_name = conversation
+        .project_name
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .map(ToString::to_string)
+        .or_else(|| project_path.and_then(project_name_from_path));
+
+    if project_path.is_none() && project_name.is_none() {
+        crate::claude_mem::append_memory_log(format!(
+            "项目记忆召回：跳过 原因=没有项目目录 会话={}",
+            conversation_id
+        ));
+        return prompt.to_string();
+    }
+
+    let project_label = project_name.as_deref().or(project_path).unwrap_or("-");
+    crate::claude_mem::append_memory_log(format!(
+        "项目记忆召回：开始 项目={} 项目路径={} 查询字符数={} top_k=5 会话={}",
+        project_label,
+        project_path.unwrap_or("-"),
+        prompt.chars().count(),
+        conversation_id
+    ));
+
+    match crate::claude_mem::collect_project_context(
+        prompt,
+        project_path,
+        project_name.as_deref(),
+        5,
+    )
+    .await
+    {
+        Ok(rag_result) => {
+            crate::claude_mem::append_memory_log(format!(
+                "项目记忆召回：完成 项目={} 来源数={} 上下文段数={} 会话={}",
+                project_label,
+                rag_result.source_results.len(),
+                rag_result.context_parts.len(),
+                conversation_id
+            ));
+            merge_agent_prompt_with_memory(prompt, &rag_result)
+        }
+        Err(err) => {
+            crate::claude_mem::append_memory_log(format!(
+                "项目记忆召回：失败 项目={} 错误={} 会话={}",
+                project_label,
+                err.chars().take(240).collect::<String>(),
+                conversation_id
+            ));
+            prompt.to_string()
+        }
     }
 }
 
@@ -1468,6 +1577,7 @@ async fn run_codex_app_server_query(
     session_id: String,
     user_msg_id: String,
     prompt: String,
+    original_prompt: String,
     provider_id: String,
     model_id: String,
     cwd: Option<String>,
@@ -1570,6 +1680,7 @@ async fn run_codex_app_server_query(
         session_id,
         user_msg_id,
         prompt,
+        original_prompt,
         prov,
         ctx,
         codex_config,
@@ -1593,6 +1704,7 @@ async fn run_codex_app_server_stdio_query(
     session_id: String,
     user_msg_id: String,
     prompt: String,
+    original_prompt: String,
     provider: ProviderConfig,
     provider_ctx: ProviderRequestContext,
     codex_config: CodexRuntimeConfig,
@@ -2342,7 +2454,7 @@ async fn run_codex_app_server_stdio_query(
                                     &provider_ctx,
                                     &conversation,
                                     &model_id,
-                                    &prompt,
+                                    &original_prompt,
                                     &accumulated_text,
                                 )
                                 .await;

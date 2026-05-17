@@ -12,6 +12,8 @@ env:
   RUST_BACKTRACE: short
   CODEX_APP_SERVER_REPO: nevermorewish/codex
   CODEX_APP_SERVER_RELEASE_TAG: codex-app-server-v0.1.0
+  CLAUDE_MEM_REPO: nevermorewish/claude-mem
+  CLAUDE_MEM_RELEASE_TAG: v13.2.0
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.ref }}'
@@ -180,6 +182,9 @@ jobs:
       - name: Prepare Codex app-server resource
         run: node scripts/prepare-codex-app-server.mjs ${{ matrix.target }}
 
+      - name: Prepare claude-mem resource
+        run: node scripts/prepare-claude-mem.mjs ${{ matrix.target }}
+
       - name: Build with Tauri
         uses: tauri-apps/tauri-action@v0
         env:
@@ -322,6 +327,9 @@ jobs:
 
       - name: Prepare Codex app-server resource
         run: node scripts/prepare-codex-app-server.mjs aarch64-unknown-linux-gnu
+
+      - name: Prepare claude-mem resource
+        run: node scripts/prepare-claude-mem.mjs aarch64-unknown-linux-gnu
 
       - name: Build for Linux ARM64
         run: |

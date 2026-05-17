@@ -483,7 +483,10 @@ pub fn run() {
             });
             app.manage(commands::platform_bridge::PlatformBridgeState::default());
             commands::agent::init_ai_agent_log_file();
-            claude_mem::start_background_worker();
+            {
+                let state = app.state::<AppState>();
+                claude_mem::start_background_worker(state.sea_db.clone(), state.master_key);
+            }
 
             {
                 let app_handle = app.handle().clone();

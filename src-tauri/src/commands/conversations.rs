@@ -3771,6 +3771,8 @@ mod tests {
             is_archived: false,
             context_compression: false,
             category_id: None,
+            working_directory: None,
+            project_name: None,
             parent_conversation_id: None,
             mode: "chat".to_string(),
             created_at: 0,

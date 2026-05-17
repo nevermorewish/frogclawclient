@@ -469,11 +469,16 @@ export function InputArea() {
           cwd: selected,
         });
         setAgentCwd(selected);
+        const projectName = selected.replace(/[\\/]+$/, '').split(/[\\/]/).filter(Boolean).pop() || selected;
+        await updateConversation(activeConversationId, {
+          working_directory: selected,
+          project_name: projectName,
+        });
       }
     } catch (e) {
       console.warn('Failed to select working directory:', e);
     }
-  }, [activeConversationId, t]);
+  }, [activeConversationId, t, updateConversation]);
 
   const currentModel = React.useMemo(() => {
     if (activeConversation) {

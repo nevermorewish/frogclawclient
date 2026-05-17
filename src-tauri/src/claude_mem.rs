@@ -1,10 +1,12 @@
 use frogclaw_core::types::{
-    MemoryItem, MemoryNamespace, ProjectMemoryProfile, RagContextResult, RagRetrievedItem,
-    RagSourceResult,
+    AppSettings, MemoryItem, MemoryNamespace, ModelType, ProjectMemoryProfile, ProviderConfig,
+    ProviderType, RagContextResult, RagRetrievedItem, RagSourceResult,
 };
 use reqwest::Client;
+use sea_orm::DatabaseConnection;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -15,10 +17,69 @@ use tokio::sync::Mutex;
 const DEFAULT_BASE_URL: &str = "http://127.0.0.1:37777";
 const DEFAULT_NAMESPACE_ID: &str = "claude-mem";
 const DEFAULT_NAMESPACE_NAME: &str = "Claude-Mem";
+const DEFAULT_CLAUDE_MEM_MODEL: &str = "claude-haiku-4-5-20251001";
+const DEFAULT_GEMINI_MEM_MODEL: &str = "gemini-2.5-flash-lite";
+const CLAUDE_MEM_WORKER_HOST: &str = "127.0.0.1";
+const CLAUDE_MEM_WORKER_PORT: &str = "37777";
 static START_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 static WORKER_PROCESS: OnceLock<Mutex<Option<Child>>> = OnceLock::new();
 static RESOURCE_DIR: OnceLock<PathBuf> = OnceLock::new();
+static RUNTIME_CONFIG: OnceLock<Mutex<Option<ClaudeMemRuntimeConfig>>> = OnceLock::new();
 static SHUTTING_DOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+#[derive(Debug, Clone)]
+struct ClaudeMemRuntimeConfig {
+    provider: ClaudeMemProviderConfig,
+    settings: BTreeMap<String, String>,
+    env_file: BTreeMap<String, String>,
+    process_env: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone)]
+enum ClaudeMemProviderConfig {
+    ClaudeGateway {
+        provider_id: String,
+        model_id: String,
+    },
+    Gemini {
+        provider_id: String,
+        model_id: String,
+    },
+    OpenRouter {
+        provider_id: String,
+        model_id: String,
+    },
+    DefaultClaude,
+}
+
+impl ClaudeMemProviderConfig {
+    fn label(&self) -> &'static str {
+        match self {
+            ClaudeMemProviderConfig::ClaudeGateway { .. } => "claude_gateway",
+            ClaudeMemProviderConfig::Gemini { .. } => "gemini",
+            ClaudeMemProviderConfig::OpenRouter { .. } => "openrouter",
+            ClaudeMemProviderConfig::DefaultClaude => "default_claude",
+        }
+    }
+
+    fn provider_id(&self) -> Option<&str> {
+        match self {
+            ClaudeMemProviderConfig::ClaudeGateway { provider_id, .. }
+            | ClaudeMemProviderConfig::Gemini { provider_id, .. }
+            | ClaudeMemProviderConfig::OpenRouter { provider_id, .. } => Some(provider_id),
+            ClaudeMemProviderConfig::DefaultClaude => None,
+        }
+    }
+
+    fn model_id(&self) -> Option<&str> {
+        match self {
+            ClaudeMemProviderConfig::ClaudeGateway { model_id, .. }
+            | ClaudeMemProviderConfig::Gemini { model_id, .. }
+            | ClaudeMemProviderConfig::OpenRouter { model_id, .. } => Some(model_id),
+            ClaudeMemProviderConfig::DefaultClaude => None,
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct ClaudeMemClient {
@@ -334,15 +395,17 @@ impl ClaudeMemClient {
         if let Some(project) = project.filter(|v| !v.trim().is_empty()) {
             request = request.query(&[("project", project)]);
         }
-        let response = request.send().await.map_err(|e| {
-            let err = format!("claude-mem list failed: {e}");
-            append_memory_log(format!(
-                "list_items failed elapsed_ms={} error={}",
-                started.elapsed().as_millis(),
-                compact_log_value(&err, 240)
-            ));
-            err
-        })?;
+        let response = send_with_short_retry(request, "list_items", started)
+            .await
+            .map_err(|e| {
+                let err = format!("claude-mem list failed: {e}");
+                append_memory_log(format!(
+                    "list_items failed elapsed_ms={} error={}",
+                    started.elapsed().as_millis(),
+                    compact_log_value(&err, 240)
+                ));
+                err
+            })?;
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
@@ -404,15 +467,17 @@ impl ClaudeMemClient {
         if let Some(project) = project.filter(|v| !v.trim().is_empty()) {
             request = request.query(&[("project", project)]);
         }
-        let response = request.send().await.map_err(|e| {
-            let err = format!("claude-mem search failed: {e}");
-            append_memory_log(format!(
-                "search_memory failed elapsed_ms={} error={}",
-                started.elapsed().as_millis(),
-                compact_log_value(&err, 240)
-            ));
-            err
-        })?;
+        let response = send_with_short_retry(request, "search_memory", started)
+            .await
+            .map_err(|e| {
+                let err = format!("claude-mem search failed: {e}");
+                append_memory_log(format!(
+                    "search_memory failed elapsed_ms={} error={}",
+                    started.elapsed().as_millis(),
+                    compact_log_value(&err, 240)
+                ));
+                err
+            })?;
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
@@ -519,6 +584,82 @@ impl ClaudeMemClient {
             ));
         }
 
+        let search_results = match self.search_memory(query, project, limit).await {
+            Ok(results) => results,
+            Err(err) => {
+                append_memory_log(format!(
+                    "collect_context search_failed elapsed_ms={} error={}",
+                    started.elapsed().as_millis(),
+                    compact_log_value(&err, 240)
+                ));
+                Vec::new()
+            }
+        };
+        let search_count = search_results.len();
+        let useful_search_results = filter_meaningful_memory_results(search_results);
+        if search_count == 0 {
+            append_memory_log(format!(
+                "collect_context search_empty elapsed_ms={}",
+                started.elapsed().as_millis()
+            ));
+        } else if useful_search_results.len() < search_count {
+            append_memory_log(format!(
+                "collect_context search_low_value_filtered count={} kept={} elapsed_ms={}",
+                search_count - useful_search_results.len(),
+                useful_search_results.len(),
+                started.elapsed().as_millis()
+            ));
+        }
+
+        let prefer_recent = prefers_recent_context(query);
+        let should_fetch_recent = useful_search_results.is_empty() || prefer_recent;
+        let recent_results = if should_fetch_recent {
+            match self.list_items(project, limit.max(8)).await {
+                Ok(recent_items) => recent_memory_results(query, recent_items, limit),
+                Err(err) => {
+                    append_memory_log(format!(
+                        "collect_context recent_failed elapsed_ms={} error={}",
+                        started.elapsed().as_millis(),
+                        compact_log_value(&err, 240)
+                    ));
+                    Vec::new()
+                }
+            }
+        } else {
+            Vec::new()
+        };
+        if recent_results.is_empty() {
+            append_memory_log(format!(
+                "collect_context recent_empty elapsed_ms={}",
+                started.elapsed().as_millis()
+            ));
+        }
+
+        let combined_results = if prefer_recent {
+            merge_memory_results(recent_results, useful_search_results, limit.max(1))
+        } else {
+            merge_memory_results(useful_search_results, recent_results, limit.max(1))
+        };
+        if !combined_results.is_empty() {
+            let used_search = combined_results.iter().any(|result| result.has_embedding);
+            let used_recent = combined_results
+                .iter()
+                .any(|result| result.id.starts_with("claude-mem-recent-"));
+            let source = match (used_search, used_recent) {
+                (true, true) => "search_recent",
+                (true, false) => "search",
+                (false, true) => "recent_observations",
+                (false, false) => "unknown",
+            };
+            append_memory_log(format!(
+                "collect_context ok source={} count={} elapsed_ms={}",
+                source,
+                combined_results.len(),
+                started.elapsed().as_millis()
+            ));
+            return Ok(vector_results_to_rag_result(combined_results));
+        }
+
         let mut request = self
             .client
             .get(format!("{}/api/context/inject", self.base_url))
@@ -545,7 +686,7 @@ impl ClaudeMemClient {
                 ));
                 err
             })?;
-            if !context.trim().is_empty() {
+            if is_useful_injected_context(&context) {
                 append_memory_log(format!(
                     "collect_context ok source=inject count=1 elapsed_ms={}",
                     started.elapsed().as_millis()
@@ -557,33 +698,511 @@ impl ClaudeMemClient {
                 started.elapsed().as_millis()
             ));
         } else {
-            tracing::warn!(
-                "claude-mem context returned {}. Falling back to search.",
-                response.status()
-            );
+            tracing::warn!("claude-mem context returned {}.", response.status());
             append_memory_log(format!(
-                "collect_context inject_status status={} fallback=search",
+                "collect_context inject_status status={}",
                 response.status()
             ));
         }
 
-        let results = self.search_memory(query, project, limit).await?;
         append_memory_log(format!(
-            "collect_context ok source=search count={} elapsed_ms={}",
-            results.len(),
+            "collect_context ok source=none count=0 elapsed_ms={}",
             started.elapsed().as_millis()
         ));
-        Ok(vector_results_to_rag_result(results))
+        Ok(RagContextResult {
+            context_parts: vec![],
+            source_results: vec![],
+        })
     }
+}
+
+async fn send_with_short_retry(
+    request: reqwest::RequestBuilder,
+    event: &str,
+    started: Instant,
+) -> Result<reqwest::Response, String> {
+    let retry_request = request.try_clone();
+    match request.send().await {
+        Ok(response) => Ok(response),
+        Err(first_error) => {
+            let first = reqwest_error_detail(&first_error);
+            append_memory_log(format!(
+                "{} request_failed retrying=true elapsed_ms={} error={}",
+                event,
+                started.elapsed().as_millis(),
+                compact_log_value(&first, 320)
+            ));
+            let Some(retry_request) = retry_request else {
+                return Err(first);
+            };
+            tokio::time::sleep(Duration::from_millis(200)).await;
+            retry_request.send().await.map_err(|second_error| {
+                format!(
+                    "{}; first_error={}",
+                    reqwest_error_detail(&second_error),
+                    compact_log_value(&first, 220)
+                )
+            })
+        }
+    }
+}
+
+fn reqwest_error_detail(error: &reqwest::Error) -> String {
+    let mut parts = vec![error.to_string()];
+    if let Some(status) = error.status() {
+        parts.push(format!("status={status}"));
+    }
+    if let Some(url) = error.url() {
+        parts.push(format!("url={url}"));
+    }
+    let mut source = std::error::Error::source(error);
+    while let Some(err) = source {
+        parts.push(format!("source={err}"));
+        source = std::error::Error::source(err);
+    }
+    parts.join(" ")
 }
 
 pub fn init_resource_dir(path: PathBuf) {
     let _ = RESOURCE_DIR.set(path);
 }
 
-pub fn start_background_worker() {
+async fn build_runtime_config(
+    db: &DatabaseConnection,
+    master_key: &[u8; 32],
+) -> Result<ClaudeMemRuntimeConfig, String> {
+    let settings = frogclaw_core::repo::settings::get_settings(db)
+        .await
+        .unwrap_or_default();
+    let providers = frogclaw_core::repo::provider::list_providers(db)
+        .await
+        .map_err(|e| format!("读取模型服务商失败: {e}"))?;
+
+    if let Some((provider, api_key)) = choose_provider_with_key(
+        db,
+        master_key,
+        &providers,
+        &settings,
+        ProviderType::Anthropic,
+    )
+    .await?
+    {
+        let model_id = choose_anthropic_model(&provider, &settings);
+        let base_url = anthropic_gateway_base_url(&provider);
+        return Ok(make_claude_gateway_config(
+            provider.id,
+            model_id,
+            base_url,
+            api_key,
+        ));
+    }
+
+    if let Some((provider, api_key)) =
+        choose_provider_with_key(db, master_key, &providers, &settings, ProviderType::Gemini)
+            .await?
+    {
+        let model_id = choose_gemini_model(&provider, &settings);
+        return Ok(make_gemini_config(provider.id, model_id, api_key));
+    }
+
+    if let Some((provider, api_key)) =
+        choose_openrouter_provider(db, master_key, &providers, &settings).await?
+    {
+        let model_id = choose_openrouter_model(&provider, &settings);
+        return Ok(make_openrouter_config(provider.id, model_id, api_key));
+    }
+
+    append_memory_log("runtime_config no_compatible_frogclaw_provider fallback=default_claude");
+    Ok(make_default_claude_config())
+}
+
+async fn choose_provider_with_key(
+    db: &DatabaseConnection,
+    master_key: &[u8; 32],
+    providers: &[ProviderConfig],
+    settings: &AppSettings,
+    provider_type: ProviderType,
+) -> Result<Option<(ProviderConfig, String)>, String> {
+    let mut candidates = compatible_providers(providers, &provider_type);
+    sort_by_settings_preference(&mut candidates, settings);
+    first_provider_with_key(db, master_key, candidates).await
+}
+
+async fn choose_openrouter_provider(
+    db: &DatabaseConnection,
+    master_key: &[u8; 32],
+    providers: &[ProviderConfig],
+    settings: &AppSettings,
+) -> Result<Option<(ProviderConfig, String)>, String> {
+    let mut candidates = providers
+        .iter()
+        .filter(|provider| {
+            provider.enabled
+                && matches!(
+                    provider.provider_type,
+                    ProviderType::OpenAI | ProviderType::OpenAIResponses | ProviderType::Custom
+                )
+                && looks_like_openrouter_provider(provider)
+        })
+        .collect::<Vec<_>>();
+    sort_by_settings_preference(&mut candidates, settings);
+    first_provider_with_key(db, master_key, candidates).await
+}
+
+async fn first_provider_with_key(
+    db: &DatabaseConnection,
+    master_key: &[u8; 32],
+    candidates: Vec<&ProviderConfig>,
+) -> Result<Option<(ProviderConfig, String)>, String> {
+    for provider in candidates {
+        let key_row = match frogclaw_core::repo::provider::get_active_key(db, &provider.id).await {
+            Ok(key) => key,
+            Err(err) => {
+                append_memory_log(format!(
+                    "runtime_config skip_provider provider_id={} reason=no_active_key error={}",
+                    provider.id,
+                    compact_log_value(&err.to_string(), 180)
+                ));
+                continue;
+            }
+        };
+        let api_key = frogclaw_core::crypto::decrypt_key(&key_row.key_encrypted, master_key)
+            .map_err(|e| format!("解密服务商密钥失败 provider_id={} error={e}", provider.id))?;
+        if api_key.trim().is_empty() {
+            append_memory_log(format!(
+                "runtime_config skip_provider provider_id={} reason=empty_key",
+                provider.id
+            ));
+            continue;
+        }
+        return Ok(Some((provider.clone(), api_key)));
+    }
+    Ok(None)
+}
+
+fn compatible_providers<'a>(
+    providers: &'a [ProviderConfig],
+    provider_type: &ProviderType,
+) -> Vec<&'a ProviderConfig> {
+    providers
+        .iter()
+        .filter(|provider| provider.enabled && &provider.provider_type == provider_type)
+        .collect()
+}
+
+fn sort_by_settings_preference(providers: &mut Vec<&ProviderConfig>, settings: &AppSettings) {
+    let preferred = [
+        settings.title_summary_provider_id.as_deref(),
+        settings.default_provider_id.as_deref(),
+    ];
+    providers.sort_by_key(|provider| {
+        preferred
+            .iter()
+            .position(|id| *id == Some(provider.id.as_str()))
+            .unwrap_or(preferred.len())
+    });
+}
+
+fn choose_anthropic_model(provider: &ProviderConfig, settings: &AppSettings) -> String {
+    choose_model_by_preferences(
+        provider,
+        settings,
+        DEFAULT_CLAUDE_MEM_MODEL,
+        &["claude-haiku-4-5", "claude-3-5-haiku", "haiku", "claude"],
+    )
+}
+
+fn choose_gemini_model(provider: &ProviderConfig, settings: &AppSettings) -> String {
+    let candidate = choose_model_by_preferences(
+        provider,
+        settings,
+        DEFAULT_GEMINI_MEM_MODEL,
+        &[
+            "gemini-2.5-flash-lite",
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
+        ],
+    );
+    if is_claude_mem_supported_gemini_model(&candidate) {
+        candidate
+    } else {
+        DEFAULT_GEMINI_MEM_MODEL.to_string()
+    }
+}
+
+fn choose_openrouter_model(provider: &ProviderConfig, settings: &AppSettings) -> String {
+    choose_model_by_preferences(
+        provider,
+        settings,
+        "xiaomi/mimo-v2-flash:free",
+        &["claude", "gemini", "gpt-4o-mini", "flash", "free"],
+    )
+}
+
+fn choose_model_by_preferences(
+    provider: &ProviderConfig,
+    settings: &AppSettings,
+    fallback: &str,
+    preferred_needles: &[&str],
+) -> String {
+    if settings.title_summary_provider_id.as_deref() == Some(provider.id.as_str()) {
+        if let Some(model_id) = settings
+            .title_summary_model_id
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+        {
+            return model_id.trim().to_string();
+        }
+    }
+    if settings.default_provider_id.as_deref() == Some(provider.id.as_str()) {
+        if let Some(model_id) = settings
+            .default_model_id
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+        {
+            return model_id.trim().to_string();
+        }
+    }
+
+    let enabled_chat = provider
+        .models
+        .iter()
+        .filter(|model| model.enabled && model.model_type == ModelType::Chat)
+        .collect::<Vec<_>>();
+    for needle in preferred_needles {
+        if let Some(model) = enabled_chat
+            .iter()
+            .find(|model| model.model_id.to_lowercase().contains(needle))
+        {
+            return model.model_id.clone();
+        }
+    }
+    enabled_chat
+        .first()
+        .map(|model| model.model_id.clone())
+        .unwrap_or_else(|| fallback.to_string())
+}
+
+fn is_claude_mem_supported_gemini_model(model_id: &str) -> bool {
+    matches!(
+        model_id,
+        "gemini-2.5-flash-lite"
+            | "gemini-2.5-flash"
+            | "gemini-2.5-pro"
+            | "gemini-2.0-flash"
+            | "gemini-2.0-flash-lite"
+            | "gemini-3-flash"
+            | "gemini-3-flash-preview"
+    )
+}
+
+fn looks_like_openrouter_provider(provider: &ProviderConfig) -> bool {
+    let haystack = format!(
+        "{} {} {} {}",
+        provider.id,
+        provider.name,
+        provider.api_host,
+        provider.builtin_id.as_deref().unwrap_or_default()
+    )
+    .to_lowercase();
+    haystack.contains("openrouter")
+}
+
+fn anthropic_gateway_base_url(provider: &ProviderConfig) -> String {
+    frogclaw_providers::resolve_base_url_for_type(&provider.api_host, &provider.provider_type)
+}
+
+fn make_base_settings() -> BTreeMap<String, String> {
+    BTreeMap::from([
+        (
+            "CLAUDE_MEM_DATA_DIR".to_string(),
+            claude_mem_data_dir().to_string_lossy().to_string(),
+        ),
+        (
+            "CLAUDE_MEM_WORKER_HOST".to_string(),
+            CLAUDE_MEM_WORKER_HOST.to_string(),
+        ),
+        (
+            "CLAUDE_MEM_WORKER_PORT".to_string(),
+            CLAUDE_MEM_WORKER_PORT.to_string(),
+        ),
+    ])
+}
+
+fn make_claude_gateway_config(
+    provider_id: String,
+    model_id: String,
+    base_url: String,
+    api_key: String,
+) -> ClaudeMemRuntimeConfig {
+    let mut settings = make_base_settings();
+    settings.insert("CLAUDE_MEM_PROVIDER".to_string(), "claude".to_string());
+    settings.insert(
+        "CLAUDE_MEM_CLAUDE_AUTH_METHOD".to_string(),
+        "gateway".to_string(),
+    );
+    settings.insert("CLAUDE_MEM_MODEL".to_string(), model_id.clone());
+    settings.insert("CLAUDE_MEM_GEMINI_API_KEY".to_string(), String::new());
+    settings.insert("CLAUDE_MEM_OPENROUTER_API_KEY".to_string(), String::new());
+
+    let mut env_file = BTreeMap::new();
+    env_file.insert("ANTHROPIC_API_KEY".to_string(), String::new());
+    env_file.insert("ANTHROPIC_BASE_URL".to_string(), base_url.clone());
+    env_file.insert("ANTHROPIC_AUTH_TOKEN".to_string(), api_key.clone());
+    env_file.insert("GEMINI_API_KEY".to_string(), String::new());
+    env_file.insert("OPENROUTER_API_KEY".to_string(), String::new());
+
+    let mut process_env = settings.clone();
+    process_env.insert(
+        "CLAUDE_MEM_ENV_FILE".to_string(),
+        claude_mem_env_file().to_string_lossy().to_string(),
+    );
+    process_env.insert("ANTHROPIC_BASE_URL".to_string(), base_url.clone());
+    process_env.insert("ANTHROPIC_AUTH_TOKEN".to_string(), api_key);
+
+    ClaudeMemRuntimeConfig {
+        provider: ClaudeMemProviderConfig::ClaudeGateway {
+            provider_id,
+            model_id,
+        },
+        settings,
+        env_file,
+        process_env,
+    }
+}
+
+fn make_gemini_config(
+    provider_id: String,
+    model_id: String,
+    api_key: String,
+) -> ClaudeMemRuntimeConfig {
+    let mut settings = make_base_settings();
+    settings.insert("CLAUDE_MEM_PROVIDER".to_string(), "gemini".to_string());
+    settings.insert("CLAUDE_MEM_GEMINI_MODEL".to_string(), model_id.clone());
+    settings.insert("CLAUDE_MEM_GEMINI_API_KEY".to_string(), api_key.clone());
+    settings.insert("CLAUDE_MEM_OPENROUTER_API_KEY".to_string(), String::new());
+
+    let mut env_file = BTreeMap::new();
+    env_file.insert("ANTHROPIC_API_KEY".to_string(), String::new());
+    env_file.insert("ANTHROPIC_BASE_URL".to_string(), String::new());
+    env_file.insert("ANTHROPIC_AUTH_TOKEN".to_string(), String::new());
+    env_file.insert("GEMINI_API_KEY".to_string(), api_key.clone());
+    env_file.insert("OPENROUTER_API_KEY".to_string(), String::new());
+
+    let mut process_env = settings.clone();
+    process_env.insert(
+        "CLAUDE_MEM_ENV_FILE".to_string(),
+        claude_mem_env_file().to_string_lossy().to_string(),
+    );
+    process_env.insert("GEMINI_API_KEY".to_string(), api_key);
+
+    ClaudeMemRuntimeConfig {
+        provider: ClaudeMemProviderConfig::Gemini {
+            provider_id,
+            model_id,
+        },
+        settings,
+        env_file,
+        process_env,
+    }
+}
+
+fn make_openrouter_config(
+    provider_id: String,
+    model_id: String,
+    api_key: String,
+) -> ClaudeMemRuntimeConfig {
+    let mut settings = make_base_settings();
+    settings.insert("CLAUDE_MEM_PROVIDER".to_string(), "openrouter".to_string());
+    settings.insert("CLAUDE_MEM_OPENROUTER_MODEL".to_string(), model_id.clone());
+    settings.insert("CLAUDE_MEM_OPENROUTER_API_KEY".to_string(), api_key.clone());
+    settings.insert("CLAUDE_MEM_GEMINI_API_KEY".to_string(), String::new());
+
+    let mut env_file = BTreeMap::new();
+    env_file.insert("ANTHROPIC_API_KEY".to_string(), String::new());
+    env_file.insert("ANTHROPIC_BASE_URL".to_string(), String::new());
+    env_file.insert("ANTHROPIC_AUTH_TOKEN".to_string(), String::new());
+    env_file.insert("GEMINI_API_KEY".to_string(), String::new());
+    env_file.insert("OPENROUTER_API_KEY".to_string(), api_key.clone());
+
+    let mut process_env = settings.clone();
+    process_env.insert(
+        "CLAUDE_MEM_ENV_FILE".to_string(),
+        claude_mem_env_file().to_string_lossy().to_string(),
+    );
+    process_env.insert("OPENROUTER_API_KEY".to_string(), api_key);
+
+    ClaudeMemRuntimeConfig {
+        provider: ClaudeMemProviderConfig::OpenRouter {
+            provider_id,
+            model_id,
+        },
+        settings,
+        env_file,
+        process_env,
+    }
+}
+
+fn make_default_claude_config() -> ClaudeMemRuntimeConfig {
+    let mut settings = make_base_settings();
+    settings.insert("CLAUDE_MEM_PROVIDER".to_string(), "claude".to_string());
+    settings.insert(
+        "CLAUDE_MEM_CLAUDE_AUTH_METHOD".to_string(),
+        "subscription".to_string(),
+    );
+    settings.insert(
+        "CLAUDE_MEM_MODEL".to_string(),
+        DEFAULT_CLAUDE_MEM_MODEL.to_string(),
+    );
+    settings.insert("CLAUDE_MEM_GEMINI_API_KEY".to_string(), String::new());
+    settings.insert("CLAUDE_MEM_OPENROUTER_API_KEY".to_string(), String::new());
+
+    let mut env_file = BTreeMap::new();
+    env_file.insert("ANTHROPIC_API_KEY".to_string(), String::new());
+    env_file.insert("ANTHROPIC_BASE_URL".to_string(), String::new());
+    env_file.insert("ANTHROPIC_AUTH_TOKEN".to_string(), String::new());
+    env_file.insert("GEMINI_API_KEY".to_string(), String::new());
+    env_file.insert("OPENROUTER_API_KEY".to_string(), String::new());
+
+    let mut process_env = settings.clone();
+    process_env.insert(
+        "CLAUDE_MEM_ENV_FILE".to_string(),
+        claude_mem_env_file().to_string_lossy().to_string(),
+    );
+
+    ClaudeMemRuntimeConfig {
+        provider: ClaudeMemProviderConfig::DefaultClaude,
+        settings,
+        env_file,
+        process_env,
+    }
+}
+
+async fn refresh_runtime_config(db: &DatabaseConnection, master_key: &[u8; 32]) {
+    match build_runtime_config(db, master_key).await {
+        Ok(config) => {
+            append_memory_log(format!(
+                "runtime_config ok provider={} provider_id={} model={} auth=from_frogclaw",
+                config.provider.label(),
+                config.provider.provider_id().unwrap_or("-"),
+                config.provider.model_id().unwrap_or("-")
+            ));
+            let mut guard = RUNTIME_CONFIG.get_or_init(|| Mutex::new(None)).lock().await;
+            *guard = Some(config);
+        }
+        Err(err) => {
+            append_memory_log(format!(
+                "runtime_config failed error={}",
+                compact_log_value(&err, 240)
+            ));
+        }
+    }
+}
+
+pub fn start_background_worker(db: DatabaseConnection, master_key: [u8; 32]) {
     append_memory_log("background_worker start requested");
-    tauri::async_runtime::spawn(async {
+    tauri::async_runtime::spawn(async move {
+        refresh_runtime_config(&db, &master_key).await;
         match ClaudeMemClient::new() {
             Ok(client) => {
                 if let Err(err) = client.ensure_ready().await {
@@ -734,6 +1353,234 @@ pub fn memory_log_path() -> PathBuf {
     crate::paths::frogclaw_home().join("memory.log")
 }
 
+fn localize_memory_log(message: &str) -> String {
+    let replacements = [
+        ("conversation_id=", "会话="),
+        ("namespace_id=", "命名空间="),
+        ("item_id=", "记忆项="),
+        ("project_path_chars=", "项目路径字符数="),
+        ("project_path=", "项目路径="),
+        ("project_name=", "项目="),
+        ("project=", "项目="),
+        ("query_chars=", "查询字符数="),
+        ("title_chars=", "标题字符数="),
+        ("content_chars=", "内容字符数="),
+        ("text_chars=", "文本字符数="),
+        ("user_chars=", "用户字符数="),
+        ("assistant_chars=", "助手字符数="),
+        ("enabled_memory_count=", "启用记忆数="),
+        ("context_parts=", "上下文段数="),
+        ("sources=", "来源数="),
+        ("source=", "来源="),
+        ("count=", "数量="),
+        ("limit=", "限制="),
+        ("top_k=", "top_k="),
+        ("elapsed_ms=", "耗时毫秒="),
+        ("saved=", "已保存="),
+        ("scanned=", "已扫描="),
+        ("candidates=", "候选数="),
+        ("provider_id=", "服务商="),
+        ("provider=", "服务商类型="),
+        ("model=", "模型="),
+        ("auth=", "认证="),
+        ("settings_path=", "设置文件="),
+        ("env_file=", "环境文件="),
+        ("registry_key=", "适配器="),
+        ("status=", "状态="),
+        ("fallback=", "回退="),
+        ("retrying=", "重试="),
+        ("existing_worker=", "已有记忆进程="),
+        ("after_lock=", "加锁后="),
+        ("pid=", "进程="),
+        ("program=", "程序="),
+        ("cwd=", "工作目录="),
+        ("args=", "参数="),
+        ("path=", "路径="),
+        ("error=", "错误="),
+        ("reason=", "原因="),
+        ("no_active_key", "没有启用密钥"),
+        ("empty_key", "密钥为空"),
+        ("has_content=", "有内容="),
+        ("id=", "ID="),
+        ("name_chars=", "名称字符数="),
+        ("scope=", "范围="),
+    ];
+
+    let mut protected_urls = Vec::new();
+    let mut output = protect_log_urls(message, &mut protected_urls);
+    for (from, to) in replacements {
+        output = output.replace(from, to);
+    }
+
+    let event_labels = [
+        ("ensure_ready", "检查记忆进程"),
+        ("save_auto_memory", "自动保存记忆"),
+        ("save_memory", "保存记忆"),
+        ("list_items", "列出记忆"),
+        ("search_memory", "搜索记忆"),
+        ("collect_project_context", "项目记忆上下文"),
+        ("collect_context", "收集记忆上下文"),
+        ("background_worker", "后台记忆进程"),
+        ("runtime_config", "claude-mem 运行配置"),
+        ("shutdown", "关闭记忆进程"),
+        ("monitor", "监控记忆进程"),
+        ("worker", "记忆进程"),
+        ("auto_capture", "自动捕获记忆"),
+        ("chat_memory_retrieval", "聊天记忆召回"),
+        ("command", "记忆命令"),
+    ];
+    for (from, to) in event_labels {
+        output = output.replace(from, to);
+    }
+
+    let status_labels = [
+        (" start_managed", "：启动托管进程"),
+        (" worker_unhealthy", "：进程异常"),
+        (" start", "：开始"),
+        (" ready", "：就绪"),
+        (" requested", "：已请求"),
+        (" required", "：需要"),
+        (" ok", "：完成"),
+        (" failed", "：失败"),
+        (" done", "：完成"),
+        (" skipped", "：已跳过"),
+        (" skip", "：跳过"),
+        (" extracted", "：已抽取"),
+        (" save_failed", "：保存失败"),
+        (" extractor_failed", "：抽取失败"),
+        (" extractor_runtime", "：抽取运行时"),
+        (" semantic_failed", "：语义上下文失败"),
+        (" semantic_empty", "：语义上下文为空"),
+        (" semantic_status", "：语义上下文状态异常"),
+        (" search_failed", "：搜索失败"),
+        (" search_empty", "：搜索为空"),
+        (" search_low_value_filtered", "：已过滤低价值搜索结果"),
+        (" recent_failed", "：最近项目记忆失败"),
+        (" recent_empty", "：最近项目记忆为空"),
+        (" inject_failed", "：注入上下文失败"),
+        (" inject_empty", "：注入上下文为空"),
+        (" inject_status", "：注入上下文状态异常"),
+        (" request_failed", "：请求失败"),
+        (" client_init", "：客户端初始化"),
+        (" auto_start", "：自动启动"),
+        (" config_ready", "：配置就绪"),
+        (" files_written", "：已写入配置文件"),
+        (" skip_provider", "：跳过服务商"),
+        (
+            " no_compatible_frogclaw_provider",
+            "：没有兼容的 FrogClaw 服务商",
+        ),
+        (" spawn", "：启动进程"),
+        (" restart", "：重启"),
+        (" stop", "：停止"),
+        (" cleanup_leftover", "：清理残留进程"),
+        (" exited", "：进程退出"),
+        (" poll", "：检查进程"),
+        (" killing", "：正在终止"),
+    ];
+    for (from, to) in status_labels {
+        output = output.replace(from, to);
+    }
+
+    let command_labels = [
+        ("list_memory_namespaces", "列出记忆命名空间"),
+        ("list_project_memory_profiles", "列出项目记忆配置"),
+        ("get_project_memory_profile", "读取项目记忆配置"),
+        ("update_project_memory_profile", "更新项目记忆配置"),
+        ("list_project_memory_items", "列出项目记忆项"),
+        ("add_project_memory_item", "添加项目记忆"),
+        ("summarize_project_memory", "从会话提取项目记忆"),
+        ("create_memory_namespace", "创建记忆命名空间"),
+        ("delete_memory_namespace", "删除记忆命名空间"),
+        ("update_memory_namespace", "更新记忆命名空间"),
+        ("list_memory_items", "列出记忆项"),
+        ("add_memory_item", "添加记忆"),
+        ("delete_memory_item", "删除记忆"),
+        ("update_memory_item", "更新记忆"),
+        ("search_project_memory", "搜索项目记忆"),
+        ("search_memory", "搜索记忆"),
+        ("rebuild_memory_index", "重建记忆索引"),
+        ("clear_memory_index", "清空记忆索引"),
+        ("reindex_memory_item", "重建单条记忆索引"),
+        ("reorder_memory_namespaces", "重排记忆命名空间"),
+    ];
+    for (from, to) in command_labels {
+        output = output.replace(from, to);
+    }
+
+    let reason_labels = [
+        ("worker_start", "启动记忆进程"),
+        ("no_child", "没有子进程"),
+        ("no_working_directory", "没有项目目录"),
+        ("content_too_short", "内容太短"),
+        ("no_summary_runtime", "没有可用的记忆抽取模型"),
+        ("unsupported_provider", "不支持的模型服务商"),
+        ("no_conversations", "当前项目没有会话"),
+        (
+            "claude_mem_single_local_namespace",
+            "claude-mem 只提供单一本地记忆库",
+        ),
+        (
+            "claude_mem_delete_api_unavailable",
+            "本地 worker 未提供删除 API",
+        ),
+        ("claude_mem_managed_index", "索引由 claude-mem 管理"),
+    ];
+    for (from, to) in reason_labels {
+        output = output.replace(from, to);
+    }
+
+    let value_labels = [
+        ("来源=semantic", "来源=语义上下文"),
+        ("来源=search_recent", "来源=搜索+最近项目记忆"),
+        ("来源=recent_observations", "来源=最近项目记忆"),
+        ("来源=search", "来源=搜索"),
+        ("来源=inject", "来源=注入上下文"),
+        ("来源=none", "来源=无"),
+        ("回退=inject", "回退=注入上下文"),
+        ("回退=default_claude", "回退=默认 Claude"),
+        ("认证=from_frogclaw", "认证=FrogClaw 用户密钥"),
+        ("服务商类型=claude_gateway", "服务商类型=Claude 网关"),
+        ("服务商类型=gemini", "服务商类型=Gemini"),
+        ("服务商类型=openrouter", "服务商类型=OpenRouter"),
+        ("服务商类型=default_claude", "服务商类型=默认 Claude"),
+    ];
+    for (from, to) in value_labels {
+        output = output.replace(from, to);
+    }
+
+    restore_log_urls(&output, &protected_urls)
+}
+
+fn protect_log_urls(input: &str, urls: &mut Vec<String>) -> String {
+    let mut output = String::with_capacity(input.len());
+    let mut rest = input;
+    loop {
+        let Some(pos) = rest.find("http://").or_else(|| rest.find("https://")) else {
+            output.push_str(rest);
+            break;
+        };
+        output.push_str(&rest[..pos]);
+        let end = rest[pos..]
+            .find(|ch: char| ch.is_whitespace() || ch == ')')
+            .map(|idx| pos + idx)
+            .unwrap_or(rest.len());
+        let token = format!("__FROGCLAW_LOG_URL_{}__", urls.len());
+        urls.push(rest[pos..end].to_string());
+        output.push_str(&token);
+        rest = &rest[end..];
+    }
+    output
+}
+
+fn restore_log_urls(input: &str, urls: &[String]) -> String {
+    let mut output = input.to_string();
+    for (idx, url) in urls.iter().enumerate() {
+        output = output.replace(&format!("__FROGCLAW_LOG_URL_{}__", idx), url);
+    }
+    output
+}
+
 pub fn append_memory_log(message: impl AsRef<str>) {
     let path = memory_log_path();
     if let Some(parent) = path.parent() {
@@ -749,7 +1596,7 @@ pub fn append_memory_log(message: impl AsRef<str>) {
         let _ = std::fs::rename(&path, rotated);
     }
     let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f");
-    let line = compact_log_value(message.as_ref(), 900);
+    let line = compact_log_value(&localize_memory_log(message.as_ref()), 900);
     if let Ok(mut file) = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -830,6 +1677,215 @@ fn observation_to_vector_result(
     }
 }
 
+fn recent_memory_results(
+    query: &str,
+    items: Vec<MemoryItem>,
+    limit: usize,
+) -> Vec<frogclaw_core::vector_store::VectorSearchResult> {
+    let limit = limit.max(1);
+    let prefer_recent = prefers_recent_context(query);
+    let mut useful = items
+        .into_iter()
+        .filter(|item| {
+            let content = format!("{}\n{}", item.title, item.content);
+            !is_low_value_memory(&content)
+        })
+        .enumerate()
+        .map(|(idx, item)| {
+            let content = format!("{}\n{}", item.title.trim(), item.content.trim())
+                .trim()
+                .to_string();
+            frogclaw_core::vector_store::VectorSearchResult {
+                id: format!("claude-mem-recent-{}", item.id),
+                document_id: item.id,
+                chunk_index: idx as i32,
+                content,
+                score: if prefer_recent {
+                    idx as f32
+                } else {
+                    1000.0 + idx as f32
+                },
+                rerank_score: None,
+                has_embedding: false,
+            }
+        })
+        .collect::<Vec<_>>();
+    useful.truncate(limit);
+    useful
+}
+
+fn filter_meaningful_memory_results(
+    results: Vec<frogclaw_core::vector_store::VectorSearchResult>,
+) -> Vec<frogclaw_core::vector_store::VectorSearchResult> {
+    results
+        .into_iter()
+        .filter(|result| !is_low_value_memory(&result.content))
+        .collect()
+}
+
+fn merge_memory_results(
+    first: Vec<frogclaw_core::vector_store::VectorSearchResult>,
+    second: Vec<frogclaw_core::vector_store::VectorSearchResult>,
+    limit: usize,
+) -> Vec<frogclaw_core::vector_store::VectorSearchResult> {
+    let mut merged = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for result in first.into_iter().chain(second) {
+        if result.content.trim().is_empty() || !seen.insert(result.document_id.clone()) {
+            continue;
+        }
+        merged.push(result);
+        if merged.len() >= limit {
+            break;
+        }
+    }
+    merged
+}
+
+fn prefers_recent_context(query: &str) -> bool {
+    let lowered = query.to_lowercase();
+    [
+        "刚才",
+        "刚刚",
+        "之前",
+        "上次",
+        "前面",
+        "最近",
+        "刚写",
+        "写的诗",
+        "那首诗",
+        "poem",
+        "previous",
+        "last time",
+        "earlier",
+        "recent",
+    ]
+    .iter()
+    .any(|needle| lowered.contains(needle))
+}
+
+fn is_low_value_memory(content: &str) -> bool {
+    let normalized = content.trim().to_lowercase();
+    if normalized.is_empty() {
+        return true;
+    }
+    if [
+        "no previous sessions found",
+        "no previous sessions found for this project",
+        "当前项目记忆里也没有",
+        "当前项目记忆里也显示没有",
+        "没有可用的历史会话",
+        "没有可用的上一轮",
+        "没有保存到先前会话",
+        "no available memory",
+        "no saved memory",
+    ]
+    .iter()
+    .any(|needle| normalized.contains(needle))
+    {
+        return true;
+    }
+    let negative_markers = [
+        "看不到",
+        "找不到",
+        "未找到",
+        "没有找到",
+        "召回不到",
+        "could not find",
+        "can't find",
+        "cannot find",
+        "unable to find",
+        "not found",
+    ];
+    let recall_markers = [
+        "刚才",
+        "刚刚",
+        "之前",
+        "上次",
+        "前面",
+        "历史会话",
+        "当前对话",
+        "上一轮",
+        "项目记忆",
+        "写的诗",
+        "那首诗",
+        "previous session",
+        "previous conversation",
+        "earlier conversation",
+        "last session",
+        "last time",
+        "poem",
+        "memory",
+    ];
+    negative_markers
+        .iter()
+        .any(|needle| normalized.contains(needle))
+        && recall_markers
+            .iter()
+            .any(|needle| normalized.contains(needle))
+}
+
+fn is_useful_injected_context(context: &str) -> bool {
+    let trimmed = context.trim();
+    !trimmed.is_empty() && !is_low_value_memory(trimmed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn memory_item(id: &str, title: &str, content: &str) -> MemoryItem {
+        MemoryItem {
+            id: id.to_string(),
+            namespace_id: DEFAULT_NAMESPACE_ID.to_string(),
+            title: title.to_string(),
+            content: content.to_string(),
+            source: "manual".to_string(),
+            index_status: "ready".to_string(),
+            index_error: None,
+            updated_at: "2026-05-17T00:00:00Z".to_string(),
+        }
+    }
+
+    #[test]
+    fn injected_placeholder_is_not_useful_context() {
+        assert!(!is_useful_injected_context(
+            "# [workspace] recent context\nNo previous sessions found."
+        ));
+    }
+
+    #[test]
+    fn recent_fallback_keeps_poem_and_filters_failed_lookup() {
+        let results = recent_memory_results(
+            "刚才写的诗是什么",
+            vec![
+                memory_item(
+                    "18",
+                    "FrogClaw 会话记忆：写一首诗",
+                    "Assistant: 夜雨轻敲旧窗台，\n一灯微暖照尘埃。",
+                ),
+                memory_item(
+                    "17",
+                    "FrogClaw 会话记忆：刚才写的诗是什么",
+                    "Assistant: 我这边看不到“刚才写的诗”的内容。",
+                ),
+            ],
+            5,
+        );
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].document_id, "18");
+        assert!(results[0].content.contains("夜雨轻敲旧窗台"));
+    }
+
+    #[test]
+    fn low_value_filter_does_not_drop_general_project_fixes() {
+        assert!(!is_low_value_memory(
+            "修复 Windows 下找不到配置文件的问题：改用 .frogclaw 路径解析。"
+        ));
+    }
+}
+
 fn context_to_rag_result(context: String, count: usize) -> RagContextResult {
     RagContextResult {
         context_parts: vec![format!("[Claude-Mem Project Memory]\n{}", context.trim())],
@@ -899,6 +1955,20 @@ async fn start_managed_worker() -> Result<(), String> {
         }
     }
 
+    let runtime_config = {
+        let guard = RUNTIME_CONFIG.get_or_init(|| Mutex::new(None)).lock().await;
+        guard.clone().unwrap_or_else(make_default_claude_config)
+    };
+    ensure_claude_mem_config(&runtime_config)?;
+    append_memory_log(format!(
+        "worker config_ready provider={} provider_id={} model={} settings_path={} env_file={}",
+        runtime_config.provider.label(),
+        runtime_config.provider.provider_id().unwrap_or("-"),
+        runtime_config.provider.model_id().unwrap_or("-"),
+        compact_log_value(&claude_mem_settings_file().display().to_string(), 220),
+        compact_log_value(&claude_mem_env_file().display().to_string(), 220)
+    ));
+
     let Some(start_command) = resolve_start_command() else {
         let err = "claude-mem executable/scripts not found. Set FROGCLAW_CLAUDE_MEM_HOME or put claude-mem under E:\\frogclaw\\claude-mem.".to_string();
         append_memory_log(format!(
@@ -917,10 +1987,10 @@ async fn start_managed_worker() -> Result<(), String> {
     let mut command = Command::new(&start_command.program);
     command
         .args(&start_command.args)
-        .current_dir(&start_command.cwd)
-        .env("CLAUDE_MEM_WORKER_HOST", "127.0.0.1")
-        .env("CLAUDE_MEM_WORKER_PORT", "37777")
-        .env("CLAUDE_MEM_DATA_DIR", claude_mem_data_dir());
+        .current_dir(&start_command.cwd);
+    for (key, value) in &runtime_config.process_env {
+        command.env(key, value);
+    }
     if let Some(plugin_root) = start_command.plugin_root.as_ref() {
         command.env("CLAUDE_PLUGIN_ROOT", plugin_root);
         command.env("PLUGIN_ROOT", plugin_root);
@@ -1037,6 +2107,172 @@ fn claude_mem_data_dir() -> PathBuf {
         .map(PathBuf::from)
         .unwrap_or_else(|_| crate::paths::frogclaw_home().join("claude-mem"))
 }
+
+fn claude_mem_settings_file() -> PathBuf {
+    claude_mem_data_dir().join("settings.json")
+}
+
+fn claude_mem_env_file() -> PathBuf {
+    claude_mem_data_dir().join(".env")
+}
+
+fn ensure_claude_mem_config(config: &ClaudeMemRuntimeConfig) -> Result<(), String> {
+    let data_dir = claude_mem_data_dir();
+    std::fs::create_dir_all(&data_dir).map_err(|e| {
+        format!(
+            "创建 claude-mem 配置目录失败 path={} error={e}",
+            data_dir.display()
+        )
+    })?;
+
+    let settings_path = claude_mem_settings_file();
+    let mut settings = read_settings_map(&settings_path)?;
+    for (key, value) in &config.settings {
+        settings.insert(key.clone(), value.clone());
+    }
+    write_settings_map(&settings_path, &settings)?;
+
+    let env_path = claude_mem_env_file();
+    let mut env_values = read_env_map(&env_path)?;
+    for key in managed_claude_mem_env_keys() {
+        if !config.env_file.contains_key(*key) {
+            env_values.remove(*key);
+        }
+    }
+    for (key, value) in &config.env_file {
+        if value.is_empty() {
+            env_values.remove(key);
+        } else {
+            env_values.insert(key.clone(), value.clone());
+        }
+    }
+    write_env_map(&env_path, &env_values)?;
+    append_memory_log(format!(
+        "runtime_config files_written settings={} env_file={} provider={}",
+        compact_log_value(&settings_path.display().to_string(), 220),
+        compact_log_value(&env_path.display().to_string(), 220),
+        config.provider.label()
+    ));
+    Ok(())
+}
+
+fn read_settings_map(path: &Path) -> Result<BTreeMap<String, String>, String> {
+    if !path.exists() {
+        return Ok(BTreeMap::new());
+    }
+    let raw = std::fs::read_to_string(path)
+        .map_err(|e| format!("读取 claude-mem settings.json 失败: {e}"))?;
+    let value: Value = serde_json::from_str(&raw)
+        .map_err(|e| format!("解析 claude-mem settings.json 失败: {e}"))?;
+    let source = value
+        .get("env")
+        .and_then(|env| env.as_object())
+        .or_else(|| value.as_object())
+        .ok_or_else(|| "claude-mem settings.json 不是 JSON 对象".to_string())?;
+    let mut result = BTreeMap::new();
+    for (key, value) in source {
+        let as_string = value
+            .as_str()
+            .map(ToString::to_string)
+            .unwrap_or_else(|| value.to_string());
+        result.insert(key.clone(), as_string);
+    }
+    Ok(result)
+}
+
+fn write_settings_map(path: &Path, settings: &BTreeMap<String, String>) -> Result<(), String> {
+    let raw = serde_json::to_string_pretty(settings)
+        .map_err(|e| format!("序列化 claude-mem settings.json 失败: {e}"))?;
+    atomic_write_text(path, &(raw + "\n"))
+}
+
+fn managed_claude_mem_env_keys() -> &'static [&'static str] {
+    &[
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_BASE_URL",
+        "ANTHROPIC_AUTH_TOKEN",
+        "GEMINI_API_KEY",
+        "OPENROUTER_API_KEY",
+    ]
+}
+
+fn read_env_map(path: &Path) -> Result<BTreeMap<String, String>, String> {
+    if !path.exists() {
+        return Ok(BTreeMap::new());
+    }
+    let raw =
+        std::fs::read_to_string(path).map_err(|e| format!("读取 claude-mem .env 失败: {e}"))?;
+    let mut result = BTreeMap::new();
+    for line in raw.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        let Some((key, value)) = trimmed.split_once('=') else {
+            continue;
+        };
+        let value = value.trim();
+        let unquoted = if (value.starts_with('"') && value.ends_with('"'))
+            || (value.starts_with('\'') && value.ends_with('\''))
+        {
+            &value[1..value.len().saturating_sub(1)]
+        } else {
+            value
+        };
+        result.insert(key.trim().to_string(), unquoted.to_string());
+    }
+    Ok(result)
+}
+
+fn write_env_map(path: &Path, env_values: &BTreeMap<String, String>) -> Result<(), String> {
+    let mut lines = vec![
+        "# claude-mem credentials".to_string(),
+        "# 自动由 FrogClaw 生成；不要把这个文件提交到版本库。".to_string(),
+        String::new(),
+    ];
+    for (key, value) in env_values {
+        if value.is_empty() {
+            continue;
+        }
+        lines.push(format!("{}={}", key, format_env_value(value)));
+    }
+    atomic_write_text(path, &(lines.join("\n") + "\n"))?;
+    set_owner_only_permissions(path);
+    Ok(())
+}
+
+fn format_env_value(value: &str) -> String {
+    if value
+        .chars()
+        .any(|ch| ch.is_whitespace() || ch == '#' || ch == '=' || ch == '"')
+    {
+        format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
+    } else {
+        value.to_string()
+    }
+}
+
+fn atomic_write_text(path: &Path, content: &str) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("创建目录失败 path={} error={e}", parent.display()))?;
+    }
+    let tmp = path.with_extension("tmp");
+    std::fs::write(&tmp, content)
+        .map_err(|e| format!("写入临时文件失败 path={} error={e}", tmp.display()))?;
+    std::fs::rename(&tmp, path)
+        .map_err(|e| format!("替换文件失败 path={} error={e}", path.display()))?;
+    Ok(())
+}
+
+#[cfg(unix)]
+fn set_owner_only_permissions(path: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+    let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
+}
+
+#[cfg(not(unix))]
+fn set_owner_only_permissions(_path: &Path) {}
 
 fn worker_pid_file() -> PathBuf {
     claude_mem_data_dir().join("worker.pid")

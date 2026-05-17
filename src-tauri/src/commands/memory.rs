@@ -30,7 +30,7 @@ fn metadata_for_source(source: &str, project_path: Option<&str>) -> serde_json::
 }
 
 fn log_memory_command(event: &str, detail: impl AsRef<str>) {
-    crate::claude_mem::append_memory_log(format!("command {event} {}", detail.as_ref()));
+    crate::claude_mem::append_memory_log(format!("记忆命令：{} {}", event, detail.as_ref()));
 }
 
 #[tauri::command]
